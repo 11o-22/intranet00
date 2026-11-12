@@ -109,7 +109,9 @@ function use(S, s, a, rng, H) {
     const it = get(a.item);
     if (!u || !it) { H.log(S, 11); return; }
     H.log(S, 80, { 대상: u.name, 아이템명: a.item });
-    const v = viewOfUnit(u, sd.units[sd.act] === u);
+    // 더블 — 같은 편 다른 자리에 나와 있는 인형도 「나와 있음」 (도핑 등 · 같은 목록을 쓴다)
+    const onF = S.dbl ? (S.order || []).some(function (x) { const y = S.sides[x]; return y && (y.tk || x) === (sd.tk || s) && y.act >= 0 && y.units[y.act] === u; }) : sd.units[sd.act] === u;
+    const v = viewOfUnit(u, onF);
     const c = check(v, a.item, a.no, true);
     if (!c.ok || c.needSkill) { H.log(S, 11); return; }
     const fx = it.fx;

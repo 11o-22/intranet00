@@ -25,6 +25,15 @@
 //   u { rec(기록 사본) · name · sp · el · lv · max · hp · st{atk,chm,def,sta,spd} · erase{k,v} · rank{7} · status 'poison'|'para'|'fox'|null · sc · trait · used{} … }
 //   S.field { reverse {from,to}|null } · S.over · S.log(전체)
 //
+// ■ ★ 더블 배틀 (2:2 · 2026-11-12 사용자 「펫 전투 더블 추가」 — 1단계: 두 자리 · 대상 지정 · 빈자리 실패 · 다음 준비 단계 충원)
+//   start({ dbl: true, my, foe }) — 자리마다 진영 하나: A(아군 왼쪽 · 3) · C(아군 오른쪽 · 4) · B(상대 왼쪽 · 1) · E(상대 오른쪽 · 2)
+//     같은 편 두 자리는 인형 목록을 함께 쓴다 (sd.tk = 그 편 첫 진영 · units 는 같은 배열 — 복사한 뒤 link(S) 로 다시 잇는다)
+//     sd.act 가 -1 이면 빈자리. S.dbl · S.allies ['A','C'] · S.foes ['B','E'] · S.order ['A','C','B','E']
+//   행동에 tgt (진영 = 자리) — 공격기는 그 자리의 지금 인형 · 상대에게 거는 유틸기도 그 자리 인형 (1단계는 자리 이동이 없어 같다)
+//     그 자리가 비었으면 「그러나 실패했다!」 · PP 는 이미 썼다 (DB06.2) · 상대(B · E)는 AI 가 살아 있는 자리를 고른다
+//   기절하면 그 자리는 비워 두고(DB05.1) · 다음 턴 준비(-2.0)에 대기 인형으로 채운다 (A · C 는 고르기 — need · B · E 는 엔진)
+//   한 편 인형이 다 쓰러지면 끝 (자리가 비어도 대기가 있으면 안 진다 · DB05.2)
+//
 // ■ 규칙 ID 는 기획 그대로 (R0~R6 · A1.1~A7 · U1~U9 · S1~S5 · -1.1~-1.6 · -2.1~-2.3 · +5 · E1). 출력문은 MSG 번호 그대로.
 //   피해  U = {[(0.4L+2)·P÷50]·[(A·RA+20)÷(B·RB+20)]}+2 · D = ⌈U·MS·MT·MO·MI·MG⌉ · 반동 ⌈ΔHP·0.25⌉ · 반사 ⌈ΔHP·0.5⌉(반사신경 0.75) · 독 ⌈최대÷16⌉
 //   랭크 배율 r≥0 → (2+r)/2 · r<0 → 2/(2−r) · 회피 0/20/35/45/50/55/60%
@@ -100,15 +109,37 @@ function rankMul(r) { return r >= 0 ? (2 + r) / 2 : 2 / (2 - r); }
 //   S.order  모든 진영 차례 ['A','C','D','B'] · S.allies ['A','C','D'] · S.tgt  B 가 이번 행동에서 노리는 아군 진영
 //   other(S, s) — 아군 진영이면 'B', B 면 지금 노리는 아군 진영 (없으면 살아 있는 첫 아군)
 function allies(S) { return S.allies || ['A']; }
-function sideOf(S, u) { const o = S.order || ['A', 'B']; for (let i = 0; i < o.length; i++) if (S.sides[o[i]].units.indexOf(u) >= 0) return o[i]; return 'A'; }
+function foes(S) { return S.foes || ['B']; }
+function isFoe(S, s) { return foes(S).indexOf(s) >= 0; }
+function tkOf(S, s) { const sd = S.sides[s]; return (sd && sd.tk) || s; }              // 더블 — 같은 편 두 자리가 함께 쓰는 진영 (목록 · 네일팁 · 만남 기록)
+// 더블 — 복사(JSON)하면 같은 편 두 자리의 인형 목록이 따로 갈라진다 → 첫 자리 것으로 다시 잇는다
+function link(S) {
+    if (!S || !S.dbl || !S.sides) return S;
+    Object.keys(S.sides).forEach(function (s) { const sd = S.sides[s], t = sd && sd.tk; if (t && t !== s && S.sides[t]) sd.units = S.sides[t].units; });
+    return S;
+}
+function sideOf(S, u) {
+    const o = S.order || ['A', 'B'];
+    if (S.dbl) { for (let i = 0; i < o.length; i++) if (cur(S, o[i]) === u) return o[i]; }
+    for (let i = 0; i < o.length; i++) if (S.sides[o[i]].units.indexOf(u) >= 0) return o[i];
+    return 'A';
+}
 function liveAllies(S) { return allies(S).filter(function (s) { return !S.sides[s].out && alive(cur(S, s)); }); }
 function other(S, s) {
+    if (S.dbl) {
+        if (S.atk && S.atk.s === s && S.atk.tgt) return S.atk.tgt;                     // 지금 하는 행동이 고른 자리
+        const os = isFoe(S, s) ? allies(S) : foes(S);
+        return os.filter(function (x) { return alive(cur(S, x)); })[0] || os[0];
+    }
     if (s !== 'B') return 'B';
     if (S.tgt && !S.sides[S.tgt].out && alive(cur(S, S.tgt))) return S.tgt;
     const la = liveAllies(S); return la.length ? la[0] : allies(S)[0];
 }
 // 상대편에 나와 있는 인형들 (B 에게는 아군 전부 · 아군에게는 B 하나)
-function oppUnits(S, s) { if (s !== 'B') return [cur(S, 'B')].filter(alive); return liveAllies(S).map(function (x) { return cur(S, x); }); }
+function oppUnits(S, s) {
+    if (S.dbl) return (isFoe(S, s) ? allies(S) : foes(S)).map(function (x) { return cur(S, x); }).filter(alive);
+    if (s !== 'B') return [cur(S, 'B')].filter(alive); return liveAllies(S).map(function (x) { return cur(S, x); });
+}
 function fieldUnits(S) { return (S.order || ['A', 'B']).filter(function (s) { return !S.sides[s].out; }).map(function (s) { return cur(S, s); }).filter(alive); }
 // B 의 표적 — 살아 있는 아군 진영 가운데 무작위 (전에 고른 것이 아직 서 있으면 그대로)
 function pickTgt(S, rng) {
@@ -118,7 +149,7 @@ function pickTgt(S, rng) {
     S.tgt = la.length === 1 ? la[0] : la[Math.floor(rng() * la.length)]; S.tgtTurn = S.turn;
     return S.tgt;
 }
-function sideName(S, s) { return s === 'B' ? '상대 진영' : '아군 진영'; }
+function sideName(S, s) { return isFoe(S, s) ? '상대 진영' : '아군 진영'; }
 function rankName(k) { return K().RANK_NAME[k] || k; }
 // 💠 속성 룬 — 먹인 룬으로 친다 (옛 출몰 전투의 룬 공격 · 2026-11-10 사용자 「전투 행동으로 유지」)
 //   위력 60 · 필중 · 무속성(속성 상성 · 자속 보정 없음) · 물리 · PP 없음 · 룬 상성(애교 › 근력 › 경청 › 인내 › 눈치 › 애교)으로 막으면 피해 1/3
@@ -162,14 +193,21 @@ function foeOf(spec, rng) {
     if (spec.hpMul && spec.hpMul > 0) { u.max = ceil(u.max * spec.hpMul); u.hp = spec.hp != null ? Math.min(u.max, u.hp) : u.max; }   // 여럿이 치는 괴담은 더 질기다
     return u;
 }
-function cur(S, s) { const sd = S.sides[s]; return sd.units[sd.act]; }
+function cur(S, s) { const sd = S.sides[s]; return (sd && sd.act >= 0) ? sd.units[sd.act] : undefined; }
 function alive(u) { return !!u && !u.fainted && u.hp > 0; }
-function bench(S, s) { const sd = S.sides[s]; return sd.units.map(function (u, i) { return i; }).filter(function (i) { return i !== sd.act && alive(sd.units[i]); }); }
+function bench(S, s) {
+    const sd = S.sides[s];
+    // 더블 — 같은 편의 다른 자리에 나와 있는 인형도 대기가 아니다 (DB04.3)
+    const on = {}; if (S.dbl) (S.order || []).forEach(function (x) { if (tkOf(S, x) === tkOf(S, s)) { const y = S.sides[x]; if (y.act >= 0 && alive(y.units[y.act])) on[y.act] = 1; } });
+    return sd.units.map(function (u, i) { return i; }).filter(function (i) { return i !== sd.act && !on[i] && alive(sd.units[i]); });
+}
+// 한 편(같은 목록)에 살아 있는 인형이 있나 — 더블 승패 (DB05.2)
+function teamAlive(S, s) { return S.sides[tkOf(S, s)].units.some(alive); }
 function base(u, k) { return (u.erase && u.erase.k === k) ? u.erase.v : u.st[k]; }
 function eff(u, k) { return base(u, k) * rankMul(u.rank[k]); }
 function speed(u) { return eff(u, 'spd'); }
 // 출력문 한 줄 — 화면이 그 순간의 HP 를 따라 그리도록 나와 있는 인형들의 HP 스냅샷(f)을 같이 적는다 { 진영: [칸, HP, 최대] }
-function snap(S) { const o = {}; (S.order || ['A', 'B']).forEach(function (s) { const sd = S.sides[s], u = sd.units[sd.act]; if (u) o[s] = [sd.act, u.hp, u.max]; }); return o; }
+function snap(S) { const o = {}; (S.order || ['A', 'B']).forEach(function (s) { const sd = S.sides[s], u = sd.act >= 0 ? sd.units[sd.act] : null; if (u) o[s] = [sd.act, u.hp, u.max]; }); return o; }
 function log(S, id, v, kind, meta) { const t = fmt(id, v); const e = Object.assign({ t: t, k: kind || 'msg', id: id, f: snap(S) }, meta || {}); S.log.push(e); S.tlog.push(e); }
 function say(S, t, kind, meta) { const e = Object.assign({ t: t, k: kind || 'sys', f: snap(S) }, meta || {}); S.log.push(e); S.tlog.push(e); }
 
@@ -239,6 +277,11 @@ function faint(S, u, cause) {
     // 이 인형이 건 예약 취소 — 상대에게 건 삭제 예약
     (S.order || ['A', 'B']).forEach(function (x) { if (x === s) return; S.sides[x].units.forEach(function (y) { if (y.pendErase && y.pendErase.by === u.key + '@' + s) y.pendErase = null; }); });
     sd.lastFaint = { turn: S.turn, by: cause.k || '', will: has(u, 30) && cause.k === 'destiny' };
+    if (S.dbl) {                                                        // 더블 — 자리는 비워 두고 다음 턴 준비에 채운다 (DB05.1~3)
+        if (isFoe(S, s)) { if (!foes(S).some(function (x) { return teamAlive(S, x); })) { S.over = { win: 'A' }; log(S, 22, {}, 'over'); throw STOP; } }
+        else if (!allies(S).some(function (x) { return teamAlive(S, x); })) { S.over = { win: 'B' }; log(S, '22b', {}, 'over'); throw STOP; }
+        return;
+    }
     if (!bench(S, s).length) {
         if (s === 'B') { S.over = { win: 'A' }; log(S, 22, {}, 'over'); throw STOP; }
         sd.out = true;                                                  // 이 아군 진영은 다 쓰러졌다
@@ -279,14 +322,17 @@ function enter(S, s, idx, why, carry) {
     // S4 등장 특성 — 준비만전 · 재빠른 발 · 허세 · 복수심 · 유언(앞 인형)
     if (canUse(u, 12)) { fire(S, u, 12); rankChange(S, u, 'acc', 1, 'self'); }
     if (canUse(u, 14)) { fire(S, u, 14); rankChange(S, u, 'spd', 1, 'self'); }
-    if (canUse(u, 13)) { const f = cur(S, other(S, s)); if (alive(f)) { fire(S, u, 13); rankChange(S, f, 'atk', -1, 'foe'); } }
+    if (canUse(u, 13)) {
+        const fs = S.dbl ? oppUnits(S, s) : [cur(S, other(S, s))].filter(alive);               // 더블 — 나와 있는 상대 모두
+        if (fs.length) { fire(S, u, 13); fs.forEach(function (f) { rankChange(S, f, 'atk', -1, 'foe'); }); }
+    }
     if (why === 'faint' && sd.lastFaint && sd.lastFaint.by === 'foeAttack' && canUse(u, 15)) { fire(S, u, 15); rankChange(S, u, 'atk', 1, 'self'); }
     if (why === 'faint' && sd.lastFaint && sd.lastFaint.will) { sd.lastFaint.will = false; log(S, 35, { 사용자: sd.lastFaint.name || '앞선 인형', 특성명: TRAIT[30] }, 'trait'); rankChange(S, u, 'atk', 1, 'self'); }
     // 상대의 집중은 대상이 바뀌면 풀린다 · 만남 기록(경험치 분배용) — 상대편에 나와 있는 인형 모두와
     oppUnits(S, s).forEach(function (f) {
         if (f.focus && why !== 'first') { f.focus = false; log(S, 28, { 사용자: f.name }); }
         const fs = sideOf(S, f);
-        u.met[fs + ':' + S.sides[fs].act] = u.lv; f.met[s + ':' + idx] = f.lv;
+        u.met[tkOf(S, fs) + ':' + S.sides[fs].act] = u.lv; f.met[tkOf(S, s) + ':' + idx] = f.lv;
     });
 }
 // S2 회수 (일반 · 바통 · B조 교대) — 돌려주는 값: 바통이면 계승 묶음
@@ -316,6 +362,7 @@ function recall(S, s, why) {
 function mkSide(auto) { return { units: [], act: 0, decoy: null, nail: 0, auto: !!auto, switched: 0, usedUtil: 0, lastFaint: null, guard1Turn: 0, out: false, owner: null, code: null }; }
 function start(opt) {
     opt = opt || {};
+    if (opt.dbl) return startDbl(opt);
     const rng = rngOf(opt.seed || ('d2bt:' + Date.now()));
     const S = { turn: 1, me: 'A', mode: opt.mode || 'pve', log: [], tlog: [], over: null, need: null, pickAt: 0, in: {}, field: { reverse: null, pendReverse: null },
         order: ['A'], allies: ['A'], tgt: null, tgtTurn: 0,
@@ -345,6 +392,33 @@ function start(opt) {
     return S;
 }
 function firstAlive(S, s) { const i = S.sides[s].units.findIndex(alive); return i < 0 ? 0 : i; }
+// ★ 더블 시작 — 진입(DB6.0~6.5): 자리 확정 → 상대 전원 등장(빠른 순) → 우리 전원 등장(빠른 순) · 등장 특성은 등장할 때
+function startDbl(opt) {
+    const rng = rngOf(opt.seed || ('d2bt:' + Date.now()));
+    const S = { turn: 1, me: 'A', mode: opt.mode || 'pve', log: [], tlog: [], over: null, need: null, pickAt: 0, in: {}, field: { reverse: null, pendReverse: null },
+        dbl: true, order: ['A', 'C', 'B', 'E'], allies: ['A', 'C'], foes: ['B', 'E'], tgt: null, tgtTurn: 0, sides: {} };
+    const autoA = !!(opt.auto && opt.auto.A), autoB = !(opt.auto && opt.auto.B === false);
+    S.sides.A = mkSide(autoA); S.sides.C = mkSide(autoA); S.sides.B = mkSide(autoB); S.sides.E = mkSide(autoB);
+    S.sides.A.tk = 'A'; S.sides.C.tk = 'A'; S.sides.B.tk = 'B'; S.sides.E.tk = 'B';
+    S.sides.A.pos = 3; S.sides.C.pos = 4; S.sides.B.pos = 1; S.sides.E.pos = 2;
+    ['A', 'C'].forEach(function (x) { S.sides[x].owner = opt.owner || null; S.sides[x].code = opt.code || null; });
+    (opt.my || []).forEach(function (rec) { S.sides.A.units.push(unitOf(rec, { art: !!(opt.art && opt.art.A) })); });
+    (opt.foe || []).forEach(function (f) { S.sides.B.units.push(f.rec ? unitOf(f.rec, { name: f.name, dark: !!f.dark, trait: f.trait, el: f.el, art: !!f.art }) : foeOf(f, rng)); });
+    link(S);
+    if (!S.sides.A.units.some(alive) || !S.sides.B.units.some(alive)) throw new Error('양쪽에 인형이 있어야 합니다.');
+    // 자리 — 살아 있는 앞의 둘 (모자라면 빈자리 -1)
+    ['A', 'B'].forEach(function (t) {
+        const live = S.sides[t].units.map(function (u, i) { return i; }).filter(function (i) { return alive(S.sides[t].units[i]); });
+        const two = t === 'A' ? ['A', 'C'] : ['B', 'E'];
+        S.sides[two[0]].act = live.length > 0 ? live[0] : -1;
+        S.sides[two[1]].act = live.length > 1 ? live[1] : -1;
+    });
+    S.tlog = [];
+    const tb = {}; S.order.forEach(function (x) { tb[x] = rng(); });
+    const bySpd = function (list) { return list.filter(function (x) { return S.sides[x].act >= 0; }).sort(function (x, y) { const a = cur(S, x), b = cur(S, y); return (speed(b) - speed(a)) || (b.lv - a.lv) || (tb[x] - tb[y]); }); };
+    bySpd(['B', 'E']).concat(bySpd(['A', 'C'])).forEach(function (x) { enter(S, x, S.sides[x].act, 'first'); });
+    return S;
+}
 
 // ==========================================
 // 상대 행동 (간단한 AI)
@@ -370,6 +444,10 @@ function ai(S, s, rng) {
     const pick = pool[Math.floor(rng() * pool.length)];
     const act = { k: 'skill', no: pick };
     const sk = K().get(pick);
+    if (S.dbl && (sk.slot === 'A' || sk.tgt === 'foe')) {                // 더블 — 살아 있는 상대 자리 가운데 하나
+        const os = (isFoe(S, s) ? allies(S) : foes(S)).filter(function (x) { return alive(cur(S, x)); });
+        act.tgt = os.length ? os[Math.floor(rng() * os.length)] : null;
+    }
     if (sk.tgt === 'ally' || pick === 74) { const b = bench(S, s); if (!b.length) return ai2(S, s, rng, list.filter(function (n) { return n !== pick; })); act.idx = b[0]; }
     return act;
 }
@@ -379,7 +457,7 @@ function ai2(S, s, rng, list) { if (!list.length) return { k: 'skill', no: 59 };
 // 한 턴
 // ==========================================
 function turn(S0, input) {
-    const S = copy(S0);
+    const S = link(copy(S0));
     S.in = input || {}; S.pickAt = 0; S.need = null; S.tlog = []; S.tcons = [];
     const seed = (S.in.seed != null ? String(S.in.seed) : 'd2t') + ':' + S.turn;
     const rng = rngOf(seed);
@@ -398,6 +476,22 @@ function turn(S0, input) {
     return { S: S, log: S.tlog, over: S.over, grow: grow, need: null, cons: cons };
 }
 
+// ★ 더블 빈자리 충원 (DB05.3 · -2.0) — 턴을 다 보여 준 뒤 다음 행동 고르기 전에 따로 부른다.
+//   상대 → 우리 · 왼쪽 → 오른쪽. 대기 후보가 있으면 반드시 (auto 는 엔진이 · 아니면 picks · 없으면 need).
+function refill(S0, input) {
+    if (!S0 || !S0.dbl || S0.over) return { S: S0, log: [], need: null, over: S0 ? S0.over : null };
+    const S = link(copy(S0));
+    S.in = input || {}; S.pickAt = 0; S.need = null; S.tlog = [];
+    try { foes(S).concat(allies(S)).forEach(function (s) { if (!alive(cur(S, s)) && bench(S, s).length) enterPick(S, s, 'faint'); }); }
+    catch (e) { if (e === NEED) return { S: S0, need: S.need, log: [], over: null }; if (e !== STOP) throw e; }
+    delete S.in;
+    return { S: S, log: S.tlog, need: null, over: S.over };
+}
+// 빈자리 가운데 내가 골라 채워야 하는 곳 (auto 아님 · 대기 후보 있음)
+function refillNeed(S, sides) {
+    if (!S || !S.dbl || S.over) return [];
+    return (sides || allies(S)).filter(function (s) { return !S.sides[s].auto && !alive(cur(S, s)) && bench(S, s).length; });
+}
 function runTurn(S, rng) {
     const T = S.turn;
     const ORD = S.order || ['A', 'B'];
@@ -420,6 +514,8 @@ function runTurn(S, rng) {
         });
     });
     if (S.field.pendReverse && S.field.pendReverse.from === T) { S.field.reverse = S.field.pendReverse; S.field.pendReverse = null; log(S, 65); }
+    // ── ★ 더블 -2.0 빈자리 충원 — 왼쪽 → 오른쪽 · 대기 후보가 있으면 반드시 (DB05.3 · -2.0.1~0.3)
+    if (S.dbl) foes(S).concat(allies(S)).forEach(function (s) { if (!alive(cur(S, s)) && bench(S, s).length) enterPick(S, s, 'faint'); });
     // ── -2.2 행동 결정 (입력 · auto 는 엔진) — 다 쓰러진 아군 진영은 건너뛴다
     const acts = {};
     const LIVE = ORD.filter(function (s) { return !S.sides[s].out && alive(cur(S, s)); });
@@ -431,7 +527,7 @@ function runTurn(S, rng) {
         a = copy(a);
         if (a.k === 'rune') {                                             // 💠 먹인 룬으로 친다 → 기술 행동(no 'rune')
             const rl = runesOf(u), nm = rl[a.i | 0];
-            if (nm) { a = { k: 'skill', no: 'rune', rune: nm, i: a.i | 0 }; }
+            if (nm) { a = { k: 'skill', no: 'rune', rune: nm, i: a.i | 0, tgt: a.tgt || null }; }
             else { const list = usableList(S, s, u); a = list.length ? { k: 'skill', no: list[0] } : { k: 'skill', no: 59, why: usableAny(u) ? 51 : 7 }; }
         } else if (a.k === 'rd') {                                        // 💠 룬으로 막는다 — 룬이 없으면 아무것도 안 한다
             const rl = runesOf(u), nm = rl[a.i | 0];
@@ -450,6 +546,16 @@ function runTurn(S, rng) {
         }
         if (a.k === 'switch') { const b = bench(S, s); if (b.indexOf(a.idx | 0) < 0) a = b.length ? { k: 'switch', idx: b[0] } : ai(S, s, rng); }
         if (S.sides[s].batonDue) a = { k: 'baton' };            // 바통 예약 실행 턴 — 이것이 이번 턴 행동
+        if (S.dbl && a.k === 'skill') {
+            if (a.tgt === s || !S.sides[a.tgt]) a.tgt = null;           // 자신은 고르지 않는다 (DB06.1)
+            if (!a.tgt) {                                               // 대상을 안 골랐으면(엔진이 고른 기술 등) 살아 있는 상대 자리
+                const os = (isFoe(S, s) ? allies(S) : foes(S)).filter(function (x) { return alive(cur(S, x)); });
+                a.tgt = os.length ? os[0] : (isFoe(S, s) ? allies(S) : foes(S))[0];
+            }
+            // 유틸기는 인형 지정 — 고른 때 그 자리에 있던 인형을 따라간다 (교체 · 기절로 바뀌면 실패 · DB06.2)
+            const sk0 = skOf(a);
+            if (sk0 && sk0.slot === 'U' && sk0.tgt === 'foe') a.tgtIdx = S.sides[a.tgt].act;
+        }
         if (a.k === 'skill') a.sk = skOf(a);
         acts[s] = a; acts[s].side = s; acts[s].unit = cur(S, s); acts[s].unitIdx = S.sides[s].act;
     });
@@ -489,7 +595,7 @@ function runTurn(S, rng) {
         return out;
     }
     ORD.forEach(function (s) { S.sides[s].usedUtil = 0; });
-    const bTgt = function () { if (acts.B) pickTgt(S, rng); };
+    const bTgt = function () { if (acts.B && !S.dbl) pickTgt(S, rng); };
     // ── +4 교체 (일반 · 바통 실행 · B조 교대) — 여럿이면 속도순
     const sw = order(LIVE.filter(function (s) { return prioOf(acts[s]) === 4; }));
     sw.forEach(function (s) { if (!S.over) { if (s === 'B') bTgt(); doSwitch(S, s, acts[s], rng); } });
@@ -590,7 +696,7 @@ function tryR(S, s, a, rng) {
     if (no === 73) { if (fieldUnits(S).some(function (x) { return x.show != null; })) { log(S, 113); return false; } }
     if (no === 60) { const f = cur(S, other(S, s)); if (!alive(f) || f.erase || f.pendErase) { log(S, 11); return false; } const vs = STATS5.map(function (k) { return f.st[k]; }); if (Math.max.apply(null, vs) === Math.min.apply(null, vs)) { log(S, 11); return false; } }
     if (no === 70) { if (S.sides[other(S, s)].switched === S.turn) { log(S, 2); return false; } }
-    if (no === 64) { if (S.sides[other(S, s)].nail >= 2) { log(S, 11); return false; } }
+    if (no === 64) { if (S.sides[tkOf(S, other(S, s))].nail >= 2) { log(S, 11); return false; } }
     return true;
 }
 // R6 — 실제 발동 기록 · 유효 훈련
@@ -606,12 +712,18 @@ function fired(S, s, a) {
     a.fired = true;
 }
 function doSkill(S, s, a, rng) {
-    if (!tryR(S, s, a, rng)) { a.done = true; return; }
-    const sk = skOf(a);
-    fired(S, s, a);
-    a.done = true;
-    if (sk.slot === 'A') attack(S, s, a, rng); else util(S, s, a, rng);
-    if (alive(a.unit) || a.ev) credit(S, a.unit, a.ev);
+    S.atk = S.dbl ? { s: s, tgt: a.tgt || null } : null;               // 더블 — 이 행동이 고른 자리 (other() 가 돌려준다)
+    try {
+        if (!tryR(S, s, a, rng)) { a.done = true; return; }
+        const sk = skOf(a);
+        // ★ 더블 — 고른 자리가 비었으면 실패 · PP 는 이미 썼다 (DB06.2 · 공격기 · 상대에게 거는 유틸기)
+        if (S.dbl && (sk.slot === 'A' || sk.tgt === 'foe') && a.no !== 59 && !alive(cur(S, a.tgt))) { log(S, 2); a.done = true; return; }
+        if (S.dbl && a.tgtIdx != null && S.sides[a.tgt].act !== a.tgtIdx) { log(S, 2); a.done = true; return; }
+        fired(S, s, a);
+        a.done = true;
+        if (sk.slot === 'A') attack(S, s, a, rng); else util(S, s, a, rng);
+        if (alive(a.unit) || a.ev) credit(S, a.unit, a.ev);
+    } finally { S.atk = null; }
 }
 
 // ==========================================
@@ -619,6 +731,7 @@ function doSkill(S, s, a, rng) {
 // ==========================================
 function elOfSkill(sk, u) { return sk.el === 'self' ? u.el : sk.el; }
 function attack(S, s, a, rng) {
+    if (S.dbl && a.no === 59 && !alive(cur(S, a.tgt))) { const os2 = oppUnits(S, s)[0]; if (os2) S.atk = { s: s, tgt: sideOf(S, os2) }; }   // 발버둥 — 살아 있는 상대에게
     const u = a.unit, sk = skOf(a), os = other(S, s), fsd = S.sides[os];
     const f = cur(S, os);
     if (!alive(f)) return;
@@ -715,7 +828,7 @@ function attack(S, s, a, rng) {
     // A4 반사 — 방어자(받아치기 소유)가 살아 있고 공격자도 살아 있을 때
     if (hit && dHP > 0 && alive(u) && f.guard === 'half' && alive(f)) { const q = ceil(dHP * (has(f, 20) ? 0.75 : 0.5)); if (q > 0) { u.hp = Math.max(0, u.hp - q); log(S, 15, { 사용자: u.name, 수치: q }); if (u.hp === 0) faint(S, u, { k: 'reflect' }); } }
     // A5 네일팁 — 물리 공격을 실제 발동한 진영
-    if (alive(u) && S.sides[s].nail > 0 && sk.kind === 'phys') { const q = ceil(u.max * (S.sides[s].nail >= 2 ? 1 / 8 : 1 / 16)); u.hp = Math.max(0, u.hp - q); log(S, 62, { 사용자: u.name, 수치: q }); if (u.hp === 0) faint(S, u, { k: 'nail' }); }
+    if (alive(u) && S.sides[tkOf(S, s)].nail > 0 && sk.kind === 'phys') { const q = ceil(u.max * (S.sides[tkOf(S, s)].nail >= 2 ? 1 / 8 : 1 / 16)); u.hp = Math.max(0, u.hp - q); log(S, 62, { 사용자: u.name, 수치: q }); if (u.hp === 0) faint(S, u, { k: 'nail' }); }
     // A6 부가효과 — 공격자가 살아 있을 때 · 상대 대상은 상대가 살아 있을 때
     if (hit && alive(u) && !isOhko) {
         const tgtAlive = alive(f) && !receiverDecoy && cur(S, os) === f;
@@ -828,7 +941,7 @@ function util(S, s, a, rng) {
     if (fx.erase) { if (alive(f)) { f.pendErase = { at: S.turn + 1, by: u.key + '@' + s }; log(S, 58, { 사용자: u.name, 대상: f.name }); } return; }
     if (fx.decoy) { const c = Math.min(ceil(u.max / 4), u.hp - 1); u.hp -= c; log(S, 52, { 사용자: u.name, 수치: c }); sd.decoy = { hp: c, max: c }; log(S, 53, { 진영: sideName(S, s), 수치: c }); return; }
     if (fx.reverse) { S.field.pendReverse = { from: S.turn + 1, to: S.turn + 2 }; log(S, 64); return; }
-    if (fx.nailtip) { const o = S.sides[os]; o.nail = Math.min(2, o.nail + 1); log(S, 61, { 진영: sideName(S, os), 중첩수: o.nail }); return; }
+    if (fx.nailtip) { const o = S.sides[tkOf(S, os)]; o.nail = Math.min(2, o.nail + 1); log(S, 61, { 진영: sideName(S, os), 중첩수: o.nail }); return; }
     if (fx.limit === 'util') { if (alive(f)) { f.pendLimit = { kind: 'util', at: S.turn + 1 }; log(S, 67, { 대상: f.name }); } return; }
     if (fx.limit === 'last') { if (alive(f)) { f.pendLimit = { kind: 'last', at: S.turn + 1 }; log(S, 69, { 대상: f.name }); } return; }
     if (fx.donut) { u.donut = true; log(S, 72, { 사용자: u.name }); return; }
@@ -866,8 +979,9 @@ function endTurn(S, rng) {
     ORD.forEach(function (s) { const u = cur(S, s); if (alive(u) && u.restUntil === T) { u.restUntil = 0; log(S, 26, { 사용자: u.name }); if (canUse(u, 28)) { fire(S, u, 28); heal(S, u, ceil(u.max / 16)); } } });
     // -1.4 상태 카운트 · 자연 해제 (이번 턴에 등장한 인형은 제외)
     ORD.forEach(function (s) { const u = cur(S, s); if (!alive(u) || !(u.status === 'poison' || u.status === 'para') || (u.enteredTurn === T && u.enteredBy !== 'first') || u.stTurn === T) return; if (field.every(function (x) { return x.u !== u; })) return; u.sc++; if (u.sc >= 3 && rng() < 0.3) { log(S, 25, { 대상: u.name, 상태이상: ST_NAME[u.status] }); u.status = null; u.sc = 0; } });
-    // -1.5 기간 종료
+    // -1.5 기간 종료 (더블 — 같은 목록을 두 번 돌지 않게 편마다 한 번)
     (S.order || ['A', 'B']).forEach(function (s) {
+        if (S.dbl && tkOf(S, s) !== s) return;
         const sd = S.sides[s];
         sd.units.forEach(function (u) {
             u.guardLast = (u.guard === 'full' && u.guardFired && alive(u));
@@ -894,16 +1008,17 @@ function settle(S) {
     const AL = allies(S);
     (S.order || ['A', 'B']).forEach(function (s) {
         const list = [];
+        if (S.dbl && tkOf(S, s) !== s) { out.bySide[s] = list; return; }      // 더블 — 같은 편 두 자리는 첫 자리에 모아 적는다
         S.sides[s].units.forEach(function (u, i) {
             const g = { side: s, idx: i, key: u.key, hp: u.hp, pp: u.pp, status: u.status ? { k: u.status, c: u.sc } : null, aid: u.aid, xp: 0, ev: {}, lv0: u.lv, lv: u.lv, up: 0, wait: false, lost: 0, part: !!(u.participated || u.enteredTurn) };
             // 노력치 — 완료한 유효 행동은 승패 무관
             STATS5.forEach(function (k) { if (u.evN[k]) g.ev[k] = u.evN[k]; });
             // 경험치 — PvE 승리 · 기절하지 않은 참여 개체 (아군 진영 모두가 나눠 받는다)
-            if (s !== 'B' && win && S.mode === 'pve' && alive(u)) {
+            if (!isFoe(S, s) && win && S.mode === 'pve' && alive(u)) {
                 S.sides.B.units.forEach(function (f, j) {
-                    if (!f.fainted) return;
+                    if (!f.fainted || f.caught) return;                         // 포옹 리본으로 데려간 인형은 경험치가 없다
                     const key = 'B:' + j; if (u.met[key] == null) return;
-                    let N = 0; AL.forEach(function (x) { S.sides[x].units.forEach(function (y) { if (alive(y) && y.met[key] != null) N++; }); });
+                    let N = 0; AL.forEach(function (x) { if (S.dbl && tkOf(S, x) !== x) return; S.sides[x].units.forEach(function (y) { if (alive(y) && y.met[key] != null) N++; }); });
                     if (N) g.xp += D2.xpWin(u.met[key], f.lv, N);
                 });
             }
@@ -913,7 +1028,7 @@ function settle(S) {
     });
     out.units = out.bySide.A;
     AL.forEach(function (s) {
-        out.bySide[s].forEach(function (g) {
+        (out.bySide[s] || []).forEach(function (g) {
             const u = S.sides[s].units[g.idx];
             if (g.xp) {
                 log(S, 40, { 사용자: u.name, 수치: g.xp }, 'grow', { s: s });
@@ -953,7 +1068,7 @@ function applyGrow(grow, recs, side, u) {
 }
 
 window.D2BT = { MSG: MSG, TRAIT: TRAIT, ONCE: ONCE, EVA: EVA, ST_NAME: ST_NAME, fmt: fmt, fix: fix, jong: jong, rankMul: rankMul,
-    unitOf: unitOf, foeOf: foeOf, start: start, turn: turn, ai: ai, settle: settle, applyGrow: applyGrow, cur: cur, alive: alive, bench: bench, usableList: usableList, allowedBy: allowedBy, speed: speed, eff: eff };
+    unitOf: unitOf, foeOf: foeOf, start: start, turn: turn, refill: refill, refillNeed: refillNeed, link: link, foes: foes, allies: allies, isFoe: isFoe, teamAlive: teamAlive, tkOf: tkOf, ai: ai, settle: settle, applyGrow: applyGrow, cur: cur, alive: alive, bench: bench, usableList: usableList, allowedBy: allowedBy, speed: speed, eff: eff };
 
 // ==========================================
 // 콘솔 — 시연

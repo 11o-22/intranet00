@@ -20,11 +20,14 @@
 //   혼자(출몰 · 야생)   S 는 내 화면에만. 상대는 엔진 AI (auto B).
 //   여럿이(여정)        dollRun/<열쇠>/fight.d2 = S. 사원마다 제 진영(A · C · D)이 있어 같이 싸운다 (동시 출전). 방장이 판을 푼다 (resolveParty).
 //   결투(사원 대 사원)  petBattle/<열쇠>/d2 = S. 신청한 쪽이 A · 받은 쪽이 B. 둘 다 고르면 트랜잭션으로 한 턴 (resolvePvp).
+//   ★ 더블(출몰 · 야생 둘) S.dbl — 자리 넷(A · C 우리 · B · E 상대) · 대상 고르기 판 · 빈자리 충원 (아래 「더블 배틀」 · 2026-11-12)
 //   선택이 필요하면(기절 · 바통) 엔진이 need 를 돌려준다 → 그 진영의 화면이 고르고 → 같은 S 로 다시 푼다 (되감기).
 //
 // ■ 콘솔
 //   dollBattleTest()        상담사 — 야생 인형 하나와 붙어 본다
 //   dollBattleTest(10)      상담사 — 괴담(번호)과 붙어 본다
+//   dollBattleTest('dbl')   상담사 — 야생 둘과 더블 배틀
+//   dollDblRate = 1 / 0     출몰지에서 늘 더블 / 늘 하나 (기본 — 살아 있는 동행이 둘 이상이면 셋에 하나)
 
 (function dollBattle() {
 'use strict';
@@ -54,6 +57,16 @@ const AT = {
     // ★ 싸운다! 단추 속 확대 그림 (2026-11-08 사용자 「싸울 때 버튼에 저런식으로」) — 단추 안쪽(테두리 3) 왼쪽, 글자 「싸운다!」 앞까지
     btnPic: { l: 32, t: 367, w: 112, h: 96 }
 };
+// ★ 더블 배틀 자리 (2026-11-12 사용자 「필드에 펫을 두 마리씩 올릴 수 있도록 배율을 작게 한 버전」)
+//   주신 그림(4배 판)의 크기 그대로 — 상대 앞모습 32 · 내 뒷모습 64 (동물 · 캐릭터 모두 같은 도트 크기 · spriteCss)
+//   진영 열쇠 = 엔진(d2-battle.js 더블) — B 상대 왼쪽(1) · E 상대 오른쪽(2) · A 우리 왼쪽(3) · C 우리 오른쪽(4)
+const DB = {
+    pos: { B: { cx: 199, foot: 216, px: 32 }, E: { cx: 262, foot: 216, px: 32 }, A: { cx: 46, foot: 277, px: 64 }, C: { cx: 116, foot: 277, px: 64 } },
+    stat: { B: [10, 98, 143, 123], E: [10, 126, 143, 151], A: [175, 223, 308, 248], C: [175, 250, 308, 275] },
+    tgt: { B: [30, 370, 157, 442], E: [157, 370, 284, 442], A: [30, 455, 157, 536], C: [157, 455, 284, 536] },
+    NAME: { B: '상대 왼쪽', E: '상대 오른쪽', A: '왼쪽', C: '오른쪽' }
+};
+const DBL_RATE = 1 / 3;                 // 출몰지 — 살아 있는 동행이 둘 이상이면 셋에 하나는 둘이 함께 나온다
 
 // ==========================================
 // 지문 — 「따라쟁이 봉제인형 — 전투 출력 지문」 (등장 · 포획 · 도망 · 승리 같은 분위기 글 — 싸움의 셈 출력문은 엔진 MSG)
@@ -223,7 +236,30 @@ function css() {
         '#dbt-ov .rib i{display:block;width:100%;height:100%}',
         '@keyframes dbspin{to{transform:rotate(720deg)}}',
         // 상태 꼬리표 (독 · 마비 · 아홉여우병 · 방어 · 집중) — 이름 옆 작은 글씨
-        '#dbt-ov .tag{font-size:6.5px;color:#ffd0d0;font-weight:normal;margin-left:3px}'
+        '#dbt-ov .tag{font-size:6.5px;color:#ffd0d0;font-weight:normal;margin-left:3px}',
+        // ★ 더블 배틀 — 작은 스테이터스 넷 · 대상 고르기 판의 인형 단추 (2026-11-12 사용자 「펫 전투 더블 추가」)
+        '#dbt-ov .dbs{position:absolute;background:#000;pointer-events:none;box-sizing:border-box;padding:2px 6px 0 7px}',
+        '#dbt-ov .dbs.f{clip-path:polygon(0 0,90% 0,100% 100%,0 100%)}',
+        '#dbt-ov .dbs.m{clip-path:polygon(10% 0,100% 0,100% 100%,0 100%);padding-left:16px}',
+        '#dbt-ov .dbs .nm{color:#fff;font-weight:bold;font-size:7.5px;white-space:nowrap;overflow:hidden;line-height:1.25}',
+        '#dbt-ov .dbs .hb{position:relative;height:4px;margin-top:2px;background:#2b2b2b;border:1px solid #777;border-radius:2px;overflow:hidden;width:86%}',
+        '#dbt-ov .dbs .hb i{display:block;height:100%;transition:width .55s linear, background .3s}',
+        '#dbt-ov .dbs .hn{position:absolute;right:6px;bottom:1px;font-size:6.5px;color:#e8e4ff;font-weight:bold}',
+        '#dbt-ov .dbs .el{position:absolute;right:9px;top:2px;font-size:8px}',
+        '#dbt-ov .tcard{position:absolute;display:flex;align-items:center;gap:4px;padding:0 6px;box-sizing:border-box;pointer-events:none;color:#2a2140;font-weight:bold}',
+        '#dbt-ov .tcard .sp{flex:0 0 auto;position:relative}',
+        '#dbt-ov .tcard .tx{flex:1;min-width:0;font-size:8px;line-height:1.3}',
+        '#dbt-ov .tcard .tx small{display:block;font-size:6.5px;color:#5a4a80;font-weight:normal}',
+        '#dbt-ov .tcard .hp{height:4px;background:#6e5f8f;border:1px solid #524173;margin-top:2px}',
+        '#dbt-ov .tcard .hp i{display:block;height:100%}',
+        '#dbt-ov .tcard.no{opacity:.32}',
+        '#dbt-ov .tcard.me .tx:after{content:"(나)";font-size:6.5px;color:#7a6aa0;margin-left:2px}',
+        '#dbt-ov .tcard.empty .tx{color:#8f84b5;font-weight:normal;font-size:7.5px;text-align:center}',
+        '#dbt-ov .tbench{position:absolute;left:28px;top:606px;width:259px;height:74px;display:flex;gap:4px;align-items:stretch;pointer-events:none}',
+        '#dbt-ov .tbench .lb{position:absolute;left:0;top:-1px;font-size:6.5px;color:#c9b8ff}',
+        '#dbt-ov .tbench button{flex:1 1 0;min-width:0;margin-top:10px;background:#d5cbea;border:2px solid #aa91db;color:#2a2140;font-size:7px;font-weight:bold;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:2px;pointer-events:auto}',
+        '#dbt-ov .tbench button[disabled]{opacity:.38}',
+        '#dbt-ov .tbench button .s{width:28px;height:28px;position:relative}'
     ].join('\n');
     document.head.appendChild(s);
 }
@@ -238,7 +274,7 @@ function el(tag, cls, style, html) {
 function rectCss(r) { return 'left:' + r[0] + 'px;top:' + r[1] + 'px;width:' + (r[2] - r[0]) + 'px;height:' + (r[3] - r[1]) + 'px;'; }
 function clipCss(r) { return 'clip-path:inset(' + r[1] + 'px ' + (W - r[2]) + 'px ' + (H - r[3]) + 'px ' + r[0] + 'px);'; }
 
-function build(loc) {
+function build(loc, dbl) {
     css();
     const ov = el('div', null, null);
     ov.id = OV;
@@ -251,20 +287,32 @@ function build(loc) {
     const gM = el('div', 'grp gme', 'transform:translateX(-120%)');
     const fl2 = el('img', 'ly', clipCss(AT.myFloor)); fl2.src = 'doll/bt-floor.webp'; gM.appendChild(fl2);
     const me = el('div', 'spr me', 'left:' + AT.me.l + 'px;top:' + AT.me.t + 'px;opacity:0'); gM.appendChild(me);
+    let foe2 = null, me2 = null;
+    if (dbl) { foe2 = el('div', 'spr foe'); gF.appendChild(foe2); me2 = el('div', 'spr me', 'opacity:0'); gM.appendChild(me2); }
     st.appendChild(gF); st.appendChild(gM);
     const sF = el('div', 'grp sfoe', 'transform:translateX(-110%)');
-    const s1 = el('img', 'ly', clipCss(AT.foeStat)); s1.src = 'doll/bt-stat.webp'; sF.appendChild(s1);
-    sF.appendChild(el('div', 'stt fnm', 'left:16px;top:114px;font-size:9.5px'));
-    sF.appendChild(el('div', 'stt fat', 'left:113px;top:113px;font-size:10px'));
-    sF.appendChild(el('div', 'stt', 'left:16px;top:139px;font-size:6.5px;color:#ffcf4d', 'HP'));
-    sF.appendChild(el('div', 'hpb fhp', 'left:28px;top:140px;width:92px', '<i style="width:100%"></i>'));
     const sM = el('div', 'grp sme', 'transform:translateX(110%)');
-    const s2 = el('img', 'ly', clipCss(AT.myStat)); s2.src = 'doll/bt-stat.webp'; sM.appendChild(s2);
-    sM.appendChild(el('div', 'stt mnm', 'left:194px;top:225px;font-size:9.5px'));
-    sM.appendChild(el('div', 'stt mat', 'left:286px;top:224px;font-size:10px'));
-    sM.appendChild(el('div', 'stt', 'left:194px;top:243px;font-size:6.5px;color:#ffcf4d', 'HP'));
-    sM.appendChild(el('div', 'hpb mhp', 'left:206px;top:244px;width:92px', '<i style="width:100%"></i>'));
-    sM.appendChild(el('div', 'stt mhn', 'left:206px;top:252px;width:92px;text-align:right;font-size:8px;color:#e8e4ff'));
+    const dbs = {};
+    if (dbl) {
+        // ★ 더블 — 편마다 작은 칸 둘 (위 · 아래 = 왼쪽 · 오른쪽 자리)
+        ['B', 'E', 'A', 'C'].forEach(function (x) {
+            const foeS = x === 'B' || x === 'E';
+            const b = el('div', 'dbs ' + (foeS ? 'f' : 'm'), rectCss(DB.stat[x]), '<div class="nm"></div><div class="hb"><i style="width:100%"></i></div>' + (foeS ? '' : '<div class="hn"></div>') + '<div class="el"></div>');
+            (foeS ? sF : sM).appendChild(b); dbs[x] = b;
+        });
+    } else {
+        const s1 = el('img', 'ly', clipCss(AT.foeStat)); s1.src = 'doll/bt-stat.webp'; sF.appendChild(s1);
+        sF.appendChild(el('div', 'stt fnm', 'left:16px;top:114px;font-size:9.5px'));
+        sF.appendChild(el('div', 'stt fat', 'left:113px;top:113px;font-size:10px'));
+        sF.appendChild(el('div', 'stt', 'left:16px;top:139px;font-size:6.5px;color:#ffcf4d', 'HP'));
+        sF.appendChild(el('div', 'hpb fhp', 'left:28px;top:140px;width:92px', '<i style="width:100%"></i>'));
+        const s2 = el('img', 'ly', clipCss(AT.myStat)); s2.src = 'doll/bt-stat.webp'; sM.appendChild(s2);
+        sM.appendChild(el('div', 'stt mnm', 'left:194px;top:225px;font-size:9.5px'));
+        sM.appendChild(el('div', 'stt mat', 'left:286px;top:224px;font-size:10px'));
+        sM.appendChild(el('div', 'stt', 'left:194px;top:243px;font-size:6.5px;color:#ffcf4d', 'HP'));
+        sM.appendChild(el('div', 'hpb mhp', 'left:206px;top:244px;width:92px', '<i style="width:100%"></i>'));
+        sM.appendChild(el('div', 'stt mhn', 'left:206px;top:252px;width:92px;text-align:right;font-size:8px;color:#e8e4ff'));
+    }
     st.appendChild(sF); st.appendChild(sM);
     st.appendChild(el('img', 'ly')).src = 'doll/bt-under.webp';
     st.appendChild(el('div', 'txt'));
@@ -284,6 +332,19 @@ function build(loc) {
     AT.def.forEach(function (r, i) { b2.appendChild(el('div', 'sk skd' + i, rectCss(r) + 'font-size:9.5px;padding:0 4px;box-sizing:border-box')); const h = el('button', 'hit', rectCss(r) + 'pointer-events:auto'); h.dataset.k = 'd' + i; b2.appendChild(h); });
     const hb = el('button', 'hit', rectCss(AT.back) + 'pointer-events:auto'); hb.dataset.k = 'back'; b2.appendChild(hb);
     st.appendChild(b2);
+    // ★ 더블 — 대상 · 위치 고르기 판 (주신 버튼 UI · 기술이나 아이템을 쓸 때마다) — 위 줄 상대 1 · 2 · 아래 줄 우리 3 · 4 · 돌아간다
+    let b3 = null;
+    if (dbl) {
+        b3 = el('div', 'grp b3 pane off', 'display:none;opacity:0');
+        const b3i = el('img', 'ly'); b3i.src = 'doll/bt-tgt.webp'; b3.appendChild(b3i);
+        ['B', 'E', 'A', 'C'].forEach(function (x) {
+            b3.appendChild(el('div', 'tcard tc' + x, rectCss(DB.tgt[x])));
+            const h = el('button', 'hit th' + x, rectCss(DB.tgt[x]) + 'pointer-events:auto'); h.dataset.k = 'tg:' + x; b3.appendChild(h);
+        });
+        const hb3 = el('button', 'hit', rectCss(AT.back) + 'pointer-events:auto'); hb3.dataset.k = 'back'; b3.appendChild(hb3);
+        b3.appendChild(el('div', 'tbench', 'display:none'));
+        st.appendChild(b3);
+    }
     st.appendChild(el('div', 'flash'));
     ov.appendChild(el('div', 'veil'));
     document.body.appendChild(ov);
@@ -294,7 +355,8 @@ function build(loc) {
     };
     fit();
     window.addEventListener('resize', fit);
-    return { ov: ov, st: st, fit: fit, foe: foe, me: me, gF: gF, gM: gM, sF: sF, sM: sM, b1: b1, b2: b2,
+    return { ov: ov, st: st, fit: fit, foe: foe, me: me, gF: gF, gM: gM, sF: sF, sM: sM, b1: b1, b2: b2, b3: b3, dbs: dbs,
+             pos: dbl ? { B: foe, E: foe2, A: me, C: me2 } : null,
              txt: st.querySelector('.txt'), nx: st.querySelector('.nx'), fl: st.querySelector('.flash'), dim: st.querySelector('.dim'), veil: ov.querySelector('.veil') };
 }
 function q(sel) { return B && B.ui.st.querySelector(sel); }
@@ -353,6 +415,7 @@ function tagOf(u, hideRanks) {
 }
 // HP 숫자는 보이는 값(B.shown) — 출력문을 따라 한 줄씩 움직인다
 function paintStat() {
+    if (B.dbl) return paintStatDbl();
     const f = foe_(), m = me_(), A = D().ATTR;
     const sh = B.shown;
     if (f) {
@@ -377,7 +440,7 @@ function showStat(foe, me) {
 }
 // 동료 진영(여정) — 작은 칸 (이름 · 인형 · HP)
 function allyPaint() {
-    if (!B.S || B.S.allies.length <= 1) return;
+    if (!B.S || B.S.dbl || B.S.allies.length <= 1) return;
     let box = q('.allies');
     if (!box) { box = el('div', 'allies', 'position:absolute;left:150px;top:99px;width:160px;pointer-events:none'); B.ui.st.appendChild(box); }
     const rows = B.S.allies.filter(function (s) { return s !== mySide(); }).map(function (s) {
@@ -431,7 +494,8 @@ function menu(mode) {
     if (!B) return;
     pane(B.ui.b1, mode === 1);
     pane(B.ui.b2, mode === 2);
-    B.ui.dim.style.opacity = (mode === 1 || mode === 2) ? '0' : (mode === 3 ? '.82' : '.55');
+    if (B.ui.b3) pane(B.ui.b3, mode === 4);                          // 더블 — 대상 고르기 판
+    B.ui.dim.style.opacity = (mode === 1 || mode === 2) ? '0' : (mode === 3 ? '.82' : (mode === 4 ? '.35' : '.55'));
     Array.prototype.forEach.call(B.ui.st.querySelectorAll('.menu'), fadeRm);
 }
 // 누른 칸이 잠깐 눌려 보인 뒤에 넘어간다
@@ -480,10 +544,13 @@ function menuBox(html, cls) {
 }
 
 // ── 움직임
-function sprOf(s) { if (s === mySide()) return B.ui.me; if (s === foeSide()) return B.ui.foe; return allyEl(s); }
+function sprOf(s) { if (B.dbl) return B.ui.pos[s] || null; if (s === mySide()) return B.ui.me; if (s === foeSide()) return B.ui.foe; return allyEl(s); }
+// 화면에 크게 그려지는 자리인가 (나 · 상대 · 더블의 넷) — 아니면 여정 동료의 작은 칸
+function bigSpr(s) { return !!B.dbl || s === mySide() || s === foeSide(); }
+function foeOfMine(s) { return B.dbl ? (s === 'B' || s === 'E') : s === foeSide(); }
 function lunge(s) {
     const e = sprOf(s); if (!e) return sleep(10);
-    const mine = s === mySide(), ally = (s !== mySide() && s !== foeSide());
+    const mine = !foeOfMine(s), ally = !bigSpr(s);
     if (ally) { e.style.transform = 'translateX(-6px)'; return sleep(160).then(function () { e.style.transform = ''; return sleep(100); }); }
     const dx = mine ? 14 : -14, dy = mine ? -8 : 6;
     e.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
@@ -491,13 +558,13 @@ function lunge(s) {
 }
 async function blink(s) {
     const e = sprOf(s); if (!e) return;
-    if (s !== mySide() && s !== foeSide()) { e.style.opacity = '.3'; await sleep(120); e.style.opacity = '1'; return; }
+    if (!bigSpr(s)) { e.style.opacity = '.3'; await sleep(120); e.style.opacity = '1'; return; }
     for (let i = 0; i < 4; i++) { e.style.opacity = (i % 2) ? '1' : '0.15'; await sleep(90); }
     e.style.opacity = '1';
 }
 async function faintFx(s) {
     const e = sprOf(s); if (!e) return;
-    if (s !== mySide() && s !== foeSide()) { e.style.opacity = '.3'; await sleep(300); return; }
+    if (!bigSpr(s)) { e.style.opacity = '.3'; await sleep(300); return; }
     e.style.transition = 'transform .45s ease-in, opacity .45s';
     e.style.transform = 'translateY(40px)'; e.style.opacity = '0';
     await sleep(480);
@@ -511,7 +578,7 @@ function fx(txt, r, ms) {
 }
 async function whiteIn(s) {
     const e = sprOf(s); if (!e) return;
-    if (s !== mySide() && s !== foeSide()) return;
+    if (!bigSpr(s)) return;
     e.style.transition = 'none';
     e.style.filter = 'brightness(0) invert(1)';
     e.style.transform = 'scale(.2)'; e.style.opacity = '1';
@@ -528,14 +595,18 @@ function img(src) {
     if (!IMG[src]) IMG[src] = new Promise(function (r) { const i = new Image(); i.onload = function () { r(i); }; i.onerror = function () { r(null); }; i.src = src; });
     return IMG[src];
 }
-async function mosaicMorph() {
-    const f = foe_(), e = B.ui.foe;
+async function mosaicMorph(s) {
+    s = s || foeSide();
+    const f = sideUnit(s), e = sprOf(s);
+    if (!f || !e) return;
+    const PX = B.dbl ? DB.pos[s].px : 64;                    // 더블 — 작은 판 (캔버스는 64 그대로 · 보이는 크기만)
+    const repaint = function () { if (B.dbl) paintPos(s); else paintFoe(false); };
     const cell = D().cellOf(f.sp);
     const base = await img('doll/base.webp'), sheet = await img(cell.chr ? 'doll/cf.webp' : 'doll/pf.webp');
     const old = (unitArt(f) && !cell.chr) ? await img('pet/old/s' + String(f.sp).padStart(2, '0') + '.webp') : null;
-    if (!B || !base || !sheet) { if (B) paintFoe(false); return; }
+    if (!B || !base || !sheet) { if (B) repaint(); return; }
     const c = document.createElement('canvas'); c.width = 64; c.height = 64;
-    c.className = 'bob'; c.style.cssText = 'width:64px;height:64px;image-rendering:pixelated;display:block';
+    c.className = 'bob'; c.style.cssText = 'width:' + PX + 'px;height:' + PX + 'px;image-rendering:pixelated;display:block';
     const t = document.createElement('canvas'); t.width = 64; t.height = 64;
     const cx = c.getContext('2d'), tx2 = t.getContext('2d');
     const draw = function (src, sx, sy, b, cs) {
@@ -557,7 +628,7 @@ async function mosaicMorph() {
     const ST = [1, 2, 3, 4, 6, 8, 11, 16];
     for (let i = 0; i < ST.length; i++) { if (!B) return; draw(base, 0, 0, ST[i]); await sleep(i ? 70 : 160); }
     for (let i = ST.length - 1; i >= 0; i--) { if (!B) return; if (old) drawFit(old, ST[i]); else draw(sheet, cell.c * cell.cs, cell.r * cell.cs, ST[i], cell.cs); await sleep(i ? 70 : 120); }
-    if (B) paintFoe(false);
+    if (B) repaint();
 }
 
 // ==========================================
@@ -579,7 +650,7 @@ function hpTick(e) {
     return out;
 }
 // 상대 진영인가 — 나(아군 진영 A · C · D)에게는 B, 결투의 B 에게는 A
-function oppSide(s) { if (!s || !B) return false; return mySide() === 'B' ? s !== 'B' : s === 'B'; }
+function oppSide(s) { if (!s || !B) return false; if (B.dbl) return s === 'B' || s === 'E'; return mySide() === 'B' ? s !== 'B' : s === 'B'; }
 async function playLine(e, opt) {
     opt = opt || {};
     if (!B) return;
@@ -594,7 +665,8 @@ async function playLine(e, opt) {
     if (k === 'enter' && e.s) {
         if (B.S.sides[e.s]) { B.S.sides[e.s].act = e.i; }
         B.shownIdx[e.s] = e.i; B.shown[e.s] = (e.f && e.f[e.s]) ? Number(arrOf(e.f[e.s])[1]) : null;
-        if (e.s === mySide()) { paintMe(); paintStat(); showStat(true, true); } else if (e.s === foeSide()) { paintFoe(false); paintStat(); } else allyPaint();
+        if (B.dbl) { paintPos(e.s); paintStat(); showStat(true, true); }
+        else if (e.s === mySide()) { paintMe(); paintStat(); showStat(true, true); } else if (e.s === foeSide()) { paintFoe(false); paintStat(); } else allyPaint();
         if (!opt.quietEnter) await say(tx(e.t), 1000);
         await whiteIn(e.s);
         return;
@@ -604,7 +676,7 @@ async function playLine(e, opt) {
     const ch = hpTick(e);
     const hurt = ch.filter(function (c) { return c.to < c.from; }), healed = ch.filter(function (c) { return c.to > c.from; });
     for (let i = 0; i < hurt.length; i++) await blink(hurt[i].s);
-    healed.forEach(function (c) { fx('💚', c.s === mySide() ? [60, 170] : c.s === foeSide() ? [230, 60] : [160, 100]); });
+    healed.forEach(function (c) { const P = B.dbl && DB.pos[c.s]; fx('💚', P ? [P.cx - 10, P.foot - P.px - 18] : c.s === mySide() ? [60, 170] : c.s === foeSide() ? [230, 60] : [160, 100]); });
     paintStat(); allyPaint();
     const ms = (k === 'over') ? 1500 : (id === 1 ? 1000 : (k === 'grow' ? 1200 : 1100));
     await say(tx(e.t), ms);
@@ -741,11 +813,12 @@ async function itemPick(name) {
 // 소모된 아이템을 소지품에서 뺀다 (엔진이 돌려준 cons 가운데 내 진영 것)
 function consume(cons) {
     const u = u_();
+    const mine = function (s) { return s === mySide() || (B && B.dbl && s === 'C'); };   // 더블 — 오른쪽 자리(C)도 내 것
     (cons || []).forEach(function (c) {
-        if (c.s !== mySide()) return;
+        if (!mine(c.s)) return;
         try { if (typeof removeItemFromInventory === 'function') removeItemFromInventory(u, c.item, 1); } catch (e) { }
     });
-    if ((cons || []).some(function (c) { return c.s === mySide(); })) { try { if (typeof saveFields === 'function') saveFields({ inventory: 1 }); } catch (e) { } try { if (typeof updateUI === 'function') updateUI(); } catch (e) { } }
+    if ((cons || []).some(function (c) { return mine(c.s); })) { try { if (typeof saveFields === 'function') saveFields({ inventory: 1 }); } catch (e) { } try { if (typeof updateUI === 'function') updateUI(); } catch (e) { } }
 }
 // 내 턴의 행동 하나를 고른다 — 돌려주는 값: 행동 또는 'run' · 'ribbon'
 async function chooseAction(opt) {
@@ -971,8 +1044,8 @@ async function endSolo(grow) {
     if (win) {
         const f = foe_();
         await faintFx(foeSide());
-        if (B.kind === 'wild') await say(WILD + '이 쓰러졌다! 솜뭉치로 돌아가 데굴데굴 굴러갔다.', 1500);
-        const m = me_();
+        if (B.kind === 'wild') await say(WILD + (B.dbl ? '들이' : '이') + ' 쓰러졌다! 솜뭉치로 돌아가 데굴데굴 굴러갔다.', 1500);
+        const m = B.dbl ? (['A', 'C'].map(sideUnit).filter(function (x) { return x && x.hp > 0 && !x.fainted; })[0] || null) : me_();
         if (m && m.hp > 0) await say(fmt(pick(TX.win), { a: m.name }), 1300);
         if (m && m.key) { try { const g = M.bondUp(m.key, u); if (g) await say(m.name + '의 교감 +' + g, 800); } catch (e) { } }
     } else {
@@ -1090,6 +1163,446 @@ async function throwRibbon() {
     M.log('[🧸 포획] ' + f.name + ' (' + g + ' · Lv.' + f.lv + ') — ' + (r.where === 'with' ? '동행' : '보관함'), u);
     M.saveHist();
     return finish({ res: 'caught', id: r.id });
+}
+
+// ==========================================
+// ★ 더블 배틀 — 출몰지 야생 둘 (1단계 · 2026-11-12 사용자 「펫 전투 더블 추가」)
+// ==========================================
+//   엔진은 d2-battle.js 더블 (start({ dbl }) · turn · refill). 자리 넷 — B 상대 왼쪽(1) · E 상대 오른쪽(2) · A 우리 왼쪽(3) · C 우리 오른쪽(4).
+//   ■ 행동 고르기 — 왼쪽 인형 → 오른쪽 인형 → 전체 확인 (DB02.2). 중간에 「↩ 왼쪽 인형 다시」로 앞 단계로.
+//   ■ 대상 · 위치 고르기 — 기술이나 아이템을 쓸 때마다 주신 버튼 판(bt-tgt)이 뜬다. 그 자리에 있는 봉제인형이 단추로 뜨고,
+//     비어 있으면 빈칸 그대로 · 빈칸도 고를 수 있다. 공격기는 자리 지정 · 상대에게 거는 유틸기는 인형 지정 (엔진이 판정).
+//     빈자리를 고르면 그 행동은 「그러나 실패했다!」 (PP 는 쓴다). 자신은 고르지 않는다.
+//     아이템 — 우리 줄(자신 포함) + 아래 대기 인형 줄 · 🎀 포옹 리본 — 상대 줄.
+//   ■ 쓰러지면 자리는 비워 두고 턴이 끝난 뒤 다음 인형을 고른다 (빈자리 충원 · 대기 인형이 있으면 반드시).
+//   ■ 성능 — 매 프레임 도는 일은 없다 (연출은 CSS 애니메이션 · 칸은 바뀐 때만 다시 쓴다).
+function isFoeS(s) { return s === 'B' || s === 'E'; }
+function liveAt(s) { const u = sideUnit(s); return !!(u && u.hp > 0 && !u.fainted); }
+function paintPos(s, mode) {
+    const e = B.ui.pos[s], P = DB.pos[s]; if (!e) return;
+    e.style.left = (P.cx - P.px / 2) + 'px'; e.style.top = (P.foot - P.px + 2) + 'px';
+    if (mode === 'base') {                                              // 🧸 따라쟁이 원형
+        e.innerHTML = '<div class="bob" style="background:url(doll/base.webp) no-repeat;background-size:' + P.px + 'px ' + P.px + 'px;image-rendering:pixelated;width:' + P.px + 'px;height:' + P.px + 'px"></div>';
+        e.style.filter = ''; e.style.opacity = '1'; e.style.transform = '';
+        return;
+    }
+    const u = sideUnit(s);
+    if (!u || u.fainted) { e.innerHTML = ''; return; }
+    const back = !isFoeS(s);
+    e.innerHTML = '<div class="' + (back ? 'bob2' : 'bob') + '" style="' + D().spriteCss(u.sp || 1, P.px, back, unitArt(u)) + '"></div>';
+    e.style.filter = ''; e.style.opacity = '1'; e.style.transform = '';
+}
+// 작은 스테이터스 넷 — 바뀐 것만 고쳐 쓴다
+function paintStatDbl() {
+    const A = D().ATTR;
+    ['B', 'E', 'A', 'C'].forEach(function (s) {
+        const box = B.ui.dbs[s]; if (!box) return;
+        const u = sideUnit(s);
+        const shownHp = B.shown[s] != null ? B.shown[s] : (u ? u.hp : 0);
+        const vis = !!u && !(u.fainted && shownHp <= 0);
+        if (box._vis !== vis) { box._vis = vis; box.style.visibility = vis ? '' : 'hidden'; }
+        if (!vis) return;
+        const foeS = isFoeS(s);
+        const nm = esc(u.name) + ' ' + unitG(u) + ' Lv.' + u.lv + tagOf(u, foeS);
+        if (box._nm !== nm) { box._nm = nm; box.querySelector('.nm').innerHTML = nm; }
+        const at = (A[u.el] || {}).e || '';
+        if (box._at !== at) { box._at = at; box.querySelector('.el').textContent = at; }
+        const p = Math.max(0, shownHp) / u.max, w = (p * 100).toFixed(1) + '%';
+        if (box._w !== w) { box._w = w; const i = box.querySelector('.hb i'); i.style.width = w; i.style.background = hpColor(p); }
+        if (!foeS) { const hn = Math.max(0, Math.ceil(shownHp)) + '/' + u.max; if (box._hn !== hn) { box._hn = hn; box.querySelector('.hn').textContent = hn; } }
+    });
+}
+// ── 대상 고르기 판
+//   mode — 'atk' 공격기(자리) · 'util' 유틸기(인형) · 'item' 아이템 · 'ribbon' 포옹 리본 · s 는 쓰는 자리
+//   돌려주는 값 — { tgt: 자리 } · { idx: 대기 인형 칸 } (아이템) · 'back'
+function tgtCard(s, u, can, self) {
+    const e = q('.tc' + s); if (!e) return;
+    e.className = 'tcard tc' + s + (can ? '' : ' no') + (self ? ' me' : '') + (u ? '' : ' empty');
+    if (!u) { e.innerHTML = '<div class="tx">' + esc(DB.NAME[s]) + ' — 빈자리</div>'; return; }
+    const p = Math.max(0, Math.min(1, u.hp / Math.max(1, u.max)));
+    const px = 36;
+    e.innerHTML = '<div class="sp" style="width:' + px + 'px;height:' + px + 'px"><div style="' + D().spriteCss(u.sp || 1, px, false, unitArt(u)) + '"></div></div>'
+        + '<div class="tx">' + esc(u.name) + '<small>' + esc(DB.NAME[s]) + ' · ' + unitG(u) + ' Lv.' + u.lv + (isFoeS(s) ? '' : ' · ' + Math.ceil(Math.max(0, u.hp)) + '/' + u.max) + '</small>'
+        + '<div class="hp"><i style="width:' + Math.round(p * 100) + '%;background:' + hpColor(p) + '"></i></div></div>';
+}
+function targetPick(s, mode, opt) {
+    opt = opt || {};
+    return new Promise(function (resolve) {
+        const I = IT(), sd = B.S.sides[s];
+        const views = {};
+        ['B', 'E', 'A', 'C'].forEach(function (x) {
+            const u = liveAt(x) ? sideUnit(x) : null;
+            let can;
+            if (mode === 'ribbon') can = isFoeS(x);
+            else if (mode === 'item') can = !isFoeS(x) && (!u || (I && I.check(I.viewOfUnit(u, true), opt.item, null, true).ok));
+            else can = x !== s;                                         // 기술 — 자신만 빼고 (빈자리도 고를 수 있다)
+            views[x] = can;
+            tgtCard(x, u, can, x === s);
+            const h = q('.th' + x); if (h) h.style.pointerEvents = can ? 'auto' : 'none';
+        });
+        // 아이템 — 아래에 대기 인형 줄 (기절 회복 등은 대기 · 쓰러진 인형에게)
+        const tb = q('.tbench');
+        const bench = [];
+        if (mode === 'item') {
+            const on = {}; ['A', 'C'].forEach(function (x) { const y = B.S.sides[x]; if (y.act >= 0 && liveAt(x)) on[y.act] = 1; });
+            sd.units.forEach(function (u, i) { if (!on[i]) bench.push(i); });
+        }
+        if (tb) {
+            if (bench.length) {
+                tb.style.display = 'flex';
+                tb.innerHTML = '<div class="lb">대기 중인 인형</div>' + bench.map(function (i) {
+                    const u = sd.units[i], v = I ? I.check(I.viewOfUnit(u, false), opt.item, null, true) : { ok: false };
+                    const p = Math.max(0, Math.min(1, u.hp / Math.max(1, u.max)));
+                    return '<button data-k="tb:' + i + '"' + (v.ok ? '' : ' disabled') + '><span class="s"><span style="position:absolute;left:0;top:0;' + D().spriteCss(u.sp || 1, 28, false, unitArt(u)) + '"></span></span>'
+                        + esc(u.name) + '<small style="font-weight:normal;font-size:6px">' + Math.ceil(Math.max(0, u.hp)) + '/' + u.max + (u.fainted || u.hp <= 0 ? ' · 쓰러짐' : '') + '</small></button>';
+                }).join('');
+                Array.prototype.forEach.call(tb.querySelectorAll('button'), function (b) {
+                    b.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+                    b.onclick = function (ev) { ev.stopPropagation(); if (b.disabled) return; const f = B && B.pick; if (!f) return; B.pick = null; b.style.background = '#b9a6e0'; setTimeout(function () { f(b.dataset.k); }, 100); };
+                });
+            } else { tb.style.display = 'none'; tb.innerHTML = ''; }
+        }
+        menu(4);
+        const who = sideUnit(s);
+        B.ui.txt.textContent = opt.ask || (mode === 'ribbon' ? '어느 인형에게 포옹 리본을 던질까?' : mode === 'item' ? (opt.item + ' — 누구에게 쓸까?') : ((who ? who.name + josa(who.name, '은') + ' ' : '') + (mode === 'atk' ? '어디를 노릴까?' : '누구에게 쓸까?')));
+        B.pick = function (k) {
+            if (tb) { tb.style.display = 'none'; tb.innerHTML = ''; }
+            menu(0);
+            if (k === 'back') return resolve('back');
+            if (k.indexOf('tb:') === 0) return resolve({ idx: Number(k.slice(3)) });
+            resolve({ tgt: k.slice(3) });
+        };
+    });
+}
+function josa(w, j) { return D().josa(w, j); }
+// 소지품 (더블) — 바꾸기 · 아이템 · 포옹 리본. 돌려주는 값: 행동 · 'back'
+async function bagMenuDbl(s) {
+    const M = D(), u = u_(), I = IT();
+    const sd = B.S.sides[s];
+    const other = s === 'A' ? 'C' : 'A';
+    for (;;) {
+        menu(3);
+        const n = M.bagHas(M.ITEM.RIBBON, u);
+        const items = I ? I.ORDER.filter(function (nm) { return I.count(nm, u) > 0; }) : [];
+        let h = dollStrip(sd.units, sd.act, 'switch');
+        h += '<button data-k="ribbon"' + ((n > 0 && catchLeft(u) > 0) ? '' : ' disabled') + '>🎀 포옹 리본 ×' + n + (catchLeft(u) > 0 ? ' <small style="color:#524173">(오늘 포획 ' + catchN(u) + '/' + CATCH_MAX + ')</small>' : ' — 오늘은 더 잡을 수 없다 (' + CATCH_MAX + '마리)') + '</button>';
+        if (items.length) h += '<div class="lb">🧷 펫 용품 — 쓰면 이 인형의 그 턴을 쓴다 (교체 다음 · 방어보다 먼저)</div>' + I.GROUPS.map(function (g) {
+            const gs = items.filter(function (nm) { return I.get(nm).g === g; });
+            if (!gs.length) return '';
+            return '<div class="lb" style="color:#7a4a6a;margin-top:6px">· ' + esc(I.G[g]) + '</div>' + gs.map(function (nm) { const it = I.get(nm); return '<button data-k="it:' + esc(nm) + '">' + esc(nm) + ' ×' + I.count(nm, u) + ' <small style="color:#524173;font-weight:normal">— ' + esc(it.d) + '</small></button>'; }).join('');
+        }).join('');
+        else h += '<div class="lb">🧷 펫 용품이 없다 — 도깨비 공방 잡화점에서 꿈결로 산다</div>';
+        h += '<button data-k="back">돌아간다</button>';
+        const box = menuBox(h);
+        // 옆자리에 나와 있는 인형도 바꿔 낼 수 없다
+        const oa = B.S.sides[other].act;
+        Array.prototype.forEach.call(box.querySelectorAll('.dstrip button'), function (b) { const i = Number(String(b.dataset.k).slice(3)); if (i === oa && liveAt(other)) { b.disabled = true; const sm = b.querySelector('small'); if (sm) sm.textContent = Math.ceil(Math.max(0, sd.units[i].hp)) + '/' + sd.units[i].max + ' · 옆자리'; } });
+        B.ui.txt.textContent = '무엇을 쓸까?';
+        const k = await wait();
+        menu(0);
+        if (!B) return 'back';
+        if (k === 'back') return 'back';
+        if (k === 'ribbon') { const r = await targetPick(s, 'ribbon'); if (r === 'back') continue; return { k: 'ribbon', tgt: r.tgt }; }
+        if (k.indexOf('sw:') === 0) return { k: 'switch', idx: Number(k.slice(3)) };
+        if (k.indexOf('it:') === 0) {
+            const name = k.slice(3), it = I.get(name);
+            const r = await targetPick(s, 'item', { item: name });
+            if (r === 'back') continue;
+            let idx;
+            if (r.idx != null) idx = r.idx;
+            else { const y = B.S.sides[r.tgt]; idx = liveAt(r.tgt) ? y.act : -1; }     // 빈자리를 고르면 아무 일도 없다 (실패)
+            const v = idx >= 0 ? I.check(I.viewOfUnit(sd.units[idx], true), name, null, true) : { ok: true };
+            if (idx < 0 || !v.needSkill) return { k: 'item', item: name, idx: idx };
+            // PP 회복 — 기술 고르기
+            const t = sd.units[idx], S2 = SK();
+            menu(3);
+            B.ui.txt.textContent = 'PP를 회복할 기술을 고르세요.';
+            const eq = S2.equipped(t).filter(function (no) { return no !== 59; });
+            menuBox(eq.map(function (no) { const sk = S2.get(no), pp = t.pp[no] | 0; return '<button data-k="no:' + no + '"' + (pp >= sk.pp ? ' disabled' : '') + '>' + esc(sk.n) + ' <small>PP ' + pp + '/' + sk.pp + (pp >= sk.pp ? ' · 가득' : '') + '</small></button>'; }).join('') + '<button data-k="back">돌아간다</button>');
+            const k2 = await wait();
+            menu(0);
+            if (!B || k2 === 'back') continue;
+            return { k: 'item', item: name, idx: idx, no: Number(k2.slice(3)) };
+        }
+    }
+}
+// 한 자리의 행동 — 돌려주는 값: 행동 · 'run' · 'prev'(앞 인형 다시)
+async function chooseOneDbl(s, canPrev) {
+    for (;;) {
+        if (!B) return null;
+        const m = sideUnit(s);
+        const bp = q('.bpet');                                          // 싸운다! 단추 속 그림 — 지금 고르는 인형
+        if (bp && bp._sp !== m.sp + ':' + unitArt(m)) { bp._sp = m.sp + ':' + unitArt(m); bp.innerHTML = '<img class="' + (D().isChr(m.sp) ? '' : 'fit') + '" src="' + portraitSrc(m.sp || 1, unitArt(m)) + '" alt="">'; }
+        B.ui.txt.textContent = (Math.random() < 0.3 ? fmt(pick(TX.idle), { a: m.name }) : (m.name + josa(m.name, '은') + ' 무엇을 할까?')) + '  (' + DB.NAME[s] + ')';
+        menu(1);
+        if (canPrev) menuBox('<button data-k="prev">↩ 왼쪽 인형 행동 다시 고르기</button>', 'rrow');
+        const k = await wait();
+        if (!B) return null;
+        if (k === 'prev') { menu(0); return 'prev'; }
+        if (k === 'run') return 'run';
+        if (k === 'bag') { const r = await bagMenuDbl(s); if (r === 'back') continue; return r; }
+        // 싸운다 — 기술 판
+        for (;;) {
+            const u = sideUnit(s);
+            skillPane(u);
+            B.ui.txt.textContent = u.name + josa(u.name, '은') + ' 무엇을 쓸까? (위 셋은 공격기 · 아래 둘은 유틸기)';
+            menu(2);
+            runeRow(u, false);
+            const k2 = await wait();
+            if (!B) return null;
+            if (k2 === 'back') break;
+            menu(0);
+            if (k2.indexOf('rn:') === 0) {
+                const r = await targetPick(s, 'atk');
+                if (r === 'back') continue;
+                return { k: 'rune', i: Number(k2.slice(3)), tgt: r.tgt };
+            }
+            const mv = SK().mvOf(u);
+            const no = k2.charAt(0) === 'a' ? mv.a[Number(k2.slice(1))] : mv.u[Number(k2.slice(1))];
+            if (!no) { await say('빈칸이다.', 700); continue; }
+            if ((u.pp[no] | 0) <= 0) { await say(SK().get(no).n + '의 PP가 없다!', 900); continue; }
+            if (!BT().allowedBy(u, no)) { await say('지금은 쓸 수 없는 기술이다!', 900); continue; }
+            const sk = SK().get(no);
+            const act = { k: 'skill', no: no };
+            if (sk.tgt === 'ally' || no === 74) {                       // 대기 인형 고르기 (꿈 잇기 · B조 교대 · 괜찮습니다 제가 할게요)
+                const b = BT().bench(B.S, s);
+                if (!b.length) { await say('대기 중인 인형이 없다!', 900); continue; }
+                const idx = await pickNext(b, 'ally');
+                if (!B) return null;
+                act.idx = idx;
+                return act;
+            }
+            if (sk.slot === 'A' || sk.tgt === 'foe') {                  // 대상 · 위치 고르기
+                const r = await targetPick(s, sk.slot === 'A' ? 'atk' : 'util');
+                if (r === 'back') continue;
+                act.tgt = r.tgt;
+            }
+            return act;
+        }
+    }
+}
+function actLine(s, a) {
+    const u = sideUnit(s);
+    let t = '';
+    if (!a) return '';
+    if (a.k === 'skill') { const sk = SK().get(a.no); t = (sk ? sk.n : '기술') + (a.tgt ? ' → ' + DB.NAME[a.tgt] : ''); }
+    else if (a.k === 'rune') t = '💠 룬 공격 → ' + DB.NAME[a.tgt];
+    else if (a.k === 'switch') t = '교체 → ' + (B.S.sides[s].units[a.idx] || {}).name;
+    else if (a.k === 'item') t = a.item + (a.idx >= 0 ? ' → ' + (B.S.sides[s].units[a.idx] || {}).name : ' → 빈자리');
+    else if (a.k === 'ribbon') t = '🎀 포옹 리본 → ' + DB.NAME[a.tgt];
+    return u.name + ': ' + t;
+}
+// 두 자리 다 — 왼쪽 → 오른쪽 → 전체 확인 (DB02.2) · 돌려주는 값 { A, C } · 'run'
+async function chooseDbl() {
+    const order = ['A', 'C'].filter(liveAt);
+    const acts = {};
+    let i = 0;
+    for (;;) {
+        if (!B) return null;
+        if (i >= order.length) {
+            if (order.length < 2) return acts;
+            menu(3);
+            B.ui.txt.textContent = order.map(function (x) { return actLine(x, acts[x]); }).join('\n') + '\n이대로 할까?';
+            menuBox('<button data-k="go">✔ 이대로 싸운다</button><button data-k="back">↩ 오른쪽 인형 다시 고르기</button>');
+            const k = await wait();
+            menu(0);
+            if (!B) return null;
+            if (k === 'go') return acts;
+            i = order.length - 1; delete acts[order[i]];
+            continue;
+        }
+        const s = order[i];
+        const r = await chooseOneDbl(s, i > 0);
+        if (!B || r == null) return null;
+        if (r === 'prev') { i = Math.max(0, i - 1); delete acts[order[i]]; continue; }
+        if (r === 'run') return 'run';
+        acts[s] = r; i++;
+    }
+}
+// 턴 사이 — 빈자리 충원 (상대는 엔진이 · 우리는 고른다)
+async function refillDbl() {
+    const picks = [];
+    for (;;) {
+        if (!B) return false;
+        const r = BT().refill(B.S, { picks: picks, seed: B.seed });
+        if (r.need) {
+            const idx = await pickNext(r.need.cands, 'faint');
+            if (!B) return false;
+            picks.push(idx);
+            continue;
+        }
+        if (r.log && r.log.length) await playLog(r.log);
+        if (!B) return false;
+        B.S = r.S; syncShown(); paintStat();
+        return true;
+    }
+}
+async function runTurnDbl(acts) {
+    const picks = [];
+    for (;;) {
+        if (!B) return null;
+        const r = BT().turn(B.S, { A: acts.A || null, C: acts.C || null, picks: picks, seed: B.seed });
+        if (r.need) { const idx = await pickNext(r.need.cands, r.need.why); if (!B) return null; picks.push(idx); continue; }
+        consume(r.cons);
+        await playLog(r.log);
+        if (!B) return null;
+        B.S = r.S; syncShown(); paintStat();
+        B.turns = (B.turns || 0) + 1;
+        return r;
+    }
+}
+// 🎀 포옹 리본 (더블) — 고른 자리의 인형에게. 잡으면 그 자리는 빈다 · 상대가 다 사라지면 끝
+async function throwRibbonDbl(tgt) {
+    const M = D(), u = u_(), f = liveAt(tgt) ? sideUnit(tgt) : null;
+    if (!f) { await say('포옹 리본을 던졌지만 그 자리에는 아무도 없다!', 1200); return null; }
+    if (catchLeft(u) <= 0) { await say('오늘은 더 잡을 수 없다! (하루 ' + CATCH_MAX + '마리)', 1200); return null; }
+    if (!M.bagAdd(M.ITEM.RIBBON, -1, u)) { await say('포옹 리본이 없다!', 1000); return null; }
+    await say(fmt(pick(TX.ribbon), { d: f.name }), 1000);
+    const P = DB.pos[tgt], e = sprOf(tgt);
+    const rb = el('div', 'rib', 'left:40px;top:300px;animation:dbspin .6s linear 1');
+    B.ui.st.appendChild(rb);
+    const x0 = 40, y0 = 300, x1 = P.cx - 15, y1 = P.foot - P.px + 2;
+    const t0 = performance.now(), DUR = 560;
+    await new Promise(function (res) {
+        const step = function (t) {
+            if (!B) return res();
+            const k = Math.min(1, (t - t0) / DUR);
+            rb.style.left = Math.round(x0 + (x1 - x0) * k) + 'px';
+            rb.style.top = Math.round(y0 + (y1 - y0) * k - 70 * Math.sin(k * Math.PI)) + 'px';
+            if (k < 1) requestAnimationFrame(step); else res();
+        };
+        requestAnimationFrame(step);
+    });
+    rb.remove();
+    if (!B) return { res: 'gone' };
+    e.style.transform = 'scale(.1)'; e.style.opacity = '0';
+    await say(fmt(pick(TX.wrap), { d: f.name }), 1100);
+    const g = unitG(f);
+    let p = (CATCH[g] || 0.5) * (1 - 0.85 * f.hp / f.max) + 0.05;
+    p = Math.max(0.05, Math.min(0.95, p));
+    const ok = Math.random() < p;
+    const wob = ok ? 3 : 1 + Math.floor(Math.random() * 3);
+    const sit = el('div', 'rib', 'left:' + (P.cx - 15) + 'px;top:' + (P.foot - 18) + 'px');
+    B.ui.st.appendChild(sit);
+    setTimeout(function () { sit.remove(); }, 4000);
+    for (let i = 0; i < wob; i++) { sit.style.animation = 'dbwob .5s 1'; await sleep(560); if (!B) return { res: 'gone' }; sit.style.animation = ''; await sleep(260); }
+    if (!ok) {
+        fx('💥', [P.cx - 12, P.foot - P.px - 14], 700);
+        sit.style.transition = 'transform .4s ease-in, opacity .4s'; sit.style.transform = 'translate(26px,-70px) rotate(260deg)'; sit.style.opacity = '0';
+        e.style.transition = 'transform .38s cubic-bezier(.2,1.7,.4,1), opacity .15s'; e.style.transform = 'scale(1)'; e.style.opacity = '1';
+        await sleep(420);
+        e.style.transition = ''; e.style.transform = '';
+        sit.remove();
+        await say(fmt(pick(TX.miss2), { d: f.name }), 1300);
+        return null;
+    }
+    fx('✨', [P.cx - 12, P.foot - P.px - 14], 900);
+    await sleep(500);
+    sit.remove();
+    const rec = f.rec || {};
+    const r = M.addDoll({ sp: f.sp, g: g, lv: f.lv, hp: Math.max(1, Math.round(f.hp)), att: f.el, iv: rec.iv, pr: rec.pr, ev: rec.ev || {}, mv: f.mv, pp: f.pp, tr: f.trait, xp: rec.xp || 0 }, u);
+    if (!r) { await say('보관함이 가득 차 있다! ' + f.name + josa(f.name, '이') + ' 리본을 풀고 달아났다……', 1800); gone(tgt); return leftFoes() ? null : finish({ res: 'full' }); }
+    if (f.status) { try { M.patchDoll(r.id, { st: { k: f.status, c: f.sc | 0 } }, u); } catch (x) { } }
+    catchAdd(u);
+    await say(fmt(pick(TX.caught), { d: f.name }), 1500);
+    const trN = (window.D2TR && window.D2TR.get(f.trait)) ? window.D2TR.get(f.trait).n : '';
+    await say(f.name + ' (' + g + ' · Lv.' + f.lv + (trN ? ' · ' + trN : '') + ')' + josa(f.name, '은') + (r.where === 'with' ? ' 동행 목록에 들어갔다!' : ' 보관함(펫 박스)으로 보내졌다!') + ' 봉제인형 도감에 적혔다. (오늘 ' + catchN(u) + '/' + CATCH_MAX + ')', 1800);
+    M.log('[🧸 포획] ' + f.name + ' (' + g + ' · Lv.' + f.lv + ') — ' + (r.where === 'with' ? '동행' : '보관함'), u);
+    M.saveHist();
+    B.caughtId = r.id;
+    gone(tgt, 'caught');
+    if (!leftFoes()) return finish({ res: 'caught', id: r.id });
+    return null;
+}
+// 상대 하나가 싸움에서 빠진다 (잡힘 · 달아남) — 그 자리는 비고, 엔진은 쓰러진 것으로 본다 (경험치 없음)
+function gone(s, why) {
+    const u = sideUnit(s); if (!u) return;
+    u.fainted = true; u.caught = true; u.left = why || 'fled';
+    const e = sprOf(s); if (e) { e.innerHTML = ''; e.style.transform = ''; e.style.opacity = '1'; }
+    paintStat();
+}
+function leftFoes() { return ['B', 'E'].some(liveAt) || BT().bench(B.S, 'B').length > 0; }
+// 야생이 달아난다 — 하나씩 (체력이 적게 남았으면 3% · 아니면 1.2%)
+async function wildFleeDbl() {
+    const ss = ['B', 'E'].filter(liveAt);
+    for (let i = 0; i < ss.length; i++) {
+        const f = sideUnit(ss[i]);
+        const pr = (f.hp / f.max < 0.25) ? 0.03 : 0.012;
+        if (Math.random() >= pr) continue;
+        await faintFx(ss[i]);
+        await say(f.name + josa(f.name, '이') + ' 쏜살같이 달아났다!', 1300);
+        gone(ss[i], 'fled');
+    }
+    return !leftFoes();
+}
+async function beginDbl(opt) {
+    const M = D(), u = u_();
+    const ui = build(opt.loc, true);
+    B = { ui: ui, opt: opt, kind: 'wild', dbl: true, tut: false, pick: null, wrapped: false, side: 'A', S: null, shown: {}, shownIdx: {}, recs: [], mon: null, boss: false, kind2: null, spec: opt.specs[0] };
+    window.D2BT_ACTIVE = true;
+    ui.ov.addEventListener('pointerdown', onTap);
+    const recs = myRecs(u);
+    B.recs = recs;
+    B.seed = 'dbl:' + Date.now() + ':' + Math.floor(Math.random() * 1e6);
+    try { B.S = BT().start({ dbl: true, my: recs, foe: opt.specs, auto: { A: false, B: true }, seed: B.seed, mode: 'pve', art: { A: M.artOld(u) } }); }
+    catch (e) { console.warn('[🧸] 더블 시작', e); return finish({ res: 'gone' }); }
+    syncShown();
+    ['B', 'E'].forEach(function (s) { if (liveAt(s)) paintPos(s, 'base'); });
+    paintStat();
+    await enterFx(ui, false);
+    await sleep(60);
+    ui.gF.style.transform = 'translateX(0)';
+    ui.gM.style.transform = 'translateX(0)';
+    await sleep(950);
+    const fs = ['B', 'E'].filter(liveAt);
+    fs.forEach(function (s) { M.dexSeen(sideUnit(s).sp); });
+    await say(WILD + ' 둘이 당신을 발견했다!', 1500);
+    await Promise.all(fs.map(function (s) { return mosaicMorph(s); }));
+    for (let i = 0; i < fs.length; i++) { if (!B) return { res: 'gone' }; await say(fmt(pick(TX.morph), { w: WILD, s: sideUnit(fs[i]).name }), 1300); }
+    showStat(true, false);
+    await sleep(300);
+    // 우리 — 왼쪽 · 오른쪽 (시작 로그의 등장 줄은 「가자」 로 · 나머지(등장 특성)는 그대로)
+    const ms = ['A', 'C'].filter(liveAt);
+    ms.forEach(function (s) { paintPos(s); const e = sprOf(s); if (e) e.style.opacity = '0'; });
+    paintStat();
+    await say(ms.map(function (s) { return sideUnit(s).name; }).join(', ') + '! 가자!', 1100);
+    await Promise.all(ms.map(function (s) { return whiteIn(s); }));
+    showStat(true, true);
+    await sleep(300);
+    const rest = B.S.log.filter(function (e) { return e.k !== 'enter'; });
+    if (rest.length) await playLog(rest);
+    return loopDbl();
+}
+async function loopDbl() {
+    for (;;) {
+        if (!B) return { res: 'gone' };
+        if (B.S.over) return endSolo();
+        if (!(await refillDbl())) return { res: 'gone' };
+        let acts = await chooseDbl();
+        if (!B || acts == null) return { res: 'gone' };
+        if (acts === 'run') {
+            menu(0);
+            const r = await tryRun();
+            if (r) return r;
+            acts = {};
+        }
+        menu(0);
+        // 🎀 포옹 리본 — 턴보다 먼저 (그 인형은 그 턴을 쓴다)
+        const order = ['A', 'C'];
+        for (let i = 0; i < order.length; i++) {
+            const s = order[i], a = acts[s];
+            if (!a || a.k !== 'ribbon') continue;
+            const r = await throwRibbonDbl(a.tgt);
+            if (r && r.res) return r;                                    // 잡았다 · 다 끝났다 (finish 가 화면을 닫았다)
+            if (!B) return { res: 'gone' };
+            acts[s] = { k: 'pass' };
+        }
+        ['A', 'C'].forEach(function (s) { if (liveAt(s) && !acts[s]) acts[s] = { k: 'pass' }; });
+        const t = await runTurnDbl(acts);
+        if (!t) return { res: 'gone' };
+        if (t.over) return endSolo(t.grow);
+        if (await wildFleeDbl()) { await say('야생 봉제인형이 모두 떠났다.', 1200); return finish({ res: 'fled' }); }
+    }
 }
 
 // ==========================================
@@ -1405,7 +1918,19 @@ async function pvpEnd(r) {
 }
 
 window.DOLLBT = {
-    wild: function (o) { o = o || {}; return begin({ kind: 'wild', loc: o.loc || 'wild', tut: !!o.tut, spec: wildSpec(o) }); },
+    // ★ 출몰지 — 살아 있는 동행이 둘 이상이면 셋에 하나는 야생 둘과 더블 배틀 (o.dbl 로 정할 수도 · 튜토리얼은 늘 하나)
+    wild: function (o) {
+        o = o || {};
+        if (B) return Promise.resolve({ res: 'busy' });
+        let dbl = o.dbl;
+        if (dbl == null) {
+            let n = 0; try { n = aliveRecs(myRecs()).length; } catch (e) { }
+            const rate = (typeof window.dollDblRate === 'number') ? window.dollDblRate : DBL_RATE;   // 콘솔 · 시험 — dollDblRate = 1 이면 늘 더블 · 0 이면 늘 하나
+            dbl = !o.tut && n >= 2 && Math.random() < rate;
+        }
+        if (dbl && !o.tut) return beginDbl({ kind: 'wild', loc: o.loc || 'wild', specs: [wildSpec(o), wildSpec(o)] });
+        return begin({ kind: 'wild', loc: o.loc || 'wild', tut: !!o.tut, spec: wildSpec(o) });
+    },
     monster: function (o) { o = o || {}; return begin({ kind: 'mon', loc: o.loc || 'arcade', spec: monSpec(o.mon != null ? o.mon : 9, o.diff || 'D', 1) }); },
     busy: function () { return !!B; },
     party: partyFight, partyStart: partyStart, resolve: resolveParty, monSpec: monSpec, foeFor: monSpec, xpFor: xpOfSpec, LV_OF_DIFF: LV_OF_DIFF,
@@ -1414,7 +1939,7 @@ window.DOLLBT = {
 };
 window.dollBattleTest = function (mon, diff) {
     if (!D() || !D().isAdmin()) { console.warn('상담사만'); return; }
-    const p = (mon != null) ? window.DOLLBT.monster({ mon: mon, loc: 'arcade', diff: diff }) : window.DOLLBT.wild({ loc: 'wild' });
+    const p = mon === 'dbl' ? window.DOLLBT.wild({ loc: 'wild', dbl: true }) : (mon != null) ? window.DOLLBT.monster({ mon: mon, loc: 'arcade', diff: diff }) : window.DOLLBT.wild({ loc: 'wild' });
     p.then(function (r) { console.log('[🧸 전투] 끝 —', r); });
 };
 
