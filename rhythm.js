@@ -74,7 +74,15 @@ const SONGS = [
     //   앞 몸통은 지난번 마스터와 한 샘플도 다르지 않다 (같은 올림) · 채보는 그대로 (곡 길이만 늘고 하드 레벨 15)
     //   채보 — 다시 뽑음 · 몸통 촘촘함 그대로 · 끝 마당은 새로 울린 소리 위에 두고 마지막 한 방에 양손 동시로 맺는다 (tools/rhythm-chart.py OUTRO)
     //   need — 그 곡 · 그 난이도에서 그 랭크 이상을 받으면 열린다 (needMet · checkNeeds)
-    { key: 'handicap', title: 'Handicap', artist: 'Benz', audio: 'snd/rhythm-handicap.mp3', chart: 'rhythm/handicap.json', color: '#6fd3a0', cover: 'rhythm/handicap-cover.jpg?v=2', need: { song: 'client', diff: 'hard', rank: 'B' } }
+    { key: 'handicap', title: 'Handicap', artist: 'Benz', audio: 'snd/rhythm-handicap.mp3', chart: 'rhythm/handicap.json', color: '#6fd3a0', cover: 'rhythm/handicap-cover.jpg?v=2', need: { song: 'client', diff: 'hard', rank: 'B' } },
+    // ★ 2026-11-12 사용자 「이것도 리듬게임에 넣어줘. 아티스트 이름은 광시 로 해주고 20000 포인트로 사야 할 수 있게. 표지 사진도 참고해」 · 제목은 받은 파일 이름(genesis)대로 「Genesis」
+    //   음원 — 위(2.5 ~ 16 kHz)가 다른 곡들보다 9 ~ 13 dB 밝고 가운데가 비었다 · 20 ~ 80 Hz 두꺼움 · 좌우 좁음
+    //          → 웅웅임 걷고 · 가장 낮은 저음 조금 · 가운데 몸통 조금 · 날카로운 3 ~ 4 kHz 와 위를 눅이고 · 좌우 조금 넓게 · 클릭 · 옅은 잡음 걷기 · -14 LUFS
+    //   채보 — 80 BPM 에 한 박을 셋으로 나누는 곡(12/8) — 격자를 박의 0 · 1/3 · 2/3 에 (tools/rhythm-chart.py SWING · 넷째 칸은 안 씀)
+    //          · 템포가 처음부터 끝까지 80.000 이라 곧은 격자 (FIXED_BPM — 따라가는 격자는 조용한 앞 · 134 ~ 146 초에서 어긋났다)
+    //          · 박이 느려 노트가 성겨 노말 한 박 노트 수를 늘림 (HARDER)
+    //   표지 — 주신 사진(푸른 하늘 십자가)을 정사각 720 으로
+    { key: 'genesis', title: 'Genesis', artist: '광시', audio: 'snd/rhythm-genesis.mp3', chart: 'rhythm/genesis.json', color: '#9fc3ea', cover: 'rhythm/genesis-cover.jpg', price: 20000 }
 ];
 const DIFFS = [['easy', 'EASY', '이지', '#5fd18a'], ['normal', 'NORMAL', '노말', '#ffc94a'], ['hard', 'HARD', '하드', '#ff5f73']];
 const LANES = 6;                      // 채보의 칸 수 — 화면에서는 가로 자리로 바꾼다 (xOfLane)

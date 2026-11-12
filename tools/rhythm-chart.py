@@ -111,6 +111,19 @@ def onset_pitch(sr, x, grid, off_bias):
     return pit, pstr
 
 
+# 「바로 다음 칸」 — 쓰지 않는 칸(SWING 의 None)이 있는 곡은 그 칸을 건너뛴 다음 칸 (Genesis 셋잇단: 박 · 1/3 · 2/3 · 다음 박 이 0.25 초 간격으로 고르다)
+#   None 이면 i + 1 · 간격 2 넘게는 늘 격자 번호 차이 그대로 (노말의 셔플 8분 — 박 · 2/3 — 이 그대로 같은 간격)
+NEXT1 = None
+
+
+def nxt(i, step):
+    return int(NEXT1[i]) if (step == 1 and NEXT1 is not None and i < len(NEXT1)) else i + step
+
+
+def adj(i, j, step):
+    return nxt(i, step) == j
+
+
 def zig_runs(pit, pstr, ok, step, n_min, n_max):
     """높이가 낮 · 높 · 낮 · 높 … 으로 번갈아 이어지는 격자 줄 (간격 step) — [격자 번호들]"""
     th = np.percentile(pstr[pstr > 0], 55) if (pstr > 0).any() else 1e9
@@ -121,8 +134,8 @@ def zig_runs(pit, pstr, ok, step, n_min, n_max):
         if s0 <= last or not ok[s0] or pstr[s0] < th:
             continue
         seq = [s0]
-        while seq[-1] + step < K and ok[seq[-1] + step] and pstr[seq[-1] + step] >= th and len(seq) < n_max:
-            seq.append(seq[-1] + step)
+        while nxt(seq[-1], step) < K and ok[nxt(seq[-1], step)] and pstr[nxt(seq[-1], step)] >= th and len(seq) < n_max:
+            seq.append(nxt(seq[-1], step))
         d = np.diff(pit[seq])
         if not len(d) or abs(d[0]) < 1:
             continue
@@ -284,14 +297,19 @@ ZIG_TWO = {'showtime': {'normal': (0, 1), 'hard': (0, 1)}}
 # 셔플(스윙)로 출렁이는 곡 — 박 안 16분 넷의 자리 (박 길이의 몫). 곧은 곡은 (0, .25, .5, .75)
 #   Handicap — 8분이 2:1 로 출렁인다 (마디를 48 칸으로 접어 보니 박 0 · 2/3 에 소리가 몰렸다 · 2026-11-11)
 #   → 앞 8분(길게)을 0 · 1/3, 뒤 8분(짧게)을 2/3 · 5/6 으로
-SWING = {'handicap': (0, 1 / 3, 2 / 3, 5 / 6)}
+#   Genesis — 한 박(0.75 초 · 80 BPM)을 셋으로 나눈다 (12/8 · 박을 24 칸으로 접어 보니 0 · 1/3 · 2/3 에 소리가 몰리고 1/6 · 1/2 · 5/6 은 옅다 · 2026-11-12)
+#     → 넷째 칸은 None — 쓰지 않는 칸 (5/6 에 두었더니 하드 노트 156 개가 거기 서서 소리와 125 ms 어긋났다)
+SWING = {'handicap': (0, 1 / 3, 2 / 3, 5 / 6), 'genesis': (0, 1 / 3, 2 / 3, None)}
 
 
 # 사용자가 「어렵게」라고 한 곡 — 노말 · 하드 둘 다 더 촘촘하게 (2026-11-11 사용자 「Handicap … 어렵게」)
 #   normal — 노말 한 박에 노트 수 배 · hard — 하드 노트 수(노말의 HARD_X 배)에 또 곱함
 #   zig — 지그재그 줄 수 배 · two — 8분 지그재그 가운데 양손으로 하는 몫 (보통 0.4) · chord — 노말 동시 몫 배
 #   fill16 — 하드에서 그래도 모자라면 박을 선율 옆 16분 자리까지 (다른 손)
-HARDER = {'handicap': {'normal': 1.1, 'hard': 0.98, 'alt': True, 'fill16': True}}
+HARDER = {'handicap': {'normal': 1.1, 'hard': 0.98, 'alt': True, 'fill16': True},
+          # Genesis — 「어렵게」는 아니지만 박이 느려서(80 BPM · 한 박 0.75 초) 한 박 기준으로 고르면 다른 곡보다 노트가 성기다 (노말 초당 2.4)
+          #   → 노말 한 박 노트 수만 늘려 느린 곡들(Devotion · 내담자 여러분께 — 노말 2.7 ~ 2.8 · 하드 4.7) 보다 조금 촘촘하게 · 하드는 노말을 따라 는다
+          'genesis': {'normal': 1.3}}
 #   ✗ 처음(2026-11-11)엔 'normal': 1.35, 'hard': 1.15, 'zig': 1.8, 'two': 0.65, 'chord': 1.8, 'fill16': True 로 촘촘하게 했다 (노말 629 · 하드 1070 · 초당 8)
 #     → 사용자 「너무 촘촘해서 안 될 것 같아. 딱 쇼타임 정도로만 맞춰주고 레벨은 17로」 — Showtime! (노말 초당 4.0 · 하드 6.68) 에 맞춘 값으로
 
@@ -381,6 +399,28 @@ def outro_notes(notes, diff, ons, t0):
     else:
         out += [[tf, 1, 0, 0], [tf, 4, 0, 0]]                     # 양손 동시로 맺는다
     return out, len(notes) - len(out)                           # 걷어 낸 노트 수 − 새로 둔 노트 수
+
+
+# 템포가 처음부터 끝까지 한결같은 곡 — 따라가는 격자(track_grid) 대신 곧은 격자 · BPM 은 정해 두고 자리(위상)만 곡 전체로 잰다
+#   Genesis — 80.000 BPM 그대로 (곡 전체로 맞춰 보니 8 초마다 잰 자리가 다 ±7 ms 안 · 2026-11-12)
+#     따라가는 격자는 조용한 앞(0 ~ 15 초)과 드럼이 옅은 134 ~ 146 초에서 60 ~ 190 ms 어긋났다
+FIXED_BPM = {'genesis': 80.0}
+
+
+def fixed_grid(env, fps, off, dur, beat, subs):
+    """곧은 16분 격자 (박마다 넷 · 노트 시각) — 박 자리 φ 는 곡 전체에서 박 · 박 안 칸(subs) 자리의 소리 결이 가장 큰 곳, 박은 낮은 소리(킥)를 더 본다."""
+    ea, el = env['all'], env['low']
+
+    def mean_at(e, ts):
+        i = np.clip(((ts - off - BIAS) * fps).round().astype(int), 0, len(e) - 1)
+        return float(e[i].mean())
+    best = None
+    for ph in np.arange(0, beat, 0.0025):
+        bt = np.arange(ph, dur, beat)
+        sc = sum(mean_at(ea, bt + w * beat) for w in subs) + mean_at(el, bt)
+        if best is None or sc > best[0]:
+            best = (sc, ph)
+    return np.arange(best[1], dur, beat / 4)         # 첫 칸이 박 (넷마다 박)
 
 
 HOLD_GAP = 250
@@ -626,7 +666,7 @@ def hard_chart(grid, K, pos, ok, F, R, active, MEL, zig_span, first_ok, last_ok,
         j = 0
         while j < len(kept):
             k = j
-            while k + 1 < len(kept) and kept[k + 1] - kept[k] == step and not any(b_ in beat_set for b_ in range(kept[k], kept[k + 1])):
+            while k + 1 < len(kept) and adj(kept[k], kept[k + 1], step) and not any(b_ in beat_set for b_ in range(kept[k], kept[k + 1])):
                 k += 1
             # 한쪽으로만 가는 가장 긴 앞머리
             best = None
@@ -747,6 +787,7 @@ TAIL = {'handicap': 143.655}
 
 
 def main():
+    global NEXT1
     wav, key, title, artist = sys.argv[1:5]
     sr, x = load(wav)
     dur_all = len(x) / sr
@@ -786,6 +827,12 @@ def main():
         post.append(t)
         t += d1
     grid = np.concatenate([grid, np.array(post)])
+    if key in FIXED_BPM:
+        beat = 60.0 / FIXED_BPM[key]
+        grid = fixed_grid(env, fps, off, dur, beat, [w for w in SWING.get(key, (0, .25, .5, .75)) if w is not None])
+
+        def per_curve(t):
+            return beat / 4
     K = len(grid)
     PIT, PSTR = onset_pitch(sr, x, grid, 0.0)                       # 격자 = 소리 시각 · 그 앞뒤 틀에서 새로 오른 소리를 본다
     MEL = melody_onsets(sr, x, grid)                                 # 하드 — 선율 따라가기 (2026-11-11)
@@ -806,8 +853,12 @@ def main():
     bar_off = beat_off + 4 * int(np.argmax([F['low'][beat_off + 4 * j::16].sum() for j in range(4)]))
     pos = (np.arange(K) - bar_off) % 16
     # ★ 셔플(스윙) 곡 — 박 안 16분 넷의 자리를 SWING 대로 옮기고, 격자에 딸린 값들을 다시 잰다 (박 자리 · 마디선은 그대로)
+    DEAD = np.zeros(K, bool)                     # 쓰지 않는 칸 (SWING 의 None) — 어떤 노트도 두지 않는다
     if key in SWING:
-        Wsw = SWING[key]
+        DEAD = np.array([SWING[key][pos[i] % 4] is None for i in range(K)])
+        if DEAD.any():
+            NEXT1 = np.array([next((j for j in range(i + 1, min(K, i + 3)) if not DEAD[j]), K) for i in range(K)])
+        Wsw = [5 / 6 if w is None else w for w in SWING[key]]
         bi = [i for i in range(K) if pos[i] % 4 == 0]
         g2 = grid.copy()
         for a, b in zip(bi[:-1], bi[1:]):
@@ -881,12 +932,12 @@ def main():
             S['slide_n'] = S['slide_n'] * HX.get('zig', 1)
             S['fill16'] = bool(HX.get('fill16'))
             S['alt'] = bool(HX.get('alt'))
-        ok = np.array([(grid[i] >= first_ok and grid[i] <= last_ok and active[i] and (pos[i] in S['mods'])) for i in range(K)])
+        ok = np.array([(grid[i] >= first_ok and grid[i] <= last_ok and active[i] and (pos[i] in S['mods']) and not DEAD[i]) for i in range(K)])
         # 지그재그 자리를 먼저 잡고 — 그 사이는 다른 노트를 비운다
         zigs = []
         if diff in ZIG:
             Z = ZIG[diff]
-            okz = np.array([(grid[i] >= first_ok + 1 and grid[i] <= last_ok - 0.5 and active[i]) for i in range(K)])
+            okz = np.array([(grid[i] >= first_ok + 1 and grid[i] <= last_ok - 0.5 and active[i] and not DEAD[i]) for i in range(K)])
             cand = []
             for step, amp in Z['steps']:
                 for r in zig_runs(PIT, PSTR, okz, step, Z['min'], Z['max']):
@@ -907,7 +958,7 @@ def main():
         zig_span = [(r[0] - 1, r[-1] + 1) for r, amp in zigs]
         if diff == 'hard':
             # 노트 수 — 정리 전 하드처럼 노말의 1.72 배 (2026-11-11 사용자 「하드 조금만 더 노트 수를 늘리자. 기존처럼」) · 지그재그 노트 몫은 뺀다
-            z8_ = sorted([zi for zi, (r, amp) in enumerate(zigs) if r[1] - r[0] >= 2], key=lambda zi: -float(R[zigs[zi][0]].mean()))
+            z8_ = sorted([zi for zi, (r, amp) in enumerate(zigs) if r[-1] - r[0] >= 1.5 * (len(r) - 1)], key=lambda zi: -float(R[zigs[zi][0]].mean()))
             two_ = set(z8_[:max(1, int(math.ceil(len(z8_) * (HX.get('two', 0.4) if HX else 0.4))))]) if z8_ else set()
             two_ |= {zi for zi in ZIG_TWO.get(key, {}).get(diff, ()) if zi < len(zigs)}
             zn_ = sum(len(r) * (2 if zi in two_ else 1) for zi, (r, amp) in enumerate(zigs))
@@ -981,7 +1032,7 @@ def main():
                 j = 0
                 while j < len(sel):
                     k = j
-                    while k + 1 < len(sel) and sel[k + 1] - sel[k] == step:
+                    while k + 1 < len(sel) and adj(sel[k], sel[k + 1], step):
                         k += 1
                     if k - j + 1 >= S['slide'][0]:
                         runs.append((j, k))
@@ -1078,7 +1129,7 @@ def main():
         # 지그재그 — 낮은 음 왼쪽 · 높은 음 오른쪽 칸을 번갈아 (곡의 그 자리 높이로 왼 · 가운데 · 오른 쪽)
         #   양손 — 8분 지그재그 가운데 소리가 큰 줄 (40 % · 적어도 하나)
         two = set()
-        z8 = [zi for zi, (r, amp) in enumerate(zigs) if r[1] - r[0] >= 2]
+        z8 = [zi for zi, (r, amp) in enumerate(zigs) if r[-1] - r[0] >= 1.5 * (len(r) - 1)]     # 8분 지그재그 (평균 간격 2 — 셋잇단 바로 다음 칸 줄은 1.33)
         if z8:
             z8.sort(key=lambda zi: -float(R[zigs[zi][0]].mean()))
             two = set(z8[:max(1, int(math.ceil(len(z8) * (HX.get('two', 0.4) if HX else 0.4))))])
