@@ -36,7 +36,7 @@ const PATH = 'playlists';
 const SET_KEY = 'plSet';
 const MAX_LISTS = 20;
 // 곡 길이 (ms) — 목록에 미리 적어 둔다 (리듬 채보의 dur). 새 곡은 한 번 틀면 재서 이 기기에 적어 둔다
-const DUR = { airplane: 147120, client: 168240, devotion: 159680, evilhigh: 147640, returnhome: 100600, cheonjiin: 153120, handicap: 147555, genesis: 184425, sangun: 153535, legacy: 149815, sunvictory: 122935,
+const DUR = { airplane: 147120, client: 168240, devotion: 159680, evilhigh: 147640, returnhome: 100600, cheonjiin: 153120, handicap: 147555, genesis: 184425, sangun: 153535, legacy: 149815,
               winterfloat: 163080, whitexmas: 120800, showtime: 126800 };
 
 function u_() { return (typeof currentUser !== 'undefined' && currentUser) ? currentUser : null; }
@@ -116,7 +116,8 @@ function loadLists() {
         Object.keys(v).forEach(function (id) {
             const x = v[id];
             if (!x || typeof x !== 'object') return;
-            LISTS[id] = { n: String(x.n || '내 플리').slice(0, 24), s: vals(x.s).map(String), at: Number(x.at) || 0 };
+            // 리듬 게임에서 뺀 곡(2026-11-12 Sun of Victory)은 플리에서도 걸러 낸다 — 곡 수 · ▲▼✕ 자리가 어긋나지 않게
+            LISTS[id] = { n: String(x.n || '내 플리').slice(0, 24), s: vals(x.s).map(String).filter(function (k) { return !!song(k); }), at: Number(x.at) || 0 };
         });
         listsFor = code;
         loading = null;

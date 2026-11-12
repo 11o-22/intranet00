@@ -98,7 +98,7 @@ const SONGS = [
     //     채보 — 16분 결이 0.159 초인데 저절로는 127 BPM 으로 잡혀 어긋나 94.5 BPM 둘레로 찾게 함 (BPM_HINT)
     { key: 'sangun', title: '山君', artist: 'Benz', audio: 'snd/rhythm-sangun.mp3', chart: 'rhythm/sangun.json', color: '#8fa3e6', cover: 'rhythm/sangun-cover.jpg' },
     { key: 'legacy', title: 'Legacy', artist: 'Benz', audio: 'snd/rhythm-legacy.mp3', chart: 'rhythm/legacy.json', color: '#d6d6d6', cover: 'rhythm/legacy-cover.jpg?v=2', need: { song: 'sangun', play: true } },     // 표지 바꿈 (2026-11-12 사용자 · 흑백 담배 든 인물 새 그림)
-    { key: 'sunvictory', title: 'Sun of Victory', artist: 'Benz', audio: 'snd/rhythm-sunvictory.mp3', chart: 'rhythm/sunvictory.json', color: '#9fd3ff', cover: 'rhythm/sunvictory-cover.jpg', price: 15000 }
+    // ✗ Sun of Victory 는 2026-11-12 사용자 「Sun of Victory 리듬게임에서 없애자」로 뺐다 (음원 · 채보 · 표지 파일은 남겨 둠)
 ];
 const DIFFS = [['easy', 'EASY', '이지', '#5fd18a'], ['normal', 'NORMAL', '노말', '#ffc94a'], ['hard', 'HARD', '하드', '#ff5f73']];
 const LANES = 6;                      // 채보의 칸 수 — 화면에서는 가로 자리로 바꾼다 (xOfLane)
