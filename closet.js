@@ -828,6 +828,20 @@ function femOk(user) {
     try { return grapeOn(u); } catch (e) { return false; }
 }
 window.dotFemOk = femOk;
+// ★ 여성 체형만 (2026-11-12 사용자 「여성 혹은 포도맛 마신 남성은 무조건 여성체형만 쓸 수 있게」)
+//   사원증 성별이 여성인 사람 · 🍇 포도맛 물약이 도는 남성 — 체형 칸에 「기본」이 없고(고를 것이 하나라 줄도 안 생긴다),
+//   적힌 체형과 상관없이 여성 체형 몸으로 그린다. 물약이 끝난 남성은 적힌 대로(보통 몸) 돌아간다.
+//   상담사는 빼 둔다 (늘 둘 다 고른다) · 물약을 마신 여성(겉모습이 남성으로 바뀐다)은 예전처럼 둘 다 고른다
+function femForced(user) {
+    const u = user || u_();
+    if (!u || isAdm(u)) return false;
+    let g = false;
+    try { g = grapeOn(u); } catch (e) { }
+    return isWoman(u) ? !g : g;
+}
+window.dotFemForced = femForced;
+// 고르는 중인 자리 기록(p · d)의 체형 — 여성 체형만 쓰는 사람은 늘 여성 체형
+function shapeOf(p, user) { return femForced(user) ? 'fem' : (p && p.shape) || ''; }
 // ★ 상담사가 콘솔로 준 것 — u.dotGrant = { fem: 1, … } (2026-11-08 사용자 「여성 체형, 상담사가 콘솔로 줄 수 있게」)
 //   dotGrant('사번', 'fem') 주기 · dotGrant('사번', 'fem', false) 거두기. owner: true 인 것(여성 체형 · 그 옷들)에 쓴다
 function hasGrant(it, user) {
@@ -877,7 +891,10 @@ window.dotHeadAllowed = function (id, user) {
 };
 
 function items(slot, user) {
-    return slot.items.filter(function (it) { return allowed(it, user); });
+    return slot.items.filter(function (it) {
+        if (slot.k === 'shape' && it.def && femForced(user)) return false;   // 여성 체형만 쓰는 사람 — 「기본」 없음
+        return allowed(it, user);
+    });
 }
 function slotOf(k) { return DOT_SLOTS.filter(function (s) { return s.k === k; })[0]; }
 // 이 체형(shape 칸의 열쇠)이 여성 체형 몸인가 — fem 옷을 고를 수 있나 (2026-11-07)
@@ -994,7 +1011,8 @@ function moveOld(d) {
 }
 function look(user, override, all) {
     const u = user || u_() || {};
-    const d = moveOld(override || u.dot || {});
+    let d = moveOld(override || u.dot || {});
+    if (femForced(u) && d.shape !== 'fem') d = Object.assign({}, d, { shape: 'fem' });   // 여성 체형만 (2026-11-12)
     const headPick = DOT_HEADS.some(function (h) { return h.i === d.head; }) ? d.head : DOT_HEADS[0].i;
     // 🍇 포도맛 물약 — 보이는 머리만 반대 성별 짝으로 (고른 머리는 headPick 그대로 · 저장은 그것을 쓴다)
     const head = grapeOn(u) ? swapHead(headPick) : headPick;
@@ -1256,11 +1274,13 @@ const SWAP = {};
 function swapHead(id) { return (SWAP[id] && DOT_HEADS.some(function (h) { return h.i === SWAP[id]; })) ? SWAP[id] : id; }
 window.dotGrapeOn = grapeOn;
 // 남에게 보내는 내 모습(광장 자리 기록) — 물약 중이면 바뀐 머리를 실어 보낸다
+//   ★ 여성 체형만 쓰는 사람(femForced · 2026-11-12)이면 체형도 여성 체형으로 실어 보낸다 — 받는 쪽이 사원증 · 물약을 몰라도 같게 보이게
 window.dotShownDot = function (u) {
-    const d = (u && u.dot && typeof u.dot === 'object') ? u.dot : null;
-    if (!d || !grapeOn(u)) return d;
-    const h = swapHead(d.head);
-    return h === d.head ? d : Object.assign({}, d, { head: h });
+    let d = (u && u.dot && typeof u.dot === 'object') ? u.dot : null;
+    if (!d) return d;
+    if (grapeOn(u)) { const h = swapHead(d.head); if (h !== d.head) d = Object.assign({}, d, { head: h }); }
+    if (femForced(u) && d.shape !== 'fem') d = Object.assign({}, d, { shape: 'fem' });
+    return d;
 };
 // 물약이 들거나 풀리면 광장의 내 모습을 다시 그리고 남에게도 다시 알린다
 (function grapeWatch() {
@@ -2303,7 +2323,7 @@ function tap(kind, k, v) {
         let sel = accSplit(p[s.k]);
         if (!v) sel = [];                                            // 「없음」은 전부 벗는다
         else if (sel.indexOf(v) >= 0) sel = sel.filter(function (x) { return x !== v; });
-        else if ((s.items.filter(function (x) { return x.i === v; })[0] || {}).fem && !femShape(p.shape)) {
+        else if ((s.items.filter(function (x) { return x.i === v; })[0] || {}).fem && !femShape(shapeOf(p))) {
             // 여성 체형에서만 다는 악세 (바니걸 머리띠 · 스타킹 · 2026-11-08)
             const n = document.getElementById('closet-note');
             if (n) { n.innerText = '여성 체형일 때만 달 수 있습니다.'; setTimeout(note_, 1800); }
@@ -2320,7 +2340,7 @@ function tap(kind, k, v) {
         //   체형을 다른 것으로 바꾸면 입고 있던 그 옷은 벗긴다 (없음)
         const s = slotOf(k);
         const it = s ? s.items.filter(function (x) { return x.i === v; })[0] : null;
-        if (it && it.fem && !femShape(p.shape)) {
+        if (it && it.fem && !femShape(shapeOf(p))) {
             const n = document.getElementById('closet-note');
             if (n) { n.innerText = '여성 체형일 때만 입을 수 있습니다.'; setTimeout(note_, 1800); }
             return;
