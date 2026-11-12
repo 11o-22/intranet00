@@ -243,6 +243,20 @@ function css() {
         '#hr-edit .tabs{display:flex;gap:6px;padding:8px 8px 4px;align-items:center;}',
         '#hr-edit .tabs .sp{flex:1;}',
         '#hr-edit .pts{font-size:11px;color:#d9c48a;padding:0 10px 4px;}',
+        // 가구 칸 안 — 📦 내 가구(눌러서 놓기) / 🛒 가구 상점 (2026-11-12 사용자 「보유하고 있는 가구를 눌러서 꾸밀 수 있게」)
+        '#hr-edit .sub{display:flex;gap:6px;padding:0 8px 4px;}',
+        '#hr-edit .sub:empty{display:none;}',
+        '#hr-edit .sub .hr-b{flex:1;padding:5px 6px;font-size:12px;}',
+        // 가구를 놓는 동안(방에서 누르거나 · 내 가구에서 누르거나) 꾸미기 창은 닫힌다 — ✓ 놓기 · 📦 넣기 하면 다시 열린다
+        //   (2026-11-12 사용자 「가구 놓을 때는 창이 닫히고, 가구만 옮겨서 놓을 수 있게」)
+        '#hr-edit.mini{display:none;}',
+        '#hr-hint{position:absolute;left:50%;bottom:52px;bottom:calc(max(8px,env(safe-area-inset-bottom)) + 44px);transform:translateX(-50%);z-index:6;display:none;background:rgba(0,0,0,.8);border:1px solid #6b5a36;color:#f3e3b5;padding:6px 12px;border-radius:9px;font-size:12px;pointer-events:none;white-space:nowrap;}',
+        '#hr-ov.place #hr-hint{display:block;}',
+        '#hr-ov.place #hr-joy{display:none !important;}',
+        '.hr-card.tap{cursor:pointer;}',
+        '.hr-card.tap:active{border-color:#ffd76a;background:rgba(255,215,106,.08);}',
+        '.hr-card.done small{color:#8fd18f;}',
+        '.hr-empty{grid-column:1/-1;color:#888;font-size:12px;text-align:center;padding:18px 6px;line-height:1.6;}',
         '#hr-edit .list{overflow:auto;padding:4px 8px 10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(98px,1fr));gap:6px;}',
         '.hr-card{background:rgba(255,255,255,.05);border:1px solid #3b3427;border-radius:8px;padding:6px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;text-align:center;}',
         '.hr-card.cur{border-color:#ffd76a;}',
@@ -345,7 +359,8 @@ function enter(host) {
         + (mine ? '<button class="hr-b" data-k="edit">🛠 꾸미기</button><button class="hr-b" data-k="inv">💌 초대</button>' : '')
         + '<button class="hr-b" data-k="x">✕ 나가기</button></div>'
         + '<div id="hr-chat"><div id="hr-feed"></div><input id="hr-in" maxlength="60" placeholder="말하기 (Enter)" autocomplete="off"></div>'
-        + '<div id="hr-tool"><button class="hr-b" data-t="rot">↻ 돌리기</button><button class="hr-b" data-t="put">📦 넣기</button><button class="hr-b" data-t="ok">✓</button></div>'
+        + '<div id="hr-tool"><button class="hr-b" data-t="rot">↻ 돌리기</button><button class="hr-b" data-t="put">📦 넣기</button><button class="hr-b on" data-t="ok">✓ 놓기</button></div>'
+        + '<div id="hr-hint">어디를 끌어도 가구가 따라 움직입니다 · ✓ 놓기</div>'
         + '<div id="hr-joy"><i></i></div>'
         + (mine ? '<div id="hr-zoom"><button class="hr-b" data-z="-1">－</button><span></span><button class="hr-b" data-z="1">＋</button></div>' : '')
         + '<div id="hr-load">🏠 사택에 들어가는 중…</div>';
@@ -569,6 +584,7 @@ function loop() {
     if (S.keys.l) dx -= 1; if (S.keys.r) dx += 1; if (S.keys.u) dy -= 1; if (S.keys.d) dy += 1;
     let mag = 1;
     if (S.joy && (S.joy.dx || S.joy.dy)) { dx = S.joy.dx; dy = S.joy.dy; mag = Math.min(1, Math.hypot(dx, dy)); }
+    if (S.edit && S.sel) { dx = 0; dy = 0; }                 // 가구를 놓는 동안엔 가구만 움직인다
     const len = Math.hypot(dx, dy);
     let moving = false;
     if (len > 0.08) {
@@ -586,6 +602,7 @@ function loop() {
         if (S.me.bub && t - S.me.bubAt > 6000) bubble(S.me, null);
     }
     S.moving = moving;
+    if (moving && S.focus) S.focus = null;
     // 남 — 받은 자리로 다가간다
     Object.keys(S.peers).forEach(function (c) {
         const p = S.peers[c]; if (!p.one) return;
@@ -602,11 +619,17 @@ function loop() {
     send(moving);
     S.raf = requestAnimationFrame(loop);
 }
+// 화면 가운데 — 보통은 나 · 끄는 동안은 끌기 시작한 자리 · 내 가구에서 놓인 것을 고르면 그 가구 (걸으면 다시 나)
+function camAt() {
+    if (S.drag && S.drag.cam) return S.drag.cam;
+    if (S.edit && S.sel && S.focus) return S.focus;
+    return { x: S.x, y: S.y };
+}
 function camera() {
     const z = S.z, vw = S.view.clientWidth || 800, vh = S.view.clientHeight || 600;
     const b = BOUND || { x0: 0, x1: N, y0: 0, y1: N };
     const cx0 = (b.x0 - 24) * z, cx1 = (b.x1 + 24) * z, cy0 = (b.y0 - 24) * z, cy1 = (b.y1 + 40) * z;
-    const fx = (S.drag && S.drag.cam) ? S.drag.cam.x : S.x, fy = (S.drag && S.drag.cam) ? S.drag.cam.y : S.y;
+    const f = camAt(), fx = f.x, fy = f.y;
     let tx, ty;
     if (cx1 - cx0 <= vw) tx = (vw - (cx0 + cx1)) / 2; else tx = Math.max(vw - cx1, Math.min(-cx0, vw / 2 - fx * z));
     if (cy1 - cy0 <= vh) ty = (vh - (cy0 + cy1)) / 2; else ty = Math.max(vh - cy1, Math.min(-cy0, vh / 2 - (fy - 30) * z));
@@ -664,19 +687,20 @@ function pointerSetup() {
         const inp = S.ov.querySelector('#hr-in'); if (inp && document.activeElement === inp) inp.blur();
         if (S.edit) {
             const el = e.target && e.target.closest ? e.target.closest('.hr-fu') : null;
-            if (el) {
-                const id = el.getAttribute('data-id');
-                const v = S.flist.find(function (q) { return q.id === id; });
+            {
+                // 가구를 누르면 그 가구 · 놓는 중에 빈 곳을 누르면 고른 가구 — 끄는 만큼 가구만 움직인다 (사람은 안 걷는다)
+                const id = el ? el.getAttribute('data-id') : S.sel;
+                const v = id ? S.flist.find(function (q) { return q.id === id; }) : null;
+                if (!v && S.sel) select(null);
                 if (v) {
-                    select(id);
+                    if (S.sel !== id) select(id);
                     const w = toWorld(e.clientX, e.clientY);
-                    S.drag = { id: id, pid: e.pointerId, ox: w.x - v.x, oy: w.y - v.y, v: { id: v.id, t: v.t, d: v.d, x: v.x, y: v.y }, x0: v.x, y0: v.y, moved: false, cam: { x: S.x, y: S.y } };
+                    S.drag = { id: id, pid: e.pointerId, ox: w.x - v.x, oy: w.y - v.y, v: { id: v.id, t: v.t, d: v.d, x: v.x, y: v.y }, x0: v.x, y0: v.y, moved: false, cam: camAt() };
                     try { view.setPointerCapture(e.pointerId); } catch (er) { }
                     e.preventDefault();
                     return;
                 }
             }
-            if (S.sel) select(null);
         }
         S.joy = { pid: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0, mouse: e.pointerType === 'mouse' };
         if (!S.joy.mouse) { joyEl.style.display = 'block'; joyEl.style.left = e.clientX + 'px'; joyEl.style.top = e.clientY + 'px'; joyEl.firstChild.style.transform = ''; }
@@ -722,6 +746,11 @@ function pointerSetup() {
             if (dg.moved) {
                 if (placeOk(v)) furnSave(v);
                 else { v.x = dg.x0; v.y = dg.y0; const el = S.fel[v.id]; if (el) furnPaint(el, v); toast('집 밖에는 놓을 수 없습니다'); }
+                // 놓는 동안엔 사람이 안 걸으므로 — 가구가 화면 가장자리로 가면 화면을 가구 쪽으로 옮겨 더 끌 수 있게
+                const a = anchorOf(v), vw = S.view.clientWidth || 800, vh = S.view.clientHeight || 600;
+                const sx = a.x * S.z + (S.tx || 0), sy = a.y * S.z + (S.ty || 0);
+                if (sx < vw * 0.2 || sx > vw * 0.8 || sy < vh * 0.22 || sy > vh * 0.78) S.focus = { x: a.x, y: a.y };
+                else S.focus = dg.cam;                               // 그대로 — 끌기 전 화면을 붙든다
             }
             return;
         }
@@ -735,6 +764,8 @@ function pointerSetup() {
 // 꾸미기 (집주인만)
 // ==========================================
 let editTab = 'furn';
+let furnSub = null;            // 가구 칸 — 'own' 내 가구 · 'shop' 가구 상점 (처음엔 산 가구가 있으면 내 가구)
+function ownCount(d) { let n = 0; FURN.forEach(function (f, t) { n += ownedOf(t, d); }); return n; }
 function editToggle() {
     if (!S || !S.mine) return;
     S.edit = !S.edit;
@@ -751,12 +782,12 @@ function editToggle() {
     const el = document.createElement('div');
     el.id = 'hr-edit';
     el.innerHTML = '<div class="tabs"><button class="hr-b" data-tab="furn">🛋 가구</button><button class="hr-b" data-tab="wall">🧱 벽지</button><button class="hr-b" data-tab="floor">🟫 바닥지</button><span class="sp"></span><button class="hr-b" data-tab="x">닫기</button></div>'
-        + '<div class="pts"></div><div class="list"></div>';
+        + '<div class="pts"></div><div class="sub"></div><div class="list"></div>';
     S.ov.appendChild(el);
     S.editEl = el;
     el.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
     el.querySelectorAll('[data-tab]').forEach(function (b) {
-        b.onclick = function () { const k = b.getAttribute('data-tab'); if (k === 'x') { editToggle(); return; } editTab = k; editPaint(); };
+        b.onclick = function () { const k = b.getAttribute('data-tab'); if (k === 'x') { editToggle(); return; } editTab = k; if (S.sel) select(null); editPaint(); };
     });
     editPaint();
 }
@@ -770,16 +801,35 @@ function editPaint() {
     if (!S || !S.editEl) return;
     const el = S.editEl, d = decoOf(), u = u_();
     el.querySelectorAll('[data-tab]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === editTab); });
-    el.querySelector('.pts').textContent = '보유 ' + won(Math.floor(Number(u && u.points) || 0)) + (editTab === 'furn' ? ' · 가구를 눌러 끌어 옮깁니다' : '');
-    const list = el.querySelector('.list');
+    const list = el.querySelector('.list'), sub = el.querySelector('.sub');
+    const pts = '보유 ' + won(Math.floor(Number(u && u.points) || 0));
     let h = '';
     if (editTab === 'furn') {
-        FURN.forEach(function (f, t) {
-            const own = ownedOf(t, d), placed = placedOf(t, d), left = Math.max(0, own - placed);
-            h += '<div class="hr-card"><div class="pic"><i style="' + picCss(t, 64) + '"></i></div><b>' + esc(f.n) + '</b><small>' + won(f.p) + (own ? ' · 남은 ' + left + '/' + own : '') + '</small>'
-                + '<div class="row"><button class="hr-b" data-buy="' + t + '">사기</button><button class="hr-b" data-put="' + t + '"' + (left ? '' : ' disabled') + '>놓기</button></div></div>';
-        });
+        const ownN = ownCount(d);
+        if (!furnSub) furnSub = ownN ? 'own' : 'shop';
+        sub.innerHTML = '<button class="hr-b' + (furnSub === 'own' ? ' on' : '') + '" data-sub="own">📦 내 가구 ' + ownN + '</button>'
+            + '<button class="hr-b' + (furnSub === 'shop' ? ' on' : '') + '" data-sub="shop">🛒 가구 상점</button>';
+        sub.querySelectorAll('[data-sub]').forEach(function (b) { b.onclick = function () { furnSub = b.getAttribute('data-sub'); editPaint(); }; });
+        if (furnSub === 'own') {
+            el.querySelector('.pts').textContent = '가구를 누르면 방에 놓입니다 · 놓인 가구는 눌러 끌어 옮깁니다';
+            FURN.forEach(function (f, t) {
+                const own = ownedOf(t, d); if (!own) return;
+                const placed = placedOf(t, d), left = Math.max(0, own - placed);
+                h += '<div class="hr-card tap' + (left ? '' : ' done') + '" data-own="' + t + '"><div class="pic"><i style="' + picCss(t, 64) + '"></i></div><b>' + esc(f.n) + '</b>'
+                    + '<small>' + (left ? '눌러서 놓기 · 남은 ' + left + '/' + own : '다 놓음 ' + own + '/' + own + ' · 눌러서 고르기') + '</small></div>';
+            });
+            if (!h) h = '<div class="hr-empty">아직 산 가구가 없습니다.<br>「🛒 가구 상점」에서 사면 여기에 들어옵니다.</div>';
+        } else {
+            el.querySelector('.pts').textContent = pts;
+            FURN.forEach(function (f, t) {
+                const own = ownedOf(t, d);
+                h += '<div class="hr-card"><div class="pic"><i style="' + picCss(t, 64) + '"></i></div><b>' + esc(f.n) + '</b><small>' + won(f.p) + (own ? ' · 보유 ' + own : '') + '</small>'
+                    + '<div class="row"><button class="hr-b" data-buy="' + t + '">사기</button></div></div>';
+            });
+        }
     } else {
+        sub.innerHTML = '';
+        el.querySelector('.pts').textContent = pts;
         const isW = editTab === 'wall', n = isW ? WALLS : FLOORS, cur = isW ? wallNo(d) : floorNo(d);
         for (let i = 1; i <= n; i++) {
             const own = isW ? ownWall(i, d) : ownFloor(i, d);
@@ -789,7 +839,7 @@ function editPaint() {
     }
     list.innerHTML = h;
     list.querySelectorAll('[data-buy]').forEach(function (b) { b.onclick = function () { buyFurn(Number(b.getAttribute('data-buy'))); }; });
-    list.querySelectorAll('[data-put]').forEach(function (b) { b.onclick = function () { putNew(Number(b.getAttribute('data-put'))); }; });
+    list.querySelectorAll('[data-own]').forEach(function (b) { b.onclick = function () { ownTap(Number(b.getAttribute('data-own'))); }; });
     list.querySelectorAll('[data-use]').forEach(function (b) { b.onclick = function () { useSkin(editTab, Number(b.getAttribute('data-use'))); }; });
     list.querySelectorAll('[data-buy2]').forEach(function (b) { b.onclick = function () { buySkin(editTab, Number(b.getAttribute('data-buy2'))); }; });
 }
@@ -830,7 +880,8 @@ function buyFurn(t) {
     ask('「' + esc(f.n) + '」을(를) <b>' + won(f.p) + '</b> 에 살까요?<br><small style="color:#aaa;">산 가구는 이 사택에 놓을 수 있습니다</small>', '사기', function () {
         if (!pay(f.p, '가구 「' + f.n + '」 구입')) { editPaint(); return; }
         const r = decoRef('inv/' + t);
-        if (r) r.transaction(function (c) { return (Number(c) || 0) + 1; }, function (err, ok) { if (err || !ok) toast('저장하지 못했습니다'); else toast('「' + f.n + '」을(를) 샀습니다'); });
+        if (r) r.transaction(function (c) { return (Number(c) || 0) + 1; }, function (err, ok) { if (err || !ok) toast('저장하지 못했습니다'); else toast('「' + f.n + '」을(를) 샀습니다 — 눌러서 놓습니다'); });
+        furnSub = 'own';                                   // 산 가구가 바로 보이게 — 📦 내 가구로 넘긴다
         editPaint();
     });
 }
@@ -868,6 +919,20 @@ function putNew(t) {
     v.id = ref.key;
     ref.set({ t: v.t, d: v.d, x: v.x, y: v.y }).then(function () { if (S) select(v.id); }).catch(function () { toast('놓지 못했습니다'); });
 }
+// 📦 내 가구 칸에서 누르면 — 남은 것이 있으면 내 앞에 하나 놓고 고른다 · 다 놓았으면 놓인 것을 차례로 골라 화면을 그쪽으로 옮긴다
+function ownTap(t) {
+    if (!S || !S.mine || !ownedOf(t)) return;
+    if (ownedOf(t) - placedOf(t) > 0) { S.focus = null; putNew(t); return; }
+    const on = S.flist.filter(function (v) { return v.t === t; });
+    if (!on.length) return;
+    S.cyc = S.cyc || {};
+    const i = ((S.cyc[t] || 0) + (S.sel && on.some(function (v) { return v.id === S.sel; }) ? 1 : 0)) % on.length;
+    S.cyc[t] = i;
+    const v = on[i], a = anchorOf(v);
+    S.focus = { x: a.x, y: a.y };
+    select(v.id);
+    if (on.length > 1) toast('놓인 「' + FURN[t].n + '」 ' + (i + 1) + '/' + on.length);
+}
 function furnSave(v) {
     const r = decoRef('furn/' + v.id); if (!r) return;
     r.update({ t: v.t, d: v.d, x: v.x, y: v.y }).catch(function () { toast('저장하지 못했습니다'); });
@@ -875,6 +940,10 @@ function furnSave(v) {
 function select(id) {
     if (!S) return;
     S.sel = id;
+    if (!id) S.focus = null;
+    if (S.editEl) S.editEl.classList.toggle('mini', !!id);
+    S.ov.classList.toggle('place', !!(id && S.edit));
+    if (id && S.joy) { S.joy = null; const j = S.ov.querySelector('#hr-joy'); if (j) j.style.display = 'none'; }
     Object.keys(S.fel).forEach(function (k) { S.fel[k].classList.toggle('sel', k === id); });
     toolPlace();
 }
