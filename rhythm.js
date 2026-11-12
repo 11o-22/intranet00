@@ -560,6 +560,10 @@ function css() {
         '.rg-load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);font-size:15px;letter-spacing:2px;}',
         '.rg-pause{position:absolute;top:8px;left:10px;width:40px;height:34px;border-radius:9px;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.35);color:#fff;font-size:15px;z-index:4;}',
         '.rg-modal{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.66);z-index:6;}',
+        // 계속 — 3 · 2 · 1 (2026-11-12)
+        '.rg-cd{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:6;pointer-events:none;font-size:96px;font-weight:900;color:#fff;text-shadow:0 0 24px rgba(160,190,255,.75),0 4px 18px #000;font-variant-numeric:tabular-nums;}',
+        '.rg-cd.go{animation:rgCd 1s ease-out both;}',
+        '@keyframes rgCd{0%{opacity:0;transform:scale(1.6);}18%{opacity:1;transform:scale(1);}80%{opacity:1;transform:scale(.96);}100%{opacity:0;transform:scale(.9);}}',
         '.rg-box{background:rgba(20,20,34,.96);border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:18px 22px;display:flex;flex-direction:column;gap:10px;align-items:center;min-width:240px;}',
         '.rg-res{display:flex;gap:22px;align-items:center;}',
         '.rg-rank{font-size:84px;font-weight:900;line-height:1;text-shadow:0 0 24px currentColor;}',
@@ -959,18 +963,44 @@ function pause() {
     MODE = 'pause';
     STILL.pauseAt = performance.now();
     try { AU.ctx.suspend(); } catch (e) { }
+    pauseMenu();
+}
+function pauseMenu() {
+    if (!UI || MODE !== 'pause') return;
     const m = document.createElement('div'); m.className = 'rg-modal';
     m.innerHTML = '<div class="rg-box"><b style="letter-spacing:4px;">PAUSE</b><button class="rg-btn" data-k="r" style="width:180px">계속</button><button class="rg-btn" data-k="re" style="width:180px">처음부터</button><button class="rg-btn" data-k="q" style="width:180px">곡 고르기</button></div>';
     UI.appendChild(m);
-    m.querySelector('[data-k="r"]').onclick = function () {
-        m.remove();
-        try { AU.ctx.resume(); } catch (e) { }
-        clockReset();
-        wdReset();
-        MODE = 'play';
-    };
+    m.querySelector('[data-k="r"]').onclick = function () { m.remove(); countIn(); };
     m.querySelector('[data-k="re"]').onclick = function () { m.remove(); stopPlay(); try { AU.ctx.resume(); } catch (e) { } start(); };
     m.querySelector('[data-k="q"]').onclick = function () { m.remove(); stopPlay(); try { AU.ctx.resume(); } catch (e) { } menu(); };
+}
+// ★ 계속 — 3 · 2 · 1 세고 이어 간다 (2026-11-12 사용자 「정지 후에 계속 누르면 카운트 3 2 1 하고 시작하게」)
+//   세는 동안은 멈춘 그대로(소리 장치도 멈춤) · 화면을 벗어나면 세기를 그만두고 멈춤 창으로 돌아간다
+let CD = null;
+function countIn() {
+    if (!UI || MODE !== 'pause') return;
+    if (CD) { clearTimeout(CD.t); if (CD.el) CD.el.remove(); }
+    const el = document.createElement('div');
+    el.className = 'rg-cd';
+    UI.appendChild(el);
+    CD = { el: el, n: 3, t: 0 };
+    const tick = function () {
+        if (!CD || CD.el !== el) return;
+        if (!UI || MODE !== 'pause' || document.hidden) { el.remove(); CD = null; if (MODE === 'pause' && UI && !UI.querySelector('.rg-modal')) pauseMenu(); return; }
+        if (CD.n <= 0) {
+            el.remove(); CD = null;
+            try { AU.ctx.resume(); } catch (e) { }
+            clockReset();
+            wdReset();
+            MODE = 'play';
+            return;
+        }
+        el.textContent = String(CD.n);
+        el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
+        CD.n--;
+        CD.t = setTimeout(tick, 1000);
+    };
+    tick();
 }
 function onVis() { if (document.hidden) { previewStop(true); if (MODE === 'cal') calExit(); else pause(); } }
 
