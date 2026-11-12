@@ -482,8 +482,10 @@ function mkOne(user, label, other, opt) {
 function dropOne(o) { if (!o) return; try { if (o.actor) o.actor.stop(); } catch (e) { } try { o.wrap.remove(); } catch (e) { } }
 function putOne(o, x, y, zOver) {
     const z = S.z;
-    o.wrap.style.transform = 'translate3d(' + (x * z - o.w / 2).toFixed(1) + 'px,' + (y * z - (o.h - o.foot)).toFixed(1) + 'px,0)';
-    o.wrap.style.zIndex = String(zOver != null ? zOver : Math.round(y) * 2 + 1);           // 들린 사람은 든 사람 바로 앞
+    const tr = 'translate3d(' + (x * z - o.w / 2).toFixed(1) + 'px,' + (y * z - (o.h - o.foot)).toFixed(1) + 'px,0)';
+    const zi = String(zOver != null ? zOver : Math.round(y) * 2 + 1);                  // 들린 사람은 든 사람 바로 앞
+    if (o._tr !== tr) { o._tr = tr; o.wrap.style.transform = tr; }                    // 안 움직였으면 안 쓴다 (매 프레임 스타일 다시 셈 줄이기)
+    if (o._zi !== zi) { o._zi = zi; o.wrap.style.zIndex = zi; }
 }
 function bubble(o, text) {
     if (!o) return;
@@ -940,7 +942,7 @@ function enter(host) {
     window.addEventListener('keyup', S.onKey);
     S.onBlur = function () { if (S) S.keys = {}; };
     window.addEventListener('blur', S.onBlur);
-    S.onSize = function () { if (S && S.built && !(S.edit && S.zEdit)) { const z = pickZ(); if (z !== S.z) rebuildScale(); } };
+    S.onSize = function () { if (!S) return; S.vw = 0; S.vh = 0; if (S.built && !(S.edit && S.zEdit)) { const z = pickZ(); if (z !== S.z) rebuildScale(); } };
     window.addEventListener('resize', S.onSize);
     pointerSetup();
 }
@@ -991,7 +993,8 @@ function title() {
     const el = S.ov.querySelector('#hr-title'); if (!el) return;
     const n = 1 + Object.keys(S.peers).filter(function (c) { return S.peers[c].one; }).length;
     const ttl = S.member ? (S.mem.length > 1 ? '우리 사택 · ' + S.mem.map(nameIn).join(' · ') : '내 사택') : (S.mem.map(nameIn).join(' · ') + ' 사원의 사택');
-    el.innerHTML = '🏠 ' + esc(ttl) + '<small>' + n + '명</small>';
+    const h = '🏠 ' + esc(ttl) + '<small>' + n + '명</small>';
+    if (S.titleH !== h) { S.titleH = h; el.innerHTML = h; }
 }
 
 // ==========================================
@@ -1220,8 +1223,14 @@ function camAt() {
     if (S.edit && S.sel && S.focus) return S.focus;
     return { x: S.x, y: S.y };
 }
+// ★ 화면 크기는 재어 둔 값으로 (2026-11-12 사용자 「렉」) — 매 프레임 clientWidth 를 읽으면 그 프레임에 쓴 자리 · 차례를
+//   브라우저가 그 자리에서 다 셈해야 해서(강제 레이아웃) 한 프레임이 길어졌다. 창 크기가 바뀔 때만 다시 잰다.
+function viewWH() {
+    if (!S.vw || !S.vh) { S.vw = S.view.clientWidth; S.vh = S.view.clientHeight; }      // 아직 0 이면(그려지기 전) 다음에 다시 잰다
+    return { w: S.vw || 800, h: S.vh || 600 };
+}
 function camera() {
-    const z = S.z, vw = S.view.clientWidth || 800, vh = S.view.clientHeight || 600;
+    const z = S.z, vv = viewWH(), vw = vv.w, vh = vv.h;
     const b = BOUND || { x0: 0, x1: N, y0: 0, y1: N };
     const cx0 = (b.x0 - 24) * z, cx1 = (b.x1 + 24) * z, cy0 = (b.y0 - 24) * z, cy1 = (b.y1 + 40) * z;
     const f = camAt(), fx = f.x, fy = f.y;
@@ -1402,7 +1411,7 @@ function pointerSetup() {
                     toast(bad ? bad + '에는 놓을 수 없습니다' : '집 밖에는 놓을 수 없습니다');
                 }
                 // 놓는 동안엔 사람이 안 걸으므로 — 가구가 화면 가장자리로 가면 화면을 가구 쪽으로 옮겨 더 끌 수 있게
-                const a = anchorOf(v), vw = S.view.clientWidth || 800, vh = S.view.clientHeight || 600;
+                const a = anchorOf(v), vv = viewWH(), vw = vv.w, vh = vv.h;
                 const sx = a.x * S.z + (S.tx || 0), sy = a.y * S.z + (S.ty || 0);
                 if (sx < vw * 0.2 || sx > vw * 0.8 || sy < vh * 0.22 || sy > vh * 0.78) S.focus = { x: a.x, y: a.y };
                 else S.focus = dg.cam;                               // 그대로 — 끌기 전 화면을 붙든다
@@ -1659,7 +1668,7 @@ function select(id) {
 }
 function toolPlace() {
     if (!S) return;
-    const tool = S.ov.querySelector('#hr-tool'); if (!tool) return;
+    const tool = S.toolEl || (S.toolEl = S.ov.querySelector('#hr-tool')); if (!tool) return;
     const v = S.sel && S.edit ? (S.drag && S.drag.id === S.sel ? S.drag.v : S.flist.find(function (q) { return q.id === S.sel; })) : null;
     if (!v) { if (tool.style.display !== 'none') tool.style.display = 'none'; return; }
     const rb = tool.querySelector('[data-t="rot"]'), mineV = canTouch(v);
@@ -1667,8 +1676,9 @@ function toolPlace() {
     const b = bbOf(v);
     const x = (v.x + (b[0] + b[2]) / 2) * S.z + (S.tx || 0), y = (v.y + b[1]) * S.z + (S.ty || 0) - 6;
     tool.style.display = 'flex';
-    tool.style.left = Math.round(Math.max(90, Math.min((S.view.clientWidth || 800) - 90, x))) + 'px';
-    tool.style.top = Math.round(Math.max(96, y)) + 'px';
+    const tl = Math.round(Math.max(90, Math.min(viewWH().w - 90, x))) + 'px', tt = Math.round(Math.max(96, y)) + 'px';
+    if (tool.style.left !== tl) tool.style.left = tl;
+    if (tool.style.top !== tt) tool.style.top = tt;
 }
 function toolDo(k) {
     if (!S || !S.sel) return;

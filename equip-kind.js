@@ -118,6 +118,7 @@ function moveToEquipBox(csName, eqName) {
     return moved;
 }
 
+function hasIn(cls) { const c = document.getElementsByClassName(cls); for (let i = 0; i < c.length; i++) if (c[i].tagName === 'INPUT') return true; return false; }
 (function hookBrief() {
     // 창이 열릴 때마다 한 번씩 옮긴다 — 어느 함수가 그리든 상관없이 본다
     let onDark = false, onParty = false;
@@ -127,7 +128,7 @@ function moveToEquipBox(csName, eqName) {
             if (d && !onDark) moveToEquipBox('dark-cs', 'dark-eq');
             onDark = d;
 
-            const p = !!document.querySelector('input.pt-eq, input.pt-cs');
+            const p = hasIn('pt-eq') || hasIn('pt-cs');             // 문서 전체 선택자 대신 이름표 목록 (0.3초마다라 — 2026-11-12 렉)
             if (p && !onParty) moveToEquipBox('pt-cs', 'pt-eq');
             onParty = p;
         } catch (e) { console.warn('[장착형]', e); }

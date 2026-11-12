@@ -2354,9 +2354,11 @@ window.__newItemWear = wearNew;
         '늑대 가면': function (u) { return window.wolfLeftText ? window.wolfLeftText(u) : ''; }
     };
 
-    function addCount() {
+    const cntKnown = new Set();          // 횟수 꼬리표를 단 「해제」 단추들 — 바뀐 자리만 볼 때도 이것들의 횟수는 늘 고쳐 적는다
+    function addCount(list) {
         if (typeof currentUser === 'undefined' || !currentUser) return;
-        const btns = document.querySelectorAll('button');
+        let btns = list || document.querySelectorAll('button');
+        if (list) { cntKnown.forEach(function (b) { if (!b.isConnected) cntKnown.delete(b); else if (list.indexOf(b) < 0) btns = btns.concat([b]); }); }
         for (let i = 0; i < btns.length; i++) {
             const b = btns[i];
             if ((b.textContent || '').trim() !== '해제') continue;
@@ -2375,6 +2377,7 @@ window.__newItemWear = wearNew;
                 row = row.parentElement; hops++;
             }
             if (!nm || !row) continue;
+            cntKnown.add(b);
 
             const txt = COUNT_OF[nm](currentUser);
             let tag = row.querySelector('.cnt-tag');
@@ -2390,8 +2393,8 @@ window.__newItemWear = wearNew;
     }
 
     // 장착칸의 그 줄에 「표적」 버튼을 붙인다
-    function addAim() {
-        const btns = document.querySelectorAll('button');
+    function addAim(list) {
+        const btns = list || document.querySelectorAll('button');
         for (let i = 0; i < btns.length; i++) {
             const b = btns[i];
             if ((b.textContent || '').trim() !== '해제') continue;
@@ -2425,15 +2428,17 @@ window.__newItemWear = wearNew;
     };
 
     let busy = false;
-    const run = function () {
+    const run = function (list) {
         if (busy) return;
         busy = true;
-        try { addAim(); addCount(); } catch (e) { }
+        try { addAim(list); addCount(list); } catch (e) { }
         busy = false;
     };
     // ★ 단추가 새로 붙거나 단추 글자가 바뀐 때만 — 전에는 문서 어디서 글자 하나만 바뀌어도(세션 시계 · 광장 말풍선 …)
     //   온 문서의 단추를 다 뒤졌다 (2026-11-11 사용자 「발열 · 렉」 — 광장에서 가장 많이 도는 일이었다)
-    new MutationObserver(function (recs) { if (ni2BtnTouched(recs)) run(); }).observe(document.body, { childList: true, subtree: true });
+    // ★ 그리고 온 문서가 아니라 **바뀐 자리의 단추만** 본다 (2026-11-12 사용자 「렉」) — 상점 · 어둠 칸이 몇 초마다 다시 그려질 때마다
+    //   문서의 단추 300여 개를 두 번씩 뒤지고, 「해제」 줄마다 위로 다섯 칸의 글자를 다 읽었다. 붙는 때는 전과 같다 (바로).
+    new MutationObserver(function (recs) { const b = ni2BtnsOf(recs); if (b.length) run(b); }).observe(document.body, { childList: true, subtree: true });
     setTimeout(run, 900);
 })();
 
@@ -2719,6 +2724,23 @@ console.log('[신규] 26종 등록 — newItemState() · heartState() · giveSil
 })();
 
 // 문서 전체를 지켜보는 MutationObserver 가 정말 볼 일이 있나 — 단추가 붙었거나 단추 안이 바뀌었을 때만 (2026-11-11 발열)
+// 바뀐 자리에 있는 단추들 — 단추 안이 바뀌었으면 그 단추 · 새로 붙은 것이 단추거나 단추를 품었으면 그 단추들
+function ni2BtnsOf(recs) {
+    const out = [], seen = new Set();
+    const add = function (b) { if (b && !seen.has(b)) { seen.add(b); out.push(b); } };
+    for (let i = 0; i < recs.length; i++) {
+        const r = recs[i], t = r.target;
+        if (t && t.nodeType === 1) { if (t.tagName === 'BUTTON') add(t); else if (t.closest) add(t.closest('button')); }
+        const a = r.addedNodes;
+        for (let j = 0; j < a.length; j++) {
+            const n = a[j];
+            if (n.nodeType !== 1) continue;
+            if (n.tagName === 'BUTTON') add(n);
+            else if (n.querySelectorAll) { const q = n.querySelectorAll('button'); for (let k = 0; k < q.length; k++) add(q[k]); }
+        }
+    }
+    return out.filter(function (b) { return b.isConnected; });
+}
 function ni2BtnTouched(recs) {
     for (let i = 0; i < recs.length; i++) {
         const r = recs[i], t = r.target;

@@ -111,10 +111,11 @@ function mount(k) {
     return true;
 }
 
+function hasInput(cls) { const c = document.getElementsByClassName(cls); for (let i = 0; i < c.length; i++) if (c[i].tagName === 'INPUT') return true; return false; }
 setInterval(function () {
     KINDS.forEach(function (k) {
         try {
-            const live = !!document.querySelector('input.' + k.eq + ', input.' + k.cs);
+            const live = hasInput(k.eq) || hasInput(k.cs);      // 문서 전체 선택자 대신 이름표 목록(살아 있는 목록 · 빠르다 — 2026-11-12 렉)
             if (!live) { q[k.id] = ''; return; }      // 창이 닫혔다
             mount(k);
         } catch (e) { }
