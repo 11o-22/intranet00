@@ -4,7 +4,7 @@ const DARK_ZONES = {
     code:"Qtrew-S-003", grade:"S", name:"동화의 뒷면",
     brief:"(대출 기록이 없습니다. 반납 기록만 있습니다.)",
     warn:"트라우마 유발 가능성 주의 — 신체 변형, 아동 형상, 강제 배역",
-    danger:"최상", survival:"0.1%", min:5, max:7, reward:[20000,30000], ready:false,
+    danger:"최상", survival:"0.1%", min:4, max:7, reward:[20000,30000], ready:false,   // 최소 4인 (2026-11-12 사용자 · 전에는 5)
     voteMode:true, tale:true, timeLimit:45,
     intro:`책이 펼쳐져 있다.<br><br>
         아무도 펼치지 않았는데 펼쳐져 있다.<br>
@@ -28,7 +28,7 @@ const DARK_ZONES = {
     code:"Qtrew-S-010", grade:"S", name:"검역 실패",
     brief:"(전원 귀환한 기록이 없습니다.)",
     warn:"트라우마 유발 가능성 주의 — 감염, 동료 간 살해",
-    danger:"최상", survival:"0.1%", min:5, max:8, reward:[10000,15000], ready:false,
+    danger:"최상", survival:"0.1%", min:4, max:8, reward:[10000,15000], ready:false,   // 최소 4인 (2026-11-12 사용자 · 전에는 5)
     voteMode:true, infection:true, timeLimit:40,
     intro:`사이렌이 멎은 직후다.<br><br>
         복도에 비닐이 겹겹이 쳐져 있다. 검역 구역을 나누던 것이다.<br>
