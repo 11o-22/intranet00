@@ -858,15 +858,15 @@ function femOk(user) {
 }
 window.dotFemOk = femOk;
 // ★ 여성 체형만 (2026-11-12 사용자 「여성 혹은 포도맛 마신 남성은 무조건 여성체형만 쓸 수 있게」)
-//   사원증 성별이 여성인 사람 · 🍇 포도맛 물약이 도는 남성 — 체형 칸에 「기본」이 없고(고를 것이 하나라 줄도 안 생긴다),
+//   🍇 포도맛 물약이 도는 남성 — 체형 칸에 「기본」이 없고(고를 것이 하나라 줄도 안 생긴다),
 //   적힌 체형과 상관없이 여성 체형 몸으로 그린다. 물약이 끝난 남성은 적힌 대로(보통 몸) 돌아간다.
-//   상담사는 빼 둔다 (늘 둘 다 고른다) · 물약을 마신 여성(겉모습이 남성으로 바뀐다)은 예전처럼 둘 다 고른다
+//   상담사는 빼 둔다 (늘 둘 다 고른다)
+//   ★ 2026-11-13 사용자 「포도맛 마신 남성이 아닌 일반 여성들은 체형 선택 가능하게」 — 사원증 성별이 여성인 사람은 다시 둘 다 고른다
+//     (기본 · 여성 체형 · 적힌 대로 그린다). 여성 체형만인 것은 물약을 마신 남성뿐.
 function femForced(user) {
     const u = user || u_();
-    if (!u || isAdm(u)) return false;
-    let g = false;
-    try { g = grapeOn(u); } catch (e) { }
-    return isWoman(u) ? !g : g;
+    if (!u || isAdm(u) || isWoman(u)) return false;
+    try { return !!grapeOn(u); } catch (e) { return false; }
 }
 window.dotFemForced = femForced;
 // 고르는 중인 자리 기록(p · d)의 체형 — 여성 체형만 쓰는 사람은 늘 여성 체형
