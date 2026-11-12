@@ -75,7 +75,8 @@ const SONGS = [
     //   채보 — 다시 뽑음 · 몸통 촘촘함 그대로 · 끝 마당은 새로 울린 소리 위에 두고 마지막 한 방에 양손 동시로 맺는다 (tools/rhythm-chart.py OUTRO)
     //   ★ 2026-11-12 사용자 「핸디캡도 채보 더 넣고 한 100정도」 — 하드 880 → 979 개
     //   need — 그 곡 · 그 난이도에서 그 랭크 이상을 받으면 열린다 (needMet · checkNeeds)
-    { key: 'handicap', title: 'Handicap', artist: 'Benz', audio: 'snd/rhythm-handicap.mp3', chart: 'rhythm/handicap.json', color: '#6fd3a0', cover: 'rhythm/handicap-cover.jpg?v=2', need: { song: 'client', diff: 'hard', rank: 'B' } },
+    // ★ 2026-11-12 사용자 「핸디캡 오픈 조건을 15000포인트로 하자」 — 「내담자 여러분께」 HARD B 조건(need)을 빼고 15,000 P 해금(price) · 이미 연 사원은 그대로 열려 있다
+    { key: 'handicap', title: 'Handicap', artist: 'Benz', audio: 'snd/rhythm-handicap.mp3', chart: 'rhythm/handicap.json', color: '#6fd3a0', cover: 'rhythm/handicap-cover.jpg?v=2', price: 15000 },
     // ★ 2026-11-12 사용자 「이것도 리듬게임에 넣어줘. 아티스트 이름은 광시 로 해주고 20000 포인트로 사야 할 수 있게. 표지 사진도 참고해」 · 제목은 받은 파일 이름(genesis)대로 「Genesis」
     //   음원 — 위(2.5 ~ 16 kHz)가 다른 곡들보다 9 ~ 13 dB 밝고 가운데가 비었다 · 20 ~ 80 Hz 두꺼움 · 좌우 좁음
     //          → 웅웅임 걷고 · 가장 낮은 저음 조금 · 가운데 몸통 조금 · 날카로운 3 ~ 4 kHz 와 위를 눅이고 · 좌우 조금 넓게 · 클릭 · 옅은 잡음 걷기 · -14 LUFS
