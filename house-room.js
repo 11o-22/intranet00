@@ -355,7 +355,7 @@ function css() {
         '#hr-box .note{font-size:11px;color:#c9a96a;margin-top:4px;}',
         '#hr-scene{position:absolute;left:0;top:0;}',
         '.hr-fu{position:absolute;background-repeat:no-repeat;image-rendering:pixelated;pointer-events:none;}',
-        '#hr-ov.edit .hr-fu{pointer-events:auto;cursor:grab;}',
+        '#hr-ov.edit .hr-fu{cursor:grab;}',                                  // 누르기는 그림이 있는 점으로 따로 잰다 (furnAt)
         '.hr-fu.sel{outline:2px dashed #ffd76a;outline-offset:-2px;filter:drop-shadow(0 0 4px #ffd76a);}',
         '.hr-fu.bad{filter:drop-shadow(0 0 4px #ff5252) saturate(.4);}',
         '.hr-one{position:absolute;left:0;top:0;pointer-events:none;}',
@@ -1184,6 +1184,48 @@ function toWorld(cx, cy) {
     const r = S.view.getBoundingClientRect();
     return { x: (cx - r.left - (S.tx || 0)) / S.z, y: (cy - r.top - (S.ty || 0)) / S.z };
 }
+// ★ 가구 누르기 — 칸(120×120) 전체가 아니라 그림이 실제로 있는 점만 (2026-11-12 사용자 「이미 배치되어 있는 애가 계속 집혀」)
+//   furn.webp 의 투명도를 한 번 읽어 두고, 누른 점 둘레(화면 4점) 안에 그림 점이 있으면 그 가구. 앞에 그려진 것(발밑이 아래)부터.
+//   투명도를 아직 못 읽었으면 그림 상자(FB)로 잰다.
+let FA = null, FAgo = false;
+function furnAlpha() {
+    if (FA || FAgo) return;
+    FAgo = true;
+    const im = new Image();
+    im.onload = function () {
+        try {
+            const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight;
+            const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+            FA = { w: c.width, h: c.height, sc: c.width / 960, a: x.getImageData(0, 0, c.width, c.height).data };
+        } catch (e) { }
+    };
+    im.src = DIR + 'furn.webp';
+}
+function furnHit(v, wx, wy, pad) {
+    const b = bbOf(v), lx = wx - v.x, ly = wy - v.y;
+    if (lx < b[0] - pad || lx >= b[2] + pad || ly < b[1] - pad || ly >= b[3] + pad) return false;
+    if (!FA) return lx >= b[0] && lx < b[2] && ly >= b[1] && ly < b[3];
+    const ox = ((v.t % 2) * 4 + v.d) * 120, oy = ((v.t / 2) | 0) * 120;
+    for (let dy = -pad; dy <= pad; dy++) {
+        for (let dx = -pad; dx <= pad; dx++) {
+            if (dx * dx + dy * dy > pad * pad) continue;
+            const px = Math.floor(lx + dx), py = Math.floor(ly + dy);
+            if (px < 0 || py < 0 || px >= 120 || py >= 120) continue;
+            const sx = Math.floor((ox + px + 0.5) * FA.sc), sy = Math.floor((oy + py + 0.5) * FA.sc);
+            if (FA.a[(sy * FA.w + sx) * 4 + 3] > 40) return true;
+        }
+    }
+    return false;
+}
+//   내가 만질 수 있는 가구만 (남의 것은 지나쳐 그 아래 것이 눌린다)
+function furnAt(cx, cy) {
+    if (!S || !S.flist) return null;
+    furnAlpha();
+    const w = toWorld(cx, cy), pad = Math.max(1, Math.round(4 / (S.z || 1)));
+    const list = S.flist.filter(function (v) { return canTouch(v) || canPutAway(v); }).sort(function (a, b) { return baseOf(b) - baseOf(a); });
+    for (let i = 0; i < list.length; i++) if (furnHit(list[i], w.x, w.y, pad)) return list[i];
+    return null;
+}
 
 // 🔍 꾸밀 때 줌 — 한 칸씩 (ZE)
 function zoomLabel() {
@@ -1233,23 +1275,23 @@ function pointerSetup() {
         // 🤝 사람을 눌렀다 — 고르는 칸 (걷지 않는다)
         if (!S.edit) { const pc = personAt(e.clientX, e.clientY); if (pc) { const r0 = S.ov.getBoundingClientRect(); personTap(pc, e.clientX - r0.left, e.clientY - r0.top); e.preventDefault(); return; } }
         if (S.edit) {
-            const el = e.target && e.target.closest ? e.target.closest('.hr-fu') : null;
-            {
-                // 가구를 누르면 그 가구 · 놓는 중에 빈 곳을 누르면 고른 가구 — 끄는 만큼 가구만 움직인다 (사람은 안 걷는다)
-                //   남이 산 가구는 고르지 않는다 (내 방에 동거인이 놓은 것은 골라서 📦 넣기만)
-                let v = el ? S.flist.find(function (q) { return q.id === el.getAttribute('data-id'); }) : null;
-                if (v && !(canTouch(v) || canPutAway(v))) v = null;
-                if (!v && S.sel) { v = S.flist.find(function (q) { return q.id === S.sel; }) || null; if (!v) select(null); }
-                if (v) {
-                    if (S.sel !== v.id) select(v.id);
-                    if (canTouch(v)) {
-                        const w = toWorld(e.clientX, e.clientY);
-                        S.drag = { id: v.id, pid: e.pointerId, ox: w.x - v.x, oy: w.y - v.y, v: Object.assign({}, v), x0: v.x, y0: v.y, moved: false, cam: camAt() };
-                        try { view.setPointerCapture(e.pointerId); } catch (er) { }
-                    }
-                    e.preventDefault();
-                    return;
+            // 가구를 누르면 그 가구 · 놓는 중(고른 것이 있을 때)에는 어디를 짚어 끌어도 고른 가구만 움직인다 (사람은 안 걷는다)
+            //   고른 채로 다른 가구를 끌지 않고 톡 누르면 그 가구로 바꿔 고른다 (2026-11-12 사용자 「이미 배치된 애가 계속 집혀」)
+            //   남이 산 가구는 고르지 않는다 (내 방에 동거인이 놓은 것은 골라서 📦 넣기만)
+            const hit = furnAt(e.clientX, e.clientY);
+            let sv = S.sel ? (S.flist.find(function (q) { return q.id === S.sel; }) || null) : null;
+            if (S.sel && !sv) select(null);
+            let v = (sv && canTouch(sv)) ? sv : (hit || sv);
+            if (v) {
+                if (S.sel !== v.id) select(v.id);
+                if (canTouch(v)) {
+                    const w = toWorld(e.clientX, e.clientY);
+                    S.drag = { id: v.id, pid: e.pointerId, ox: w.x - v.x, oy: w.y - v.y, v: Object.assign({}, v), x0: v.x, y0: v.y, moved: false, cam: camAt(),
+                        cx: e.clientX, cy: e.clientY, tap: (hit && hit.id !== v.id) ? hit.id : null };
+                    try { view.setPointerCapture(e.pointerId); } catch (er) { }
                 }
+                e.preventDefault();
+                return;
             }
         }
         S.joy = { pid: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0, mouse: e.pointerType === 'mouse' };
@@ -1269,6 +1311,7 @@ function pointerSetup() {
             return;
         }
         if (S.drag && S.drag.pid === e.pointerId) {
+            if (!S.drag.moved && Math.hypot(e.clientX - S.drag.cx, e.clientY - S.drag.cy) < 7) return;   // 톡 누른 손떨림은 끌기가 아니다
             const w = toWorld(e.clientX, e.clientY);
             const v = S.drag.v;
             v.x = Math.round(w.x - S.drag.ox); v.y = Math.round(w.y - S.drag.oy);
@@ -1293,6 +1336,7 @@ function pointerSetup() {
         if (S.drag && S.drag.pid === e.pointerId) {
             const dg = S.drag; S.drag = null;
             const v = dg.v;
+            if (!dg.moved && dg.tap && S.flist.some(function (q) { return q.id === dg.tap; })) { select(dg.tap); return; }   // 다른 가구를 톡 — 그것으로 바꿔 고른다
             if (dg.moved) {
                 if (placeOkMe(v)) furnWrite(v);
                 else {
@@ -1334,6 +1378,7 @@ function editToggle() {
     }
     S.zEdit = S.z;
     zoomLabel();
+    furnAlpha();                                                        // 가구 그림 투명도 — 누르기 판정용
     const el = document.createElement('div');
     el.id = 'hr-edit';
     el.innerHTML = '<div class="tabs"><button class="hr-b" data-tab="furn">🛋 가구</button><button class="hr-b" data-tab="wall">🧱 벽지</button><button class="hr-b" data-tab="floor">🟫 바닥지</button><span class="sp"></span><button class="hr-b" data-tab="x">닫기</button></div>'
