@@ -672,6 +672,7 @@ async function playLine(e, opt) {
         return;
     }
     if (k === 'ui') return;                                          // 「다음으로 내보낼 인형을 선택해 주세요」 — 선택창이 따로 뜬다
+    if (k === 'swap' && B.dbl) { await swapFx(e); return; }           // ★ 더블 — 두 자리를 맞바꾼다 (자리 바꾸기 · 자리잡기)
     // HP 변화 — 깜빡이고(맞음) 바가 움직인다 · 회복이면 💚
     const ch = hpTick(e);
     const hurt = ch.filter(function (c) { return c.to < c.from; }), healed = ch.filter(function (c) { return c.to > c.from; });
@@ -1177,6 +1178,23 @@ async function throwRibbon() {
 //   ■ 쓰러지면 자리는 비워 두고 턴이 끝난 뒤 다음 인형을 고른다 (빈자리 충원 · 대기 인형이 있으면 반드시).
 //   ■ 성능 — 매 프레임 도는 일은 없다 (연출은 CSS 애니메이션 · 칸은 바뀐 때만 다시 쓴다).
 function isFoeS(s) { return s === 'B' || s === 'E'; }
+// 두 자리를 맞바꾸는 줄 — 그림이 서로의 자리로 미끄러져 가고, 엔진 상태(칸 · 주인)도 따라 바꾼다
+async function swapFx(e) {
+    const a = e.a, b = e.b, ea = sprOf(a), eb = sprOf(b);
+    const dx = DB.pos[b].cx - DB.pos[a].cx;
+    B.ui.txt.textContent = tx(e.t);
+    [[ea, dx], [eb, -dx]].forEach(function (x) { if (x[0]) { x[0].style.transition = 'transform .28s ease-in-out'; x[0].style.transform = 'translateX(' + x[1] + 'px)'; } });
+    await sleep(300);
+    if (!B) return;
+    const A = B.S.sides[a], C2 = B.S.sides[b];
+    ['own', 'code', 'owner', 'auto'].forEach(function (k) { const t = A[k]; A[k] = C2[k]; C2[k] = t; });
+    [a, b].forEach(function (x) { const v = (e.f && e.f[x]) ? arrOf(e.f[x]) : null; B.S.sides[x].act = v ? Number(v[0]) : -1; B.shownIdx[x] = B.S.sides[x].act; B.shown[x] = v ? Number(v[1]) : 0; });
+    [ea, eb].forEach(function (x) { if (x) { x.style.transition = 'none'; x.style.transform = ''; } });
+    paintPos(a); paintPos(b); paintStat();
+    await sleep(30);
+    [ea, eb].forEach(function (x) { if (x) x.style.transition = ''; });
+    await say(tx(e.t), 900);
+}
 function liveAt(s) { const u = sideUnit(s); return !!(u && u.hp > 0 && !u.fainted); }
 function paintPos(s, mode) {
     const e = B.ui.pos[s], P = DB.pos[s]; if (!e) return;
@@ -1187,7 +1205,7 @@ function paintPos(s, mode) {
         return;
     }
     const u = sideUnit(s);
-    if (!u || u.fainted) { e.innerHTML = ''; return; }
+    if (!u || u.fainted || (B.shown[s] != null && B.shown[s] <= 0)) { e.innerHTML = ''; return; }     // 빈자리 · 이번 턴에 쓰러진 자리
     const back = !isFoeS(s);
     e.innerHTML = '<div class="' + (back ? 'bob2' : 'bob') + '" style="' + D().spriteCss(u.sp || 1, P.px, back, unitArt(u)) + '"></div>';
     e.style.filter = ''; e.style.opacity = '1'; e.style.transform = '';
@@ -1213,7 +1231,8 @@ function paintStatDbl() {
     });
 }
 // ── 대상 고르기 판
-//   mode — 'atk' 공격기(자리) · 'util' 유틸기(인형) · 'item' 아이템 · 'ribbon' 포옹 리본 · s 는 쓰는 자리
+//   mode — 'atk' 공격기(자리 — 자신만 빼고 어디든) · 'foe' 상대 인형 지정(유틸 · 집중 · 함께 꿰맨 꿈) · 'mate' 옆자리(널 응원해! · 할 수 있어! · 자리 바꾸기)
+//          'ally' 우리 줄(자신 포함 — 아홉여우병의 랭크 변화를 받을 인형) · 'item' 아이템 · 'ribbon' 포옹 리본 · s 는 쓰는 자리
 //   돌려주는 값 — { tgt: 자리 } · { idx: 대기 인형 칸 } (아이템) · 'back'
 function tgtCard(s, u, can, self) {
     const e = q('.tc' + s); if (!e) return;
@@ -1233,9 +1252,11 @@ function targetPick(s, mode, opt) {
         ['B', 'E', 'A', 'C'].forEach(function (x) {
             const u = liveAt(x) ? sideUnit(x) : null;
             let can;
-            if (mode === 'ribbon') can = isFoeS(x);
+            if (mode === 'ribbon' || mode === 'foe') can = isFoeS(x);   // 상대 줄 (빈자리도 고를 수 있다 — 고르면 실패)
             else if (mode === 'item') can = !isFoeS(x) && (!u || (I && I.check(I.viewOfUnit(u, true), opt.item, null, true).ok));
-            else can = x !== s;                                         // 기술 — 자신만 빼고 (빈자리도 고를 수 있다)
+            else if (mode === 'mate') can = !isFoeS(x) && x !== s;      // 옆자리
+            else if (mode === 'ally') can = !isFoeS(x);                 // 우리 줄 (자신 포함)
+            else can = x !== s;                                         // 공격기 — 자신만 빼고 (빈자리도 고를 수 있다)
             views[x] = can;
             tgtCard(x, u, can, x === s);
             const h = q('.th' + x); if (h) h.style.pointerEvents = can ? 'auto' : 'none';
@@ -1265,6 +1286,7 @@ function targetPick(s, mode, opt) {
         menu(4);
         const who = sideUnit(s);
         B.ui.txt.textContent = opt.ask || (mode === 'ribbon' ? '어느 인형에게 포옹 리본을 던질까?' : mode === 'item' ? (opt.item + ' — 누구에게 쓸까?') : ((who ? who.name + josa(who.name, '은') + ' ' : '') + (mode === 'atk' ? '어디를 노릴까?' : '누구에게 쓸까?')));
+        if (opt.sk && !opt.ask) B.ui.txt.textContent = opt.sk + ' — ' + B.ui.txt.textContent;
         B.pick = function (k) {
             if (tb) { tb.style.display = 'none'; tb.innerHTML = ''; }
             menu(0);
@@ -1364,19 +1386,24 @@ async function chooseOneDbl(s, canPrev) {
             if (!BT().allowedBy(u, no)) { await say('지금은 쓸 수 없는 기술이다!', 900); continue; }
             const sk = SK().get(no);
             const act = { k: 'skill', no: no };
-            if (sk.tgt === 'ally' || no === 74) {                       // 대기 인형 고르기 (꿈 잇기 · B조 교대 · 괜찮습니다 제가 할게요)
-                const b = BT().bench(B.S, s);
+            if (sk.tgt === 'ally' || no === 74) {                       // 대기 인형 고르기 (꿈 잇기 · B조 교대 — 내 대기 인형 · 괜찮습니다 제가 할게요 — 같은 편 대기 인형 누구든)
+                const b = (sk.fx && sk.fx.allyHeal) ? BT().benchTeam(B.S, s) : BT().bench(B.S, s);
                 if (!b.length) { await say('대기 중인 인형이 없다!', 900); continue; }
                 const idx = await pickNext(b, 'ally');
                 if (!B) return null;
                 act.idx = idx;
                 return act;
             }
-            if (sk.slot === 'A' || sk.tgt === 'foe') {                  // 대상 · 위치 고르기
-                const r = await targetPick(s, sk.slot === 'A' ? 'atk' : 'util');
-                if (r === 'back') continue;
-                act.tgt = r.tgt;
+            // 대상 · 위치 고르기 (DB06.1 — 공격기는 자리 · 유틸기는 인형 · 범위 · 자신 · 필드 · 진영 대상은 고르지 않는다)
+            const kd = BT().tgtKind(sk);
+            if (kd === 'pos') { const r = await targetPick(s, 'atk', { sk: sk.n }); if (r === 'back') continue; act.tgt = r.tgt; }
+            else if (kd === 'foe') {
+                const r = await targetPick(s, 'foe', { sk: sk.n }); if (r === 'back') continue; act.tgt = r.tgt;
+                if (sk.fx && sk.fx.status === 'fox') {                   // 아홉여우병 — 옮겨 받을 아군 인형도 고른다
+                    const r2 = await targetPick(s, 'ally', { ask: sk.n + ' — 랭크 변화를 누가 받을까?' }); if (r2 === 'back') continue; act.tgt2 = r2.tgt;
+                }
             }
+            else if (kd === 'mate' || (sk.fx && sk.fx.swap)) { const r = await targetPick(s, 'mate', { sk: sk.n, ask: (sk.fx && sk.fx.swap) ? (sk.n + ' — 어느 자리와 바꿀까?') : null }); if (r === 'back') continue; act.tgt = r.tgt; }
             return act;
         }
     }
@@ -1385,7 +1412,7 @@ function actLine(s, a) {
     const u = sideUnit(s);
     let t = '';
     if (!a) return '';
-    if (a.k === 'skill') { const sk = SK().get(a.no); t = (sk ? sk.n : '기술') + (a.tgt ? ' → ' + DB.NAME[a.tgt] : ''); }
+    if (a.k === 'skill') { const sk = SK().get(a.no); t = (sk ? sk.n : '기술') + ((sk && sk.fx && sk.fx.range) ? (sk.fx.range === 'foes' ? ' → 상대 모두' : ' → 나 빼고 모두') : a.tgt ? ' → ' + DB.NAME[a.tgt] : ''); }
     else if (a.k === 'rune') t = '💠 룬 공격 → ' + DB.NAME[a.tgt];
     else if (a.k === 'switch') t = '교체 → ' + (B.S.sides[s].units[a.idx] || {}).name;
     else if (a.k === 'item') t = a.item + (a.idx >= 0 ? ' → ' + (B.S.sides[s].units[a.idx] || {}).name : ' → 빈자리');

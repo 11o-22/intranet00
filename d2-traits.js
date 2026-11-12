@@ -1,5 +1,5 @@
 // ==========================================
-// ★ 🧸 봉제인형 전투 2차 — 특성 35 (이름표 · 뽑기 · 택 로고 각인)
+// ★ 🧸 봉제인형 전투 2차 — 특성 35 + 더블 1 (이름표 · 뽑기 · 택 로고 각인)
 // bundles.json 마지막 묶음 — d2-battle.js 뒤 (D2 · D2BT · DOLL · PET 를 쓴다)
 // ==========================================
 //
@@ -129,10 +129,16 @@ const TRAITS = {
         c: "전투당 1회" },
     35: { n: '고요한 심장', cat: '심리전·특수기형', rare: 1, eng: 0,
         e: "집중하기를 실제 발동한 시점부터 해당 턴 종료까지 받는 공격 피해 50% 감소. 선택만 한 시점·발동 전 공격에는 미적용. 즉사 효과·상태이상은 막지 못함.",
-        c: "효과에 적힌 조건·범위마다 적용(별도 횟수 제한 없음)" }
+        c: "효과에 적힌 조건·범위마다 적용(별도 횟수 제한 없음)" },
+    // ★ 더블 배틀 전용 (2026-11-12 사용자 「펫 전투 더블 추가」 · 기획 탭 「더블배틀 특성」) — 일반 · 각인 가능 · 싱글에서는 끼워 두기만 (효과 없음)
+    36: { n: '자리잡기', cat: '위치 이동·선제 등장', rare: 0, eng: 1,
+        e: "등장 시 같은 진영 다른 위치와 인형·탐사자의 위치 소유권을 교환한다. 다른 모든 등장 특성보다 우선한다. 반대 위치가 비어 있어도 이동 가능. (더블 배틀 전용 — 싱글에서는 발동하지 않는다)",
+        c: "전투당 1회. 최초 발동 뒤 교체로 퇴장·재등장해도 재발동하지 않는다." }
 };
-const NORMAL = Object.keys(TRAITS).map(Number).filter(function (k) { return !TRAITS[k].rare; });
+const NORMAL = Object.keys(TRAITS).map(Number).filter(function (k) { return !TRAITS[k].rare; });        // 일반 31 (자리잡기 포함) — 뽑기 · 각인
 const RARE = Object.keys(TRAITS).map(Number).filter(function (k) { return TRAITS[k].rare; });
+// ★ 기록 없는 인형의 결정적 값(fallback)은 예전 서른 가지에서만 — 목록이 늘어도 이미 있던 인형의 특성이 바뀌지 않게
+const NORMAL30 = NORMAL.filter(function (k) { return k <= 35; });
 
 function D2() { return window.D2; }
 function DL() { return window.DOLL; }
@@ -148,7 +154,7 @@ function isRare(no) { const t = get(no); return !!(t && t.rare); }
 
 // ── 뽑기 — 희귀 2% · 일반 98%
 function roll(r) { r = r || Math.random; if (r() < RARE_P) return RARE[Math.floor(r() * RARE.length)]; return NORMAL[Math.floor(r() * NORMAL.length)]; }
-function fallback(d) { return roll(D2().rngOf('d2tr:' + String((d && d.id) || '') + ':' + String((d && d.at) || 0))); }
+function fallback(d) { const r = D2().rngOf('d2tr:' + String((d && d.id) || '') + ':' + String((d && d.at) || 0)); if (r() < RARE_P) return RARE[Math.floor(r() * RARE.length)]; return NORMAL30[Math.floor(r() * NORMAL30.length)]; }
 function trOf(d) { const v = int(d && d.tr); return TRAITS[v] ? v : fallback(d); }
 // 기록 조각 — tr 이 없으면
 function fixTr(d) { return (d && TRAITS[int(d.tr)]) ? null : { tr: fallback(d) }; }
