@@ -59,6 +59,12 @@
 //   룸메이트가 바뀌면 hk 가 바뀐다 → 거실 · 남의 방 · 남는 방에 놓았던 가구는 새 집 기록에 없으니 저절로 보관함으로 돌아온다 (보관함 개수 = 산 개수 − 지금 집에 놓인 내 것)
 //   예전 houseDeco/<사번> 은 처음 들어올 때 houseMine 으로 옮긴다 — 산 것(가구 · 벽지 · 바닥지)과 고른 벽지 · 바닥지는 내 방으로, 놓아 둔 가구는 보관함으로
 //
+// ■ 👔 까기 · 👙 벗기기 (2026-11-12 사용자 「사택 시스템에 까기 쑤시기 마사지 같은 기능을 다 넣어줘」 — 쑤시기 · 마사지는 안 넣었다)
+//   광장과 같은 조건 · 같은 신호 칸(plazaPeel · plazaStrip) — plaza.js 의 window.plazaTouchApi 로 묻고 보낸다
+//   · 남을 누르면: 깔 수 있는 셔츠를 입었으면 [까기] · 벗길 수 있는 옷(레드 비키비키니)을 입었으면 [벗기기] (커플이면 짝끼리)
+//   · 나를 누르면: 깔 수 있는 셔츠를 입었으면 [까기]
+//   · 벗기는 중에는 모두의 사택 화면에서 그 사람 옷이 7~12 로 벗겨진다 (stripAt) · 옷이 바뀐 사람은 houseRedress 로 다시 그려 알린다
+//
 // ■ 콘솔
 //   houseRoomState()
 (function houseRoom() {
@@ -646,7 +652,7 @@ function openMenu(cx, cy, title, items, onPick) {
     return true;
 }
 function infoOpen(c) { try { if (typeof window.openEmpDetailModal === 'function') window.openEmpDetailModal(c); } catch (e) { } }
-// 사람을 눌렀다 — 광장 carryTap 과 같은 갈래 (쑤시기 · 마사지 · 벗기기 · 까기 · 끌고가기 빼고)
+// 사람을 눌렀다 — 광장 carryTap 과 같은 갈래 (쑤시기 · 마사지 · 끌고가기 빼고 · 까기 · 벗기기는 2026-11-12 부터)
 function personTap(c, cx, cy) {
     const me = me_(), p = S.peers[c];
     if (!p) return false;
@@ -673,9 +679,12 @@ function personTap(c, cx, cy) {
         }
     }
     bat().forEach(function (x) { items.push(x); });
+    touchItems(c, p).forEach(function (x) { items.push(x); });
     items.push(['info', '👤 정보 보기']);
     return openMenu(cx, cy, (p.wk ? '🫙 ' : (p.sm ? '🍍 ' : '')) + nameIn(c), items, function (k) {
         if (k === 'info') { infoOpen(c); return; }
+        if (k === 'peel') { const A = TA(); if (A && touchItems(c, S.peers[c] || {}).some(function (x) { return x[0] === 'peel'; })) A.peel(c); return; }
+        if (k === 'strip') { const A = TA(); if (A && touchItems(c, S.peers[c] || {}).some(function (x) { return x[0] === 'strip'; })) A.strip(c); return; }
         if (k === 'bonk') { if (WA) WA.bonk(c, toastSay); return; }
         if (k === 'wish') { if (WA) WA.use(c, toastSay, function () { dropCarry(c); }); return; }
         if (k === 'down') { dropCarry(c); toast('🍍 ' + nameIn(c) + ' 사원을 내려놓았습니다'); return; }
@@ -685,6 +694,47 @@ function personTap(c, cx, cy) {
         if (S.sm) goDo({ t: 'climb', c: c, k: k }); else goDo({ t: 'take', c: c, k: k });
     });
 }
+// 👔 까기 · 👙 벗기기 (plaza.js window.plazaTouchApi) — 둘 다 보통 크기 · 물약 모습이 아닐 때만
+function TA() { return window.plazaTouchApi || null; }
+function touchItems(c, p) {
+    const A = TA();
+    if (!A || !S || S.sm || S.wk || !p || p.sm || p.wk || !p.one) return [];
+    const out = [];
+    try { if (A.peelOk(c, p.d)) out.push(['peel', '까기']); } catch (e) { }
+    try { if (A.stripOk(c, p.one.actor)) out.push(['strip', '벗기기']); } catch (e) { }
+    return out;
+}
+function meAt(cx, cy) {
+    if (!S || !S.me || !S.me.wrap || S.edit) return false;
+    const b = S.me.wrap.getBoundingClientRect();
+    if (!b.width || !b.height) return false;
+    const mid = (b.left + b.right) / 2, half = b.width * 0.2;
+    return !(cx < mid - half || cx > mid + half || cy < b.top + b.height * 0.28 || cy > b.bottom - b.height * 0.04);
+}
+function selfPeelOk() { const A = TA(); return !!(A && S && !S.sm && !S.wk && A.peelSelfOk()); }
+// 벗기는 중인 사람 — 모두의 화면에서 옷이 7~12 로 벗겨진다 (광장 stTick 과 같은 칸 · 같은 빠르기)
+function stripPaint() {
+    const A = TA(); if (!A) return;
+    const one = function (c, o) {
+        if (!o || !o.actor || o.wf || typeof o.actor.strip !== 'function') return;
+        const f = A.stripAt(c);
+        if (f != null) o.actor.strip(f);
+    };
+    one(me_(), S.me);
+    Object.keys(S.peers).forEach(function (c) { one(c, S.peers[c].one); });
+}
+// 내 옷이 바뀌었다 (까였다 · 벗겨졌다) — 내 모습을 다시 그리고 바로 알린다
+window.houseRedress = function (note) {
+    if (!S || !S.built || !S.me) return false;
+    const f = S.me.actor ? S.me.actor.facing() : 1;
+    dropOne(S.me);
+    S.me = mkOne(u_(), nameOf(u_()), false, { tiny: S.sm, wf: S.wk });
+    try { S.me.actor.face(f); if (S.moving) S.me.actor.moving(true); } catch (e) { }
+    putOne(S.me, S.x, S.y);
+    send(S.moving, true);
+    if (note) { try { toast(note); } catch (e) { } }
+    return true;
+};
 function dropCarry(c) {
     if (!S) return;
     S.carry = listOf(S.carry).filter(function (x) { return x.c !== c; });
@@ -1068,7 +1118,7 @@ function peersPaint(room) {
         seen[c] = 1;
         let p = S.peers[c];
         if (!p) { p = S.peers[c] = { x: Number(v.x) || SPAWN.x, y: Number(v.y) || SPAWN.y, one: null, st: 0, dk: '' }; }
-        p.sm = !!v.sm; p.wk = Number(v.wk) || 0; p.cy = v.cy || null; p.on = v.on || null; p.dn = v.dn || null;
+        p.sm = !!v.sm; p.wk = Number(v.wk) || 0; p.cy = v.cy || null; p.on = v.on || null; p.dn = v.dn || null; p.d = v.d || {};
         const dk = JSON.stringify(v.d || {}) + '|' + (p.sm ? 1 : 0) + '|' + p.wk;
         if (!p.one || p.dk !== dk) {
             if (p.one) dropOne(p.one);
@@ -1157,6 +1207,7 @@ function loop() {
         if (p.one.bub && t - p.one.bubAt > 6000) bubble(p.one, null);
     });
     carryTick(t);
+    stripPaint();
     camera();
     toolPlace();
     if (S.rps && Object.keys(S.rps).length) rpsPaint();
@@ -1274,6 +1325,12 @@ function pointerSetup() {
         closeMenu();
         // 🤝 사람을 눌렀다 — 고르는 칸 (걷지 않는다)
         if (!S.edit) { const pc = personAt(e.clientX, e.clientY); if (pc) { const r0 = S.ov.getBoundingClientRect(); personTap(pc, e.clientX - r0.left, e.clientY - r0.top); e.preventDefault(); return; } }
+        // 👔 나를 눌렀다 — 깔 수 있는 셔츠를 입었으면 [까기]
+        if (!S.edit && meAt(e.clientX, e.clientY) && selfPeelOk()) {
+            const r0 = S.ov.getBoundingClientRect();
+            openMenu(e.clientX - r0.left, e.clientY - r0.top, nameOf(u_()), [['peel', '까기']], function (k) { const A = TA(); if (k === 'peel' && A && selfPeelOk()) A.peelSelf(); });
+            e.preventDefault(); return;
+        }
         if (S.edit) {
             // 가구를 누르면 그 가구 · 놓는 중(고른 것이 있을 때)에는 어디를 짚어 끌어도 고른 가구만 움직인다 (사람은 안 걷는다)
             //   고른 채로 다른 가구를 끌지 않고 톡 누르면 그 가구로 바꿔 고른다 (2026-11-12 사용자 「이미 배치된 애가 계속 집혀」)

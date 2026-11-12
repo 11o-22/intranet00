@@ -2356,6 +2356,7 @@ function stUndress(L) {
     if (!me) return;
     try { if (typeof window.dotUndress === 'function') window.dotUndress(me); } catch (e) { }
     try { if (typeof window.plazaRedress === 'function') window.plazaRedress(); } catch (e) { }
+    try { if (typeof window.houseRedress === 'function') window.houseRedress('👙 ' + (L.bn || '누군가') + ' 사원이 레드 비키비키니를 벗겼습니다'); } catch (e) { }   // 🏠 사택 안이면 그쪽 모습도
     sysLine('👙 ' + (L.bn || '누군가') + ' 사원이 레드 비키비키니를 벗겼습니다.');
     try {
         database.ref(ST_PATH + '/' + me.code).transaction(function (cur) {
@@ -2444,6 +2445,7 @@ function pkApply(byName) {
     if (!me || typeof window.dotPeel !== 'function') return false;
     if (!window.dotPeel(me)) return false;
     try { if (typeof window.plazaRedress === 'function') window.plazaRedress(); } catch (e) { }
+    try { if (typeof window.houseRedress === 'function') window.houseRedress(byName ? '👔 ' + byName + ' 사원이 셔츠를 깠습니다' : ''); } catch (e) { }   // 🏠 사택 안이면 그쪽 모습도
     if (byName) sysLine('👔 ' + byName + ' 사원이 셔츠를 깠습니다.');
     return true;
 }
@@ -2478,6 +2480,53 @@ function pkSelfOk() {
     const me = u_();
     return !!(me && run && run.me && !run.me.wf && typeof window.dotPeelOf === 'function' && window.dotPeelOf(me, false));
 }
+
+// ==========================================
+// 🏠 사택에서도 까기 · 벗기기 (2026-11-12 사용자 「사택 시스템에 까기 쑤시기 마사지 같은 기능을 다 넣어줘」 — 쑤시기 · 마사지는 안 넣었다)
+// ==========================================
+//   신호 칸은 광장과 같은 것을 쓴다 (plazaPeel · plazaStrip) — 받는 쪽은 어디에 있든 위의 pkListen · stListen 이 듣고
+//   pkApply · stUndress 가 옷을 바꾼 뒤 window.houseRedress 로 사택 모습도 다시 그린다.
+//   사택(house-room.js)은 이 API 로 메뉴에 넣을지 묻고 · 보내고 · 벗겨지는 칸(stripAt)을 자기 사람 그림에 입힌다.
+window.plazaTouchApi = {
+    // 까기 — 남(c)이 입은 모습(dot)이 깔 수 있는 셔츠인가 · 커플이면 짝끼리 (cpOk)
+    peelOk: function (c, dot) {
+        if (!c || c === myCode() || !cpOk(c) || typeof window.dotPeelOf !== 'function') return false;
+        try { return !!window.dotPeelOf({ code: c, dot: dot || {} }, true); } catch (e) { return false; }
+    },
+    peel: function (c) {
+        const me = u_(), d = db_();
+        if (!me || !d || !c) return false;
+        d.ref(PK_PATH + '/' + c).set({ id: me.code + ':' + now(), by: me.code, bn: nameOf(me), at: chatNow() });
+        return true;
+    },
+    // 내가 내 셔츠를 깐다
+    peelSelfOk: function () { const me = u_(); return !!(me && typeof window.dotPeelOf === 'function' && window.dotPeelOf(me, false)); },
+    peelSelf: function () { return pkApply(''); },
+    // 벗기기 — actor 는 사택 쪽 그 사람 그림 (strips() 가 벗길 옷을 입었는지 안다)
+    stripOk: function (c, actor) {
+        if (!c || c === myCode() || !cpOk(c)) return false;
+        if (!actor || typeof actor.strips !== 'function' || !actor.strips()) return false;
+        return !(STL[c] && !STL[c].done);
+    },
+    strip: function (c) {
+        const me = u_(), d = db_();
+        if (!me || !d || !c) return false;
+        const rec = { id: me.code + ':' + now(), by: me.code, bn: nameOf(me), at: chatNow() };
+        d.ref(ST_PATH + '/' + c).transaction(function (cur) {
+            if (cur && cur.id && chatNow() - (Number(cur.at) || 0) < 6 * ST_MS + 3000) return;   // 방금 누가 벗기는 중
+            return rec;
+        }, function (err, ok) { if (!err && ok) stHeard(c, rec); });
+        return true;
+    },
+    // 지금 c 가 벗겨지는 칸 — 0~5 · 'gone' (다 벗겨진 뒤 조금 더) · null (벗기는 중 아님)
+    stripAt: function (c) {
+        const L = STL[c];
+        if (!L) return null;
+        const dt = now() - L.t0, f = Math.floor(dt / ST_MS);
+        if (f < 6) return f;
+        return dt < 6 * ST_MS + 6000 ? 'gone' : null;
+    }
+};
 
 // ★ other 가 참이면 **남**이다 — 가진 것을 따지지 않고 입은 그대로 그린다.
 //
