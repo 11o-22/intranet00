@@ -36,7 +36,7 @@ const PATH = 'playlists';
 const SET_KEY = 'plSet';
 const MAX_LISTS = 20;
 // 곡 길이 (ms) — 목록에 미리 적어 둔다 (리듬 채보의 dur). 새 곡은 한 번 틀면 재서 이 기기에 적어 둔다
-const DUR = { airplane: 147120, client: 168240, devotion: 159680, evilhigh: 147640, returnhome: 100600, cheonjiin: 153120, handicap: 135943,
+const DUR = { airplane: 147120, client: 168240, devotion: 159680, evilhigh: 147640, returnhome: 100600, cheonjiin: 153120, handicap: 143655,
               winterfloat: 163080, whitexmas: 120800, showtime: 126800 };
 
 function u_() { return (typeof currentUser !== 'undefined' && currentUser) ? currentUser : null; }

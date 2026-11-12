@@ -298,9 +298,89 @@ HARDER = {'handicap': {'normal': 1.1, 'hard': 0.98, 'alt': True, 'fill16': True}
 
 # 사용자가 정한 레벨 — 다시 뽑아도 이 값 (2026-11-11 사용자 「쇼타임은 하드 레벨을 17로」)
 #   하드를 선율 따라가기로 다시 짠 뒤(2026-11-11)에도 하드 레벨 표시는 그 전 값 그대로 둔다 — 꿈결 +50 (레벨 15 이상)이 이 표시에 붙어 있다
-LV_FIX = {'showtime': {'hard': 17}, 'handicap': {'hard': 17},   # Handicap 하드 17 (2026-11-11 사용자)
+LV_FIX = {'showtime': {'hard': 17}, 'handicap': {'hard': 17, 'normal': 10},   # Handicap 하드 17 (2026-11-11 사용자) · 노말은 그때 뽑힌 10 그대로 (2026-11-12 새 판 끝 마당이 성겨져 평균이 조금 내려도)
           'airplane': {'hard': 15}, 'client': {'hard': 11}, 'devotion': {'hard': 11}, 'evilhigh': {'hard': 15},
           'returnhome': {'hard': 15}, 'winterfloat': {'hard': 15}, 'whitexmas': {'hard': 13}}
+
+# 끝 마당 — 드럼이 빠지고 박 없이 흐르는 곳 (이 시각부터 끝까지). 격자(박을 이어 그은 줄)는 거기서 소리와 어긋나므로,
+#   격자 노트를 걷고 새로 울린 소리 위에 바로 노트를 둔다 · 가장 크게 친 소리(마지막 한 방)에 맺고 그 뒤 꼬리에는 두지 않는다
+#   Handicap 새 판 (2026-11-12 사용자 「끝부분만 좀 다르거든」) — 132.3 초부터 드럼이 빠지고 142.1 초에 한 번 크게 친 뒤 사라진다
+OUTRO = {'handicap': 132.3}
+#   난이도마다 (새 소리 세기 문턱 · 노트 사이 최소 초 · 길게 누르기로 바꾸는 다음 노트까지 초) — 세기는 끝 마당 앞 30 초 95 % 를 1 로
+OUT_SPEC = {'easy': (0.35, 0.40, 1.0), 'normal': (0.17, 0.22, 0.7), 'hard': (0.10, 0.12, 0.7)}
+
+
+def outro_onsets(sr, x, t0, env, off, fps):
+    """t0 뒤 새로 울린 소리 [시각(초), 세기, 높이(log2 Hz)].
+    찾기는 4096 틀에서 6 dB 넘게 새로 오른 주파수 칸의 합 (패드가 깔린 곳에서도 새 음이 보인다) —
+    시각은 그 자리 가운데 소리 결(env['mid']) 꼭대기로 다시 잡는다 (격자와 같은 잣대 · 4096 틀 값은 소리에 따라 20 ms 안팎 흔들린다)."""
+    a = max(0, int((t0 - 30) * sr))
+    f, t, Z = stft(x[a:], sr, nperseg=4096, noverlap=4096 - HOP, boundary=None, padded=False)
+    L = 20 * np.log10(np.abs(Z) + 1e-9)
+    L = np.maximum(L, L.max() - 60)
+    k = (f > 150) & (f < 3000)
+    D = np.maximum(0, L[k, 6:] - L[k, :-6])
+    D = np.where(D > 6, D, 0)
+    nov = D.sum(axis=0)
+    tn = t[6:] - 3 * HOP / sr + a / sr
+    nov = nov / (np.percentile(nov[tn < t0], 95) + 1e-9)
+    lf = np.log2(f[k])
+    pk, _ = find_peaks(nov, height=0.08, distance=int(0.08 * sr / HOP))
+    e = env['mid']
+    out = []
+    for p in pk:
+        if tn[p] < t0:
+            continue
+        i0 = max(0, int((tn[p] - 0.05 - off) * fps))
+        i1 = min(len(e) - 1, int((tn[p] + 0.015 - off) * fps))
+        j = i0 + int(np.argmax(e[i0:i1 + 1]))
+        w = D[:, p] + 1e-9
+        out.append([j / fps + off + BIAS, float(nov[p]), float((w * lf).sum() / w.sum())])
+    return out
+
+
+def outro_notes(notes, diff, ons, t0):
+    """끝 마당(t0 ~)의 격자 노트를 걷고 ons 위에 다시 둔다. t0 앞에서 시작한 길게 누르기 · 슬라이드 줄은 그대로 둔다."""
+    th, gap, hold_at = OUT_SPEC[diff]
+    T0 = t0 * 1000
+    head = {}
+    for n in notes:
+        if n[2] in (2, 3):
+            head[n[3]] = min(head.get(n[3], n[0]), n[0])
+    keep = [n for n in notes if n[0] < T0 or (n[2] in (2, 3) and head[n[3]] < T0)]
+    busy = max([n[0] + (n[3] if n[2] == 1 else 0) for n in keep] + [0]) / 1000 + gap
+    if not ons:
+        return keep, len(notes) - len(keep)
+    fin = max(ons, key=lambda o: o[1])                      # 마지막 한 방
+    pick = []
+    for o in sorted(ons, key=lambda o: -o[1]):
+        if o is fin or o[1] < th or o[0] < busy or o[0] > fin[0] - gap:
+            continue
+        if any(abs(o[0] - p[0]) < gap for p in pick):
+            continue
+        pick.append(o)
+    pick.sort(key=lambda o: o[0])
+    out = list(keep)
+    if pick:
+        ps = sorted(p[2] for p in pick)
+        qs = [ps[int(len(ps) * q / 6)] for q in range(1, 6)] if len(ps) >= 6 else []
+        prev = None
+        for i, o in enumerate(pick):
+            lane = int(np.searchsorted(qs, o[2])) if qs else int(np.clip(round((o[2] - ps[0]) / max(1e-6, ps[-1] - ps[0]) * 5), 0, 5))
+            if prev and prev[1] == lane and o[0] - prev[0] < 0.3:
+                lane = lane + 1 if lane < 3 else lane - 1           # 같은 칸 연타는 옆 칸으로
+            nxt = pick[i + 1][0] if i + 1 < len(pick) else fin[0]
+            if nxt - o[0] >= hold_at:                               # 다음 소리까지 길게 이어지면 길게 누르기
+                out.append([int(round(o[0] * 1000)), lane, 1, int(round(min(1.5, nxt - o[0] - 0.3) * 1000))])
+            else:
+                out.append([int(round(o[0] * 1000)), lane, 0, 0])
+            prev = (o[0], lane)
+    tf = int(round(fin[0] * 1000))
+    if diff == 'easy':
+        out.append([tf, 2, 0, 0])
+    else:
+        out += [[tf, 1, 0, 0], [tf, 4, 0, 0]]                     # 양손 동시로 맺는다
+    return out, len(notes) - len(out)                           # 걷어 낸 노트 수 − 새로 둔 노트 수
 
 
 HOLD_GAP = 250
@@ -734,6 +814,7 @@ def main():
         F = {k: np.array([feat(k, t) for t in grid]) for k in ('all', 'low', 'mid', 'high')}
         C = np.array([cen[int(min(len(cen) - 1, max(0, (t - off) * fps)))] for t in grid])
         R = np.array([rdb[int(min(len(rdb) - 1, max(0, (t - off) * fps)))] for t in grid])
+    OUT_ON = outro_onsets(sr, x, OUTRO[key], env, off, fps) if key in OUTRO else None
     metric = np.where(pos == 0, 1.0, np.where(pos % 4 == 0, 0.8, np.where(pos % 2 == 0, 0.55, 0.35)))
 
     loud = R - np.percentile(R, 95)                 # 0 이 가장 큰 쪽 · 음수
@@ -781,6 +862,7 @@ def main():
     ZIG = {'normal': {'steps': ((2, 2),), 'min': 6, 'max': 10, 'per30': 1.2},
            'hard':   {'steps': ((2, 3), (1, 2)), 'min': 6, 'max': 12, 'per30': 1.8}}
     charts = {}
+    NORM_N = 0
     HX = HARDER.get(key)
     for diff, S in SPEC.items():
         if HX and diff in ('normal', 'hard'):
@@ -822,7 +904,7 @@ def main():
             two_ |= {zi for zi in ZIG_TWO.get(key, {}).get(diff, ()) if zi < len(zigs)}
             zn_ = sum(len(r) * (2 if zi in two_ else 1) for zi, (r, amp) in enumerate(zigs))
             notes, chain = hard_chart(grid, K, pos, ok, F, R, active, MEL, zig_span, first_ok, last_ok, beats_per_sec, S,
-                                      int(HARD_X * (HX.get('hard', 1) if HX else 1) * charts['normal']['count']) - zn_)
+                                      int(HARD_X * (HX.get('hard', 1) if HX else 1) * (charts['normal']['count'] + NORM_N)) - zn_)
         else:
             sc = strength * metric * (1.0 + 0.25 * np.clip(loud / 30 + 1, 0, 1))
             if diff == 'easy':
@@ -1013,6 +1095,10 @@ def main():
             for q, i in enumerate(r):
                 low = (q % 2 == 0) == first_low
                 notes.append([int(round(grid[i] * 1000)), lo if low else hi, 3, chain])
+        if OUT_ON is not None:
+            notes, out_d = outro_notes(notes, diff, OUT_ON, OUTRO[key])
+            if diff == 'normal':
+                NORM_N = out_d                                      # 하드 노트 수는 끝 마당을 걷기 전 노말 수에 맞춘다 (몸통 촘촘함 그대로)
         # 길게 누르는 칸에 걸친 다른 노트는 치운다 (같은 칸)
         notes.sort(key=lambda n: (n[0], n[1]))
         clean = []
