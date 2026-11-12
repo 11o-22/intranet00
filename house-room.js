@@ -28,6 +28,11 @@
 //   houseInvite/<집주인>/<사번>     { at, n }    — 집주인이 초대한 사원 (집주인 쪽 명단)
 //   houseInvited/<사번>/<집주인>    { at, n }    — 같은 것을 받은 사람 쪽에도 (받은 사람 화면이 듣는다)
 //
+// ■ 🔍 꾸밀 때 줌인 · 줌아웃 (2026-11-12 사용자 「(기본 배치는) 하지 말고 꾸밀 때에는 줌인 줌아웃이 가능한 기능만」)
+//   꾸미기를 켜면 오른쪽 위에 ［－ 100% ＋］ — 50% ~ 400% 를 한 칸씩 (ZE) · PC 는 마우스 휠 · 손가락 두 개로 벌리면 확대 · 오므리면 축소
+//   꾸미기를 닫으면 원래 크기로. 걷기 · 가구 끌기는 줌과 상관없이 그대로 된다.
+//   ✗ 같은 날 처음엔 가구 22개 · 벽지 1 · 바닥지 1 을 기본으로 깔아 두려다가 사용자가 「하지 말고」 — 집은 처음에 비어 있다
+//
 // ■ 누가 들어가나
 //   집주인 · 집주인의 룸메이트(house.roomie — 어느 쪽에 적혀 있든) · 집주인이 초대한 사원 · 꾸미기는 집주인만
 //
@@ -71,6 +76,9 @@ const DIRS = ['앞', '옆', '뒤', '옆'];
 // 화면 배 (화면 점 / 도트) — 사람이 도트 한 칸에 고르게 찍히는 자리만 (광장의 K_STEP × 4)
 const Z_STEP = [1, 4 / 3, 2, 8 / 3, 3, 4];
 const VIEW_DOTS = 420;               // 창 높이에 이만큼의 도트가 들게 (광장과 사람 크기가 비슷해진다)
+// 🔍 꾸밀 때 줌인 · 줌아웃 (2026-11-12 사용자 「꾸밀 때에는 줌인 줌아웃이 가능한 기능만」) — 이 배들 사이를 한 칸씩
+//   ＋ · － 단추 · PC 마우스 휠 · 손가락 두 개로 벌리기 · 오므리기. 꾸미기를 닫으면 원래 배로 돌아간다.
+const ZE = [0.5, 2 / 3, 1, 4 / 3, 2, 8 / 3, 3, 4];
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function db_() { return (typeof database !== 'undefined') ? database : null; }
@@ -245,6 +253,10 @@ function css() {
         '.hr-card .row{display:flex;gap:4px;}',
         '.hr-card .hr-b{padding:3px 7px;font-size:11px;}',
         '#hr-tool{position:absolute;z-index:5;display:none;gap:4px;transform:translate(-50%,-100%);}',
+        '#hr-zoom{position:absolute;right:8px;top:52px;top:calc(max(8px,env(safe-area-inset-top)) + 44px);z-index:5;display:none;align-items:center;gap:4px;}',
+        '#hr-ov.edit #hr-zoom{display:flex;}',
+        '#hr-zoom .hr-b{min-width:34px;font-size:16px;font-weight:bold;padding:3px 8px;}',
+        '#hr-zoom span{font-size:11px;color:#f2e6c9;min-width:40px;text-align:center;text-shadow:0 0 3px #000;}',
         '#hr-tool .hr-b{padding:5px 8px;}',
         '.hr-modal{position:absolute;inset:0;z-index:9;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;}',
         '.hr-box{background:#1b1813;border:1px solid #6b5a36;border-radius:12px;padding:16px;min-width:240px;max-width:min(360px,90vw);max-height:80vh;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.6;}',
@@ -335,6 +347,7 @@ function enter(host) {
         + '<div id="hr-chat"><div id="hr-feed"></div><input id="hr-in" maxlength="60" placeholder="말하기 (Enter)" autocomplete="off"></div>'
         + '<div id="hr-tool"><button class="hr-b" data-t="rot">↻ 돌리기</button><button class="hr-b" data-t="put">📦 넣기</button><button class="hr-b" data-t="ok">✓</button></div>'
         + '<div id="hr-joy"><i></i></div>'
+        + (mine ? '<div id="hr-zoom"><button class="hr-b" data-z="-1">－</button><span></span><button class="hr-b" data-z="1">＋</button></div>' : '')
         + '<div id="hr-load">🏠 사택에 들어가는 중…</div>';
     document.body.appendChild(ov);
     S = {
@@ -359,6 +372,7 @@ function enter(host) {
     const eb = ov.querySelector('[data-k="edit"]'); if (eb) eb.onclick = function () { editToggle(); };
     const ib = ov.querySelector('[data-k="inv"]'); if (ib) ib.onclick = function () { inviteModal(); };
     ov.querySelectorAll('#hr-tool [data-t]').forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); toolDo(b.getAttribute('data-t')); }; });
+    ov.querySelectorAll('#hr-zoom [data-z]').forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); zoomStep(Number(b.getAttribute('data-z'))); }; });
     const inp = ov.querySelector('#hr-in');
     inp.onkeydown = function (e) {
         e.stopPropagation();
@@ -379,7 +393,7 @@ function enter(host) {
     window.addEventListener('keyup', S.onKey);
     S.onBlur = function () { if (S) S.keys = {}; };
     window.addEventListener('blur', S.onBlur);
-    S.onSize = function () { if (S && S.built) { const z = pickZ(); if (z !== S.z) rebuildScale(); } };
+    S.onSize = function () { if (S && S.built && !(S.edit && S.zEdit)) { const z = pickZ(); if (z !== S.z) rebuildScale(); } };
     window.addEventListener('resize', S.onSize);
     pointerSetup();
 }
@@ -399,7 +413,7 @@ function leave() {
 }
 
 function build() {
-    const z = S.z = pickZ();
+    const z = S.z = (S.edit && S.zEdit) ? S.zEdit : pickZ();
     const W = N * z;
     S.world.style.width = W + 'px'; S.world.style.height = W + 'px';
     ['hr-floor', 'hr-wall', 'hr-frame'].forEach(function (id) {
@@ -422,6 +436,7 @@ function rebuildScale() {
     S.fel = {};
     build();
     peersPaint(S.room || {});
+    if (S.sel) select(S.sel);
 }
 
 function title() {
@@ -603,11 +618,49 @@ function toWorld(cx, cy) {
     return { x: (cx - r.left - (S.tx || 0)) / S.z, y: (cy - r.top - (S.ty || 0)) / S.z };
 }
 
+// 🔍 꾸밀 때 줌 — 한 칸씩 (ZE)
+function zoomLabel() {
+    if (!S) return;
+    const sp = S.ov.querySelector('#hr-zoom span'); if (!sp) return;
+    const base = pickZ();
+    sp.textContent = Math.round((S.z / base) * 100) + '%';
+    const i = ZE.indexOf(S.z);
+    const a = S.ov.querySelector('#hr-zoom [data-z="-1"]'), b = S.ov.querySelector('#hr-zoom [data-z="1"]');
+    if (a) a.disabled = i === 0; if (b) b.disabled = i === ZE.length - 1;
+}
+function zoomStep(dir) {
+    if (!S || !S.edit || !S.built) return;
+    let i = ZE.indexOf(S.z);
+    if (i < 0) { i = 0; ZE.forEach(function (z, k) { if (Math.abs(z - S.z) < Math.abs(ZE[i] - S.z)) i = k; }); }
+    const ni = Math.max(0, Math.min(ZE.length - 1, i + (dir > 0 ? 1 : -1)));
+    if (ZE[ni] === S.z) { zoomLabel(); return; }
+    S.zEdit = ZE[ni];
+    rebuildScale();
+    zoomLabel();
+}
+
 // 짚어 끄는 조이스틱 · 꾸미기 중에는 가구를 끈다
 function pointerSetup() {
     const view = S.view, joyEl = S.ov.querySelector('#hr-joy');
+    // 손가락 두 개 — 꾸미는 중에만 줌 (벌리면 ＋ · 오므리면 －)
+    const touches = {};
+    view.addEventListener('wheel', function (e) {
+        if (!S || !S.edit) return;
+        e.preventDefault();
+        const t = now();
+        if (t - (S.wheelAt || 0) < 140) return;
+        S.wheelAt = t;
+        zoomStep(e.deltaY < 0 ? 1 : -1);
+    }, { passive: false });
     view.addEventListener('pointerdown', function (e) {
         if (!S || !S.built) return;
+        if (e.pointerType === 'touch') touches[e.pointerId] = { x: e.clientX, y: e.clientY };
+        if (S.edit && Object.keys(touches).length === 2 && !S.drag) {
+            const k = Object.keys(touches);
+            S.pinch = { d: Math.hypot(touches[k[0]].x - touches[k[1]].x, touches[k[0]].y - touches[k[1]].y) || 1 };
+            if (S.joy) { S.joy = null; joyEl.style.display = 'none'; }
+            return;
+        }
         const inp = S.ov.querySelector('#hr-in'); if (inp && document.activeElement === inp) inp.blur();
         if (S.edit) {
             const el = e.target && e.target.closest ? e.target.closest('.hr-fu') : null;
@@ -631,6 +684,16 @@ function pointerSetup() {
     });
     view.addEventListener('pointermove', function (e) {
         if (!S) return;
+        if (touches[e.pointerId]) { touches[e.pointerId].x = e.clientX; touches[e.pointerId].y = e.clientY; }
+        if (S.pinch) {
+            const k = Object.keys(touches);
+            if (k.length >= 2) {
+                const d = Math.hypot(touches[k[0]].x - touches[k[1]].x, touches[k[0]].y - touches[k[1]].y) || 1;
+                if (d / S.pinch.d > 1.3) { zoomStep(1); S.pinch.d = d; }
+                else if (d / S.pinch.d < 0.77) { zoomStep(-1); S.pinch.d = d; }
+            }
+            return;
+        }
         if (S.drag && S.drag.pid === e.pointerId) {
             const w = toWorld(e.clientX, e.clientY);
             const v = S.drag.v;
@@ -650,7 +713,9 @@ function pointerSetup() {
         }
     });
     const up = function (e) {
+        delete touches[e.pointerId];
         if (!S) return;
+        if (S.pinch) { if (Object.keys(touches).length < 2) S.pinch = null; return; }
         if (S.drag && S.drag.pid === e.pointerId) {
             const dg = S.drag; S.drag = null;
             const v = dg.v;
@@ -675,7 +740,14 @@ function editToggle() {
     S.edit = !S.edit;
     S.ov.classList.toggle('edit', S.edit);
     const b = S.ov.querySelector('[data-k="edit"]'); if (b) b.classList.toggle('on', S.edit);
-    if (!S.edit) { select(null); if (S.editEl) { S.editEl.remove(); S.editEl = null; } return; }
+    if (!S.edit) {
+        select(null); if (S.editEl) { S.editEl.remove(); S.editEl = null; }
+        if (S.zEdit) { S.zEdit = null; if (pickZ() !== S.z) rebuildScale(); }     // 꾸미기를 닫으면 원래 배로
+        S.pinch = null;
+        return;
+    }
+    S.zEdit = S.z;
+    zoomLabel();
     const el = document.createElement('div');
     el.id = 'hr-edit';
     el.innerHTML = '<div class="tabs"><button class="hr-b" data-tab="furn">🛋 가구</button><button class="hr-b" data-tab="wall">🧱 벽지</button><button class="hr-b" data-tab="floor">🟫 바닥지</button><span class="sp"></span><button class="hr-b" data-tab="x">닫기</button></div>'
