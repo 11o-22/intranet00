@@ -298,7 +298,7 @@ HARDER = {'handicap': {'normal': 1.1, 'hard': 0.98, 'alt': True, 'fill16': True}
 
 # 사용자가 정한 레벨 — 다시 뽑아도 이 값 (2026-11-11 사용자 「쇼타임은 하드 레벨을 17로」)
 #   하드를 선율 따라가기로 다시 짠 뒤(2026-11-11)에도 하드 레벨 표시는 그 전 값 그대로 둔다 — 꿈결 +50 (레벨 15 이상)이 이 표시에 붙어 있다
-LV_FIX = {'showtime': {'hard': 17}, 'handicap': {'hard': 17, 'normal': 10},   # Handicap 하드 17 (2026-11-11 사용자) · 노말은 그때 뽑힌 10 그대로 (2026-11-12 새 판 끝 마당이 성겨져 평균이 조금 내려도)
+LV_FIX = {'showtime': {'hard': 17}, 'handicap': {'hard': 15, 'normal': 10},   # Handicap 하드 17 (2026-11-11 사용자) → 15 (2026-11-12 사용자 「핸디캡 하드 레벨 15로 낮추자」) · 노말은 그때 뽑힌 10 그대로 (2026-11-12 새 판 끝 마당이 성겨져 평균이 조금 내려도)
           'airplane': {'hard': 15}, 'client': {'hard': 11}, 'devotion': {'hard': 11}, 'evilhigh': {'hard': 15},
           'returnhome': {'hard': 15}, 'winterfloat': {'hard': 15}, 'whitexmas': {'hard': 13}}
 
@@ -741,9 +741,17 @@ def hard_chart(grid, K, pos, ok, F, R, active, MEL, zig_span, first_ok, last_ok,
     return notes, chain
 
 
+# 박 · 격자를 잴 때 이 시각 뒤는 보지 않는다 — 덧붙인 꼬리(박 없는 잔향)가 템포 · 마디 첫 박 고르기를 흔들지 않게. 곡 길이(dur)는 파일 전체
+#   Handicap 새 판 — 142.6 초에 뚝 끊기던 화음을 이어 살려 147.6 초까지 잦아들게 했다 (2026-11-12 사용자 「그 부분 다시 살려줘」) · 그 전 끝(143.655 초)까지만 잰다
+TAIL = {'handicap': 143.655}
+
+
 def main():
     wav, key, title, artist = sys.argv[1:5]
     sr, x = load(wav)
+    dur_all = len(x) / sr
+    if key in TAIL:
+        x = x[:int(TAIL[key] * sr)]
     dur = len(x) / sr
     fps, off, env, cen, rdb, mid_db = analyse(sr, x)
     bpm0, lp = local_period(env, fps)
@@ -1146,7 +1154,7 @@ def main():
     sr1 = sr // 1000
     head = np.abs(x[:sr1 * 1500]).reshape(-1, sr1).mean(axis=1)
     head = [round(float(v), 4) for v in head / (head.max() + 1e-9)]
-    data = {'key': key, 'title': title, 'artist': artist, 'dur': int(dur * 1000), 'head': head,
+    data = {'key': key, 'title': title, 'artist': artist, 'dur': int(dur_all * 1000), 'head': head,
             'bpm': bpms[0] if len(bpms) == 1 else [bpms[0], bpms[-1]], 'bars': bars, 'charts': charts}
     out = 'rhythm/' + key + '.json'
     with open(out, 'w') as fp:
