@@ -9,6 +9,8 @@
 //   돌려주는 돈은 없다 (상담사가 거저 준 옷이다).
 //   옷 자체(closet.js · wear-gift.js 목록)는 그대로 둔다 — 상담사 옷장에는 늘 보이고, 이 정리 뒤에 다시 주면 그건 걷지 않는다.
 //   ★ 같은 날 교복을 새 그림(분홍 셔츠 · 하늘색 치마)으로 바꿨다 — 새 교복은 열쇠 w-uniform2 · i wuniform2 라 여기서 걷지 않는다.
+//   ★ 같은 날 「오피스 룩」(예전 교복 그림을 이름만 바꿔 다시 넣은 것 · 열쇠 office-look · i office)도 판에서 지웠다
+//     (사용자 「기존에 내가 넣은 오피스룩을 지우자. 아예」) — 그 사이에 받은 사람이 있으면 같은 길로 걷는다 (purgeOffice/<사번> · 따로 한 번).
 //
 // ■ 누가 하나 — 한 사람에 딱 한 번 (purgeWuni/<사번> 를 트랜잭션으로 먼저 잡은 쪽 · purge1026.js 와 같은 길)
 //   · 사원 본인 화면 — 들어와서 자료가 다 내려온 뒤 (어둠 · K 의 방 안에서는 기다린다)
@@ -16,15 +18,16 @@
 //   상담사 본인은 건너뛴다 (받은 사람이 아니다 · 상담사 옷장에는 늘 있다)
 //
 // ■ 콘솔
-//   purgeWuniRun()   상담사 — 남은 사원을 지금 바로 걷는다
+//   purgeWuniRun()   상담사 — 남은 사원을 지금 바로 걷는다 (여성 교복 · 오피스 룩 둘 다)
 
 (function purgeWuni() {
 
-const NODE = 'purgeWuni';
 const ADMIN = 'kario0987';
-const KEY = 'w-uniform';            // 옷장 열쇠 (wear-gift.js k · closet.js own)
-const ID = 'wuniform';              // 겉옷 칸의 i (closet.js DOT_SLOTS)
-const NAME = '여성 교복';           // 물품 이름 (선물함 · 소지품)
+// node — 한 사람 한 번 잡는 칸 · key — 옷장 열쇠 (wear-gift.js k · closet.js own) · id — 겉옷 칸의 i · name — 물품 이름 (선물함 · 소지품)
+const JOBS = [
+    { node: 'purgeWuni',   key: 'w-uniform',   id: 'wuniform', name: '여성 교복' },
+    { node: 'purgeOffice', key: 'office-look', id: 'office',   name: '오피스 룩' }
+];
 
 function me() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function db_() { return (typeof database !== 'undefined' && database) ? database : null; }
@@ -39,6 +42,10 @@ function stamp() {
     const n = new Date();
     return String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0') + ':' + String(n.getSeconds()).padStart(2, '0');
 }
+
+const runs = [];
+JOBS.forEach(function (J) {
+const NODE = J.node, KEY = J.key, ID = J.id, NAME = J.name;
 
 function cleanUser(u) {
     const set = {}, nul = [];
@@ -68,7 +75,7 @@ function cleanUser(u) {
     }
     if (hit) {
         if (!Array.isArray(u.history)) u.history = [];
-        u.history.unshift({ time: stamp(), text: '[옷장] 여성 교복이 거두어졌습니다.' });
+        u.history.unshift({ time: stamp(), text: '[옷장] ' + NAME + '이 거두어졌습니다.' });
         if (u.history.length > 10) u.history.length = 10;
         set.history = 1;
     }
@@ -116,13 +123,13 @@ function selfRun() {
             if ((Array.isArray(v) && !v.length) || (obj(v) && !Object.keys(v).length)) { up[k] = null; return; }
             f[k] = 1;
         });
-        if (Object.keys(up).length) d.ref('users/' + code).update(up).catch(function (e) { console.warn('[교복 거두기] 지우기', e); });
-        try { if (Object.keys(f).length && typeof saveFields === 'function') saveFields(f); } catch (e) { console.warn('[교복 거두기] 저장', e); }
+        if (Object.keys(up).length) d.ref('users/' + code).update(up).catch(function (e) { console.warn('[' + NAME + ' 거두기] 지우기', e); });
+        try { if (Object.keys(f).length && typeof saveFields === 'function') saveFields(f); } catch (e) { console.warn('[' + NAME + ' 거두기] 저장', e); }
         note(code, r);
         try { if (typeof window.plazaRedress === 'function') window.plazaRedress(); } catch (e) { }
         try { if (typeof window.closetReset === 'function') window.closetReset(); } catch (e) { }
         try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
-        console.log('[교복 거두기] 내 기록 — 칸: ' + Object.keys(r.set).join(', ') + ' · 지움: ' + r.nul.join(', '));
+        console.log('[' + NAME + ' 거두기] 내 기록 — 칸: ' + Object.keys(r.set).join(', ') + ' · 지움: ' + r.nul.join(', '));
     });
 }
 setInterval(function () { try { selfRun(); } catch (e) { selfBusy = false; } }, 2000);
@@ -169,7 +176,7 @@ function cleanOther(code) {
                 return r;
             });
         });
-    }).catch(function (e) { console.warn('[교복 거두기] ' + code, e); return null; });
+    }).catch(function (e) { console.warn('[' + NAME + ' 거두기] ' + code, e); return null; });
 }
 function cleanGifts() {
     const d = db_();
@@ -189,9 +196,9 @@ function cleanGifts() {
                     else up[c + '/' + id + '/items'] = left ? items : null;
                 });
             });
-            if (Object.keys(up).length) { console.log('[교복 거두기] 선물함 ' + Object.keys(up).length + '자리 고침'); return d.ref('gifts').update(up); }
+            if (Object.keys(up).length) { console.log('[' + NAME + ' 거두기] 선물함 ' + Object.keys(up).length + '자리 고침'); return d.ref('gifts').update(up); }
         }).then(function () { return true; });
-    }).catch(function (e) { console.warn('[교복 거두기] 선물함', e); return false; });
+    }).catch(function (e) { console.warn('[' + NAME + ' 거두기] 선물함', e); return false; });
 }
 let adminBusy = false, adminAt = 0;
 function adminRun(force) {
@@ -210,11 +217,18 @@ function adminRun(force) {
     };
     return cleanGifts().then(function () { return step(0); }).then(function () {
         adminBusy = false;
-        if (n) console.log('[교복 거두기] 상담사 화면 — 접속하지 않은 사원 ' + n + '명에게서 걷었습니다.');
+        if (n) console.log('[' + NAME + ' 거두기] 상담사 화면 — 접속하지 않은 사원 ' + n + '명에게서 걷었습니다.');
         return n;
     }).catch(function (e) { adminBusy = false; console.warn('[교복 거두기]', e); return n; });
 }
-setInterval(function () { try { adminRun(false); } catch (e) { adminBusy = false; } }, 15000);
-window.purgeWuniRun = function () { return adminRun(true); };
+runs.push(adminRun);
+});
+// 상담사 화면 — 거두기 둘을 차례로 (한 사람 기록을 둘이 동시에 읽고 덮지 않게)
+function adminAll(force) {
+    return runs.reduce(function (p, f) { return p.then(function () { return f(force); }).catch(function () { }); }, Promise.resolve());
+}
+let allBusy = false;
+setInterval(function () { if (allBusy) return; allBusy = true; adminAll(false).then(function () { allBusy = false; }, function () { allBusy = false; }); }, 15000);
+window.purgeWuniRun = function () { return adminAll(true); };
 
 })();
