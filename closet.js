@@ -158,7 +158,7 @@ const DOT = {
         'sound-lp', 'sexy-pantsu', 'gochu', 'red-bikini', 'bunny-stk', 'sound-coat-in', 'pj-bottom', 'w-panty', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'sailor-shoes', 'pj-top', 'w-shirt', 'w-shirt-open', 'knit', 'gym-suit', 'm-shirt', 'han-inner',
         'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit', 'newbie-outfit', 'sailor-bubble', 'garaetteok',
         'school-m', 'sdress', 'devil-m', 'devil-f',         // 의상 1차 (2026-11-04)
-        'robe', 'han-duru', 'cape',
+        'robe', 'nun-robe', 'han-duru', 'cape',            // 수녀복 (2026-11-12) — 장포 옆
         // 바니걸 (2026-11-08) — 뒤 털 → 의상 → 앞 털. 완전체 그림에서 털 한 장(옆으로 늘어진 털)은 의상 밑, 다른 한 장(걸을 때 감기는 털)은 의상 위였다
         'bunny-fur-b', 'bunny-suit', 'lingerie', 'slave-tee', 'w-uniform2', 'office-look2', 'bunny-fur-f',
         'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in',
@@ -197,6 +197,12 @@ const DOT = {
     //   짝이 없는 머리(J3 · 장허운 · 브라운 …)는 그대로.
     GENDER_SWAP: [['h02', 'h02f'], ['h03', 'h03f'], ['h04', 'h04m'], ['h05', 'h05f'], ['h06', 'h06f'], ['h07', 'h14'], ['h08', 'h08m'],
                   ['h10', 'h10f'], ['h11', 'h11m'], ['h12', 'h13'], ['h15', 'h15m'], ['h16', 'h16f'], ['h17', 'h17m'], ['h18', 'h18f'], ['h20', 'h20f']],
+    // ★ 후드 안의 뒷머리 (2026-11-12 사용자 「여성 머리카락 (ex. 호유원.) 뒷 머리가 후드 안에 있을 경우 후드 그림자보다 앞에 오도록」)
+    //   뒷머리(hair-*)는 몸 뒤에 깔려 후드 그림자(-in)에 덮였다. 후드 그림자가 있는 자리만 오려 둔 뒷머리 장(<뒷머리>-in-<후드>)을
+    //   그 그림자 바로 위에 한 장 더 깐다 — 후드 안쪽에서는 머리카락이 앞으로 · 그 밖(어깨 뒤로 늘어진 데)은 그대로 몸 뒤.
+    //   오린 장은 칸마다 (걷기 칸 · 서기 첫 칸 뒷머리) ∩ (같은 칸 후드 그림자) — 후드가 서기 칸마다 나부끼면 그 칸대로 (FLAP_COLS)
+    HOOD_IN: { 'wolf-pj-in': 'wolf', 'newbie-hood-in': 'newbie', 'maker-outer-in': 'maker' },
+    HOOD_HAIR: { 'hair-h02f-in-maker': 1, 'hair-h02f-in-newbie': 1, 'hair-h02f-in-wolf': 1, 'hair-h03f-in-maker': 1, 'hair-h03f-in-newbie': 1, 'hair-h03f-in-wolf': 1, 'hair-h05f-in-maker': 1, 'hair-h05f-in-newbie': 1, 'hair-h05f-in-wolf': 1, 'hair-h06f-in-maker': 1, 'hair-h06f-in-newbie': 1, 'hair-h06f-in-wolf': 1, 'hair-h10f-in-maker': 1, 'hair-h10f-in-newbie': 1, 'hair-h10f-in-wolf': 1, 'hair-h16f-in-maker': 1, 'hair-h16f-in-newbie': 1, 'hair-h16f-in-wolf': 1, 'hair-h18f-in-maker': 1, 'hair-h18f-in-newbie': 1, 'hair-h18f-in-wolf': 1, 'hair-h19-in-maker': 1, 'hair-h19-in-newbie': 1, 'hair-h19-in-wolf': 1 },
     FACE_PAIR: { h05: 'h09', h05f: 'h09f', 'rab-friend': 'rab-friend-r', 'cat-halo-cat': 'cat-halo-cat-r', 'nuow-friend': 'nuow-friend-r', 'nuow2-doll': 'nuow2-doll-r' },
     // ★ 스물네 칸짜리 장 (2026-10-31 · 검은 고양이 헤일로) — 네 줄 (윗 두 줄 걷기 1~12 · 아랫 두 줄 정지 13~24) · 제 시계로 돈다.
     //   걷기  1~12 를 한 번 → 7~12 를 되풀이. n 번째 칸은 몸의 걷기 (n-1)%6 칸과 같은 자리라 몸의 걸음 칸과 함께 넘긴다.
@@ -226,6 +232,24 @@ const DOT = {
     FLAP_COLS: { robe: [0, 1], 'rab-friend': [0, 1, 2, 3, 4, 5], 'bunny-headset': [0, 1, 2, 3, 4, 5], 'glass-pen': [0, 1, 2, 3, 4, 5],
                  'maker-outer': [0, 1, 2, 3, 4, 5], 'maker-outer-in': [0, 1, 2, 3, 4, 5], 'newbie-sprout': [0, 1],
                  'wolf-pj': [0, 1, 2, 3, 4, 5], 'wolf-pj-in': [0, 1, 2, 3, 4, 5],
+                 // 후드 안의 뒷머리 — 그 후드 그림자처럼 서기 칸마다 (2026-11-12)
+                 'hair-h02f-in-maker': [0, 1, 2, 3, 4, 5],
+                 'hair-h02f-in-wolf': [0, 1, 2, 3, 4, 5],
+                 'hair-h03f-in-maker': [0, 1, 2, 3, 4, 5],
+                 'hair-h03f-in-wolf': [0, 1, 2, 3, 4, 5],
+                 'hair-h05f-in-maker': [0, 1, 2, 3, 4, 5],
+                 'hair-h05f-in-wolf': [0, 1, 2, 3, 4, 5],
+                 'hair-h06f-in-maker': [0, 1, 2, 3, 4, 5],
+                 'hair-h06f-in-wolf': [0, 1, 2, 3, 4, 5],
+                 'hair-h10f-in-maker': [0, 1, 2, 3, 4, 5],
+                 'hair-h10f-in-wolf': [0, 1, 2, 3, 4, 5],
+                 'hair-h16f-in-maker': [0, 1, 2, 3, 4, 5],
+                 'hair-h16f-in-wolf': [0, 1, 2, 3, 4, 5],
+                 'hair-h18f-in-maker': [0, 1, 2, 3, 4, 5],
+                 'hair-h18f-in-wolf': [0, 1, 2, 3, 4, 5],
+                 'hair-h19-in-maker': [0, 1, 2, 3, 4, 5],
+                 'hair-h19-in-wolf': [0, 1, 2, 3, 4, 5],
+
                  'gochu': [0, 1],                 // 곧휴 — 서기 두 칸 (반짝이)
                  // ★ 사운드 코트 — 서기 줄 두 칸에 자락이 흔들린다 (그림자도 같이 돈다 · 두 칸이 같은 그림이라 티는 안 난다)
                  //   사운드 레빗 헤드셋 — 서기 줄 여섯 칸에 귀가 흔들린다 (2026-10-23)
@@ -466,6 +490,11 @@ const DOT_SLOTS = [
             { i: 'bsuit', n: '브라운 정장', over: ['brown-suit'], own: 'brown-suit' },
             // 서 있을 때 두 칸(0·1)으로 나부낀다 — FLAP_COLS 참고
             { i: 'robe', n: '검은 장포', over: ['robe'], own: 'robe' },
+            // ★ 수녀복 (2026-11-12 사용자 「이거 뽑기에 넣어주고 수녀복은 따로 준 걸로 해서 넣어줘」) — 의상 뽑기 · 뽑은 사람만 (own)
+            //   따로 주신 두 장(1728x768 · 칸 288)을 칸마다 +30 으로 352 칸에 — 수도복(nun-robe)은 옷 줄, 베일(nun-veil)은 머리 위(top)
+            //   걷기 여섯 칸이 다 그려져 있다 · 서기 여섯 칸은 같은 그림이라 첫 칸만 (보통 몸에 맞춰 그려져 있다)
+            //   (같이 온 sister_wear 묶음의 낱장 192x320 은 같은 옷의 다른 꼴이라 쓰지 않았다)
+            { i: 'nun', n: '수녀복', over: ['nun-robe'], top: ['nun-veil'], own: 'nun-robe' },
             { i: 'han', n: '내의', over: ['han-inner'], own: 'han-inner' },
             { i: 'dress', n: '드레스', over: ['dress'], own: 'dress' },
             { i: 'tuxedo', n: '턱시도', over: ['tuxedo'], own: 'tuxedo' },
@@ -1181,6 +1210,22 @@ function look(user, override, all) {
         });
     }
     if (!hd.solo && !hd.bare) (hd.back || []).forEach(function (o) { backs.push(o); fol[o] = 1; });
+    // ★ 후드 안의 뒷머리 — 후드 그림자 바로 위에 오린 뒷머리를 한 장 더 (D.HOOD_IN · 2026-11-12)
+    if (!hd.solo && !hd.bare && hd.back && D.HOOD_IN) {
+        Object.keys(D.HOOD_IN).forEach(function (hin) {
+            const at = over.indexOf(hin); if (at < 0) return;
+            const add = hd.back.map(function (o) { return o + '-in-' + D.HOOD_IN[hin]; }).filter(function (n) { return D.HOOD_HAIR && D.HOOD_HAIR[n]; });
+            add.forEach(function (n, j) {
+                over.splice(at + 1 + j, 0, n);
+                fol[n] = 1;
+                const c0 = (d.col && typeof d.col === 'object') ? d.col : {}, src = n.split('-in-')[0];
+                if (c0[src] != null && c0[src] !== '') {                // 물들인 뒷머리 — 오린 장도 같은 빛깔 (저장되지 않게 셀 수 없는 칸으로)
+                    if (!colOut) colOut = Object.assign({}, c0);
+                    Object.defineProperty(colOut, n, { value: c0[src], enumerable: false });
+                }
+            });
+        });
+    }
     fol[head] = 1;
     (D.NO_BOB || []).forEach(function (o) { delete fol[o]; });
     (D.FRONT || []).forEach(function (f) {
