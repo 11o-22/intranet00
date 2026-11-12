@@ -1324,7 +1324,11 @@ window.dotShownDot = function (u) {
     let d = (u && u.dot && typeof u.dot === 'object') ? u.dot : null;
     if (!d) return d;
     if (grapeOn(u)) { const h = swapHead(d.head); if (h !== d.head) d = Object.assign({}, d, { head: h }); }
-    if (femForced(u) && d.shape !== 'fem') d = Object.assign({}, d, { shape: 'fem' });
+    if (femForced(u)) { if (d.shape !== 'fem') d = Object.assign({}, d, { shape: 'fem' }); }
+    // ★ 2026-11-13 사용자 「일반 남성도 여성 체형으로 되어서 (포도맛이 풀린 후) · 풀린 이후에는 기본 체형으로 돌아가게」
+    //   물약 중에 옷장을 저장하면 체형이 여성 체형으로 적힌다. 받는 쪽은 권한을 안 가리고 적힌 대로 그리므로,
+    //   물약이 풀려 더는 여성 체형을 못 쓰는 사람이면 기본 체형으로 실어 보낸다 (제 화면은 look 이 이미 기본으로 그린다)
+    else if (femShape(d.shape) && !femOk(u)) d = Object.assign({}, d, { shape: '' });
     return d;
 };
 // 물약이 들거나 풀리면 광장의 내 모습을 다시 그리고 남에게도 다시 알린다
