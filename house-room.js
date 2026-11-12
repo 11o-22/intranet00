@@ -359,6 +359,8 @@ function css() {
         '.hr-fu.sel{outline:2px dashed #ffd76a;outline-offset:-2px;filter:drop-shadow(0 0 4px #ffd76a);}',
         '.hr-fu.bad{filter:drop-shadow(0 0 4px #ff5252) saturate(.4);}',
         '.hr-one{position:absolute;left:0;top:0;pointer-events:none;}',
+        // 꾸미는 동안엔 집과 가구만 — 사람(나 · 룸메이트 · 손님) · 이름표 · 말풍선은 숨긴다 (2026-11-12 사용자 「꾸밀 때에는 가구만 나오게」)
+        '#hr-ov.edit .hr-one{visibility:hidden;}',
         '.hr-tag{position:absolute;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:11px;font-weight:bold;color:#fff;text-shadow:0 0 3px #000,0 0 6px #000;}',
         '.hr-tag.me{color:#ffe08a;}',
         '.hr-bub{position:absolute;left:50%;transform:translateX(-50%);max-width:180px;white-space:normal;word-break:break-all;background:#fff;color:#111;font-size:12px;line-height:1.35;padding:4px 8px;border-radius:9px;box-shadow:0 2px 6px rgba(0,0,0,.5);text-align:center;}',
