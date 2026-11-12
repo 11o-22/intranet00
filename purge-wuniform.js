@@ -26,7 +26,9 @@ const ADMIN = 'kario0987';
 // node — 한 사람 한 번 잡는 칸 · key — 옷장 열쇠 (wear-gift.js k · closet.js own) · id — 겉옷 칸의 i · name — 물품 이름 (선물함 · 소지품)
 const JOBS = [
     { node: 'purgeWuni',   key: 'w-uniform',   id: 'wuniform', name: '여성 교복' },
-    { node: 'purgeOffice', key: 'office-look', id: 'office',   name: '오피스 룩' }
+    // byName:false — 같은 날 「오피스 룩」을 새 그림(열쇠 office-look2)으로 다시 넣었다. 소지품 · 선물함은 이름으로만 알아보므로
+    //   새로 보낸 「오피스 룩」을 걷지 않게, 예전 것은 옷장 열쇠 · 입은 칸(office-look · office)으로만 걷는다.
+    { node: 'purgeOffice', key: 'office-look', id: 'office',   name: '오피스 룩', byName: false }
 ];
 
 function me() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
@@ -45,7 +47,7 @@ function stamp() {
 
 const runs = [];
 JOBS.forEach(function (J) {
-const NODE = J.node, KEY = J.key, ID = J.id, NAME = J.name;
+const NODE = J.node, KEY = J.key, ID = J.id, NAME = J.name, BYNAME = J.byName !== false;
 
 function cleanUser(u) {
     const set = {}, nul = [];
@@ -69,7 +71,7 @@ function cleanUser(u) {
         if (!obj(e.d) || !Object.keys(e.d).length) delete u.dotSets[k];   // 이 옷만 담겨 있던 코디 — 칸째 비운다
         set.dotSets = 1; hit = true;
     });
-    if (Array.isArray(u.inventory)) {
+    if (BYNAME && Array.isArray(u.inventory)) {
         const inv = u.inventory.filter(function (n) { return n !== NAME; });
         if (inv.length !== u.inventory.length) { u.inventory = inv; set.inventory = 1; hit = true; }
     }
@@ -180,6 +182,7 @@ function cleanOther(code) {
 }
 function cleanGifts() {
     const d = db_();
+    if (!BYNAME) return Promise.resolve(true);
     return claim('_global', 'admin').then(function (ok) {
         if (!ok) return false;
         return d.ref('gifts').once('value').then(function (s) {
