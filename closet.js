@@ -160,7 +160,7 @@ const DOT = {
         'school-m', 'sdress', 'devil-m', 'devil-f',         // 의상 1차 (2026-11-04)
         'robe', 'han-duru', 'cape',
         // 바니걸 (2026-11-08) — 뒤 털 → 의상 → 앞 털. 완전체 그림에서 털 한 장(옆으로 늘어진 털)은 의상 밑, 다른 한 장(걸을 때 감기는 털)은 의상 위였다
-        'bunny-fur-b', 'bunny-suit', 'lingerie', 'slave-tee', 'w-uniform2', 'bunny-fur-f',
+        'bunny-fur-b', 'bunny-suit', 'lingerie', 'slave-tee', 'w-uniform2', 'office-look', 'bunny-fur-f',
         'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in',
         'apron',                                            // 🧺 에이프런 (2026-11-11) — 모든 옷 위 · 장갑 밑
         'glove', 'bungeo'],
@@ -240,7 +240,7 @@ const DOT = {
                  // 바니걸 (2026-11-08) — 의상 · 뒤 털 · 스타킹은 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다 (머리띠는 첫 칸을 들썩임 몫만큼 내린 것과 같아 그대로 둔다)
                  'bunny-suit': [0, 1, 2, 3, 4, 5], 'bunny-fur-b': [0, 1, 2, 3, 4, 5], 'bunny-stk': [0, 1, 2, 3, 4, 5],
                  // 란제리 · 금 목줄 (2026-11-08) — 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다
-                 'lingerie': [0, 1, 2, 3, 4, 5], 'gold-leash': [0, 1, 2, 3, 4, 5], 'slave-tee': [0, 1, 2, 3, 4, 5], 'w-uniform2': [0, 1, 2, 3, 4, 5],
+                 'lingerie': [0, 1, 2, 3, 4, 5], 'gold-leash': [0, 1, 2, 3, 4, 5], 'slave-tee': [0, 1, 2, 3, 4, 5], 'w-uniform2': [0, 1, 2, 3, 4, 5], 'office-look': [0, 1, 2, 3, 4, 5],
                  // 셔츠 (여성 체형 · 2026-11-08) — 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다 · 몸과 같은 시계로 돈다
                  'w-shirt': [0, 1, 2, 3, 4, 5],
                  // 풀어진 셔츠 · 여성용 속옷 (2026-11-08) — 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다
@@ -572,6 +572,10 @@ const DOT_SLOTS = [
             //   주신 그림 1728x768 (칸 288) → 칸마다 +30 으로 352 칸. 걷기 넷(5=3 · 6=2) · 서기 여섯 칸 (FLAP_COLS)
             //   fem — 몸이 여성 체형일 때만 · alone — 다른 칸 옷은 안 그린다 · keep — 망토 칸은 같이
             { i: 'wuniform2', n: '여성 교복', over: ['w-uniform2'], own: 'w-uniform2', fem: true, alone: true, keep: ['cape'] },
+            // ★ 오피스 룩 (2026-11-12 사용자 「기존에 내가 줬던 건 오피스 룩으로 이름을 바꿔줘」) — 예전 여성 교복 그림(흰 셔츠 · 검은 치마)을 이름만 바꿔 다시 넣었다.
+            //   셔츠 안에 란제리 윗부분을 받친 한 장 그대로 (예전 w-uniform · 2026-11-12 합친 것) · 상담사가 선물함으로 보내 준 사람만 (wear-gift.js)
+            //   열쇠 · i 를 따로(office-look · office) 써서 예전 교복 거두기(purge-wuniform.js)와 안 겹친다
+            { i: 'office', n: '오피스 룩', over: ['office-look'], own: 'office-look', fem: true, alone: true, keep: ['cape'] },
             // ★ 의상 뽑기 탈 세 벌 + 퐁실 의상 (2026-10-25) — 주신 그림은 432x192 (칸 72x96) 라
             //   네 배로 늘려 칸마다 가로 +30 으로 352 칸에 옮겼다 (다섯 벌 · 2026-10-23 과 같은 길).
             //   탈 셋은 머리까지 감싸고 얼굴만 뚫려 있어 **머리 위**(top)에 얹는다 — 늑대 잠옷 바깥과 같다.
