@@ -97,7 +97,7 @@ const SONGS = [
     //     음원 — 낮은 웅웅임 조금 · 가운데 몸통 · 밝은 위를 조금 눅이고 · 좌우 조금 넓게 · -14 LUFS · 끝 0.4 초만 닫는다
     //     채보 — 16분 결이 0.159 초인데 저절로는 127 BPM 으로 잡혀 어긋나 94.5 BPM 둘레로 찾게 함 (BPM_HINT)
     { key: 'sangun', title: '山君', artist: 'Benz', audio: 'snd/rhythm-sangun.mp3', chart: 'rhythm/sangun.json', color: '#8fa3e6', cover: 'rhythm/sangun-cover.jpg' },
-    { key: 'legacy', title: 'Legacy', artist: 'Benz', audio: 'snd/rhythm-legacy.mp3', chart: 'rhythm/legacy.json', color: '#d6d6d6', cover: 'rhythm/legacy-cover.jpg?v=3', need: { song: 'sangun', play: true } },     // 표지 바꿈 (2026-11-12 사용자 · 흑백 담배 든 인물 새 그림 → 같은 날 셔츠 · 넥타이 그림으로 한 번 더)
+    { key: 'legacy', title: 'Legacy', artist: 'Benz', audio: 'snd/rhythm-legacy.mp3', chart: 'rhythm/legacy.json', color: '#a9b0e6', cover: 'rhythm/legacy-cover.jpg?v=4', need: { song: 'sangun', play: true } },     // 표지 바꿈 (2026-11-12 사용자 · 흑백 담배 든 인물 새 그림 → 같은 날 셔츠 · 넥타이 그림 → 남색 배경 같은 그림 · 곡 색도 그 셔츠 빛으로)
     // ✗ Sun of Victory 는 2026-11-12 사용자 「Sun of Victory 리듬게임에서 없애자」로 뺐다 (음원 · 채보 · 표지 파일은 남겨 둠)
 ];
 const DIFFS = [['easy', 'EASY', '이지', '#5fd18a'], ['normal', 'NORMAL', '노말', '#ffc94a'], ['hard', 'HARD', '하드', '#ff5f73']];
