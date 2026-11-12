@@ -214,8 +214,8 @@ def one_side(notes):
     return out
 
 
-def local_period(env, fps, sub=4, lo=60, hi=200, win=12.0, step=2.0):
-    """창마다 16분 길이(초) — 봉우리들의 원 평균으로."""
+def local_period(env, fps, sub=4, lo=60, hi=200, win=12.0, step=2.0, around=None):
+    """창마다 16분 길이(초) — 봉우리들의 원 평균으로. around — 곡 전체 템포를 이 BPM ±3 안에서만 찾는다 (BPM_HINT)"""
     e = env['all']
     pk, pr = find_peaks(e, height=np.convolve(e, np.ones(41) / 41, mode='same') + 0.15, distance=int(0.07 * fps))
     ts = pk / fps
@@ -226,7 +226,7 @@ def local_period(env, fps, sub=4, lo=60, hi=200, win=12.0, step=2.0):
     ee = np.maximum(ee, 0)
     ac = np.correlate(ee, ee, mode='full')[len(ee) - 1:]
     best = None
-    for bpm in np.arange(70, 180, 0.05):
+    for bpm in (np.arange(around - 3, around + 3, 0.05) if around else np.arange(70, 180, 0.05)):
         lag = 60 / bpm * fps
         s = 0.0
         for k in (1, 2, 4):
@@ -309,7 +309,11 @@ SWING = {'handicap': (0, 1 / 3, 2 / 3, 5 / 6), 'genesis': (0, 1 / 3, 2 / 3, None
 HARDER = {'handicap': {'normal': 1.1, 'hard': 1.105, 'alt': True, 'fill16': True},
           # Genesis — 「어렵게」는 아니지만 박이 느려서(80 BPM · 한 박 0.75 초) 한 박 기준으로 고르면 다른 곡보다 노트가 성기다 (노말 초당 2.4)
           #   → 노말 한 박 노트 수만 늘려 느린 곡들(Devotion · 내담자 여러분께 — 노말 2.7 ~ 2.8 · 하드 4.7) 보다 조금 촘촘하게 · 하드는 노말을 따라 는다
-          'genesis': {'normal': 1.3, 'hard': 1.32, 'alt': True, 'chords': True}}
+          'genesis': {'normal': 1.3, 'hard': 1.32, 'alt': True, 'chords': True},
+          # ★ 2026-11-12 사용자 「둘 다 난이도는 16으로 맞춰 주고 (하드 기준)」 — 山君 · Legacy 하드 (노말은 그대로)
+          #   레벨 15 곡들(Handicap · Genesis — 초당 6.4 ~ 6.7)과 17 인 Showtime! 사이로 · 16분 채움(fill16) · 박 칸 번갈아(alt)
+          'sangun': {'hard': 1.3, 'alt': True, 'fill16': True},
+          'legacy': {'hard': 1.3, 'alt': True, 'fill16': True}}
 #   ★ 2026-11-12 사용자 「새로 넣은 리듬게임 하드가 너무 쉬운데 15레벨 정도로 어렵게」 — Genesis 하드 (노말은 그대로)
 #     셋잇단 격자는 한 박에 세 칸뿐이라 선율 · 박만으로는 초당 4.3 개에서 찬다 → 선율 음에 박이 같이 세게 오면 다른 손 동시(chords)를 셋잇단 한 칸 간격까지 · 하드 노트 수 1.32 배 · 박 칸 번갈아(alt)
 #   ★ 2026-11-12 사용자 「그김에 핸디캡도 채보 더 넣고 한 100정도」 — Handicap 하드 0.98 → 1.105 (880 → 980 개쯤)
@@ -320,6 +324,7 @@ HARDER = {'handicap': {'normal': 1.1, 'hard': 1.105, 'alt': True, 'fill16': True
 # 사용자가 정한 레벨 — 다시 뽑아도 이 값 (2026-11-11 사용자 「쇼타임은 하드 레벨을 17로」)
 #   하드를 선율 따라가기로 다시 짠 뒤(2026-11-11)에도 하드 레벨 표시는 그 전 값 그대로 둔다 — 꿈결 +50 (레벨 15 이상)이 이 표시에 붙어 있다
 LV_FIX = {'showtime': {'hard': 17}, 'handicap': {'hard': 15, 'normal': 10}, 'genesis': {'hard': 15},   # Genesis 하드 15 (2026-11-12 사용자)
+          'sangun': {'hard': 16}, 'legacy': {'hard': 16},   # 山君 · Legacy 하드 16 (2026-11-12 사용자)
           # Handicap 하드 17 (2026-11-11 사용자) → 15 (2026-11-12 사용자 「핸디캡 하드 레벨 15로 낮추자」) · 노말은 그때 뽑힌 10 그대로 (2026-11-12 새 판 끝 마당이 성겨져 평균이 조금 내려도)
           'airplane': {'hard': 15}, 'client': {'hard': 11}, 'devotion': {'hard': 11}, 'evilhigh': {'hard': 15},
           'returnhome': {'hard': 15}, 'winterfloat': {'hard': 15}, 'whitexmas': {'hard': 13}}
@@ -327,7 +332,19 @@ LV_FIX = {'showtime': {'hard': 17}, 'handicap': {'hard': 15, 'normal': 10}, 'gen
 # 끝 마당 — 드럼이 빠지고 박 없이 흐르는 곳 (이 시각부터 끝까지). 격자(박을 이어 그은 줄)는 거기서 소리와 어긋나므로,
 #   격자 노트를 걷고 새로 울린 소리 위에 바로 노트를 둔다 · 가장 크게 친 소리(마지막 한 방)에 맺고 그 뒤 꼬리에는 두지 않는다
 #   Handicap 새 판 (2026-11-12 사용자 「끝부분만 좀 다르거든」) — 132.3 초부터 드럼이 빠지고 142.1 초에 한 번 크게 친 뒤 사라진다
-OUTRO = {'handicap': 132.3}
+#   값이 dict 이면 { t0 · scale: 세기 문턱 배 · last: 마지막 한 방 = 가장 센 것의 이 몫 넘는 소리 가운데 마지막 · hold: 마지막 한 방을 이 초만큼 길게 누르기 }
+#   ★ 2026-11-12 山君 · Legacy · Sun of Victory — 드럼이 끝나고 화음만 남는 꼬리에 16분 채움이 깔려 소리 없는 데를 치게 됐다
+#     山君 — 146.80 초 마지막 한 방 뒤 화음이 이어지다(148.65 에 끊기던 것을 이어 살림) 잦아든다 → 그 한 방에 양손 동시 길게 누르기 2 초
+#     Legacy — 144.16 초 마지막 한 방 뒤 낮은 음이 5 초 잦아든다 → 양손 동시 길게 누르기 2 초
+#     Sun of Victory — 119.8 초 뒤 화음이 버티다 121.81 · 121.97 두 번 치고 잦아든다 → 버티는 데는 비우고(문턱 4 배) 두 번에 맺는다
+OUTRO = {'handicap': 132.3,
+         'sangun': {'t0': 146.45, 'last': 0.5, 'hold': 2.0},
+         'legacy': {'t0': 144.10, 'last': 0.5, 'hold': 2.0},
+         'sunvictory': {'t0': 119.85, 'scale': 4.0, 'last': 0.5}}
+
+
+def outro_t0(v):
+    return v['t0'] if isinstance(v, dict) else v
 #   난이도마다 (새 소리 세기 문턱 · 노트 사이 최소 초 · 길게 누르기로 바꾸는 다음 노트까지 초) — 세기는 끝 마당 앞 30 초 95 % 를 1 로
 OUT_SPEC = {'easy': (0.35, 0.40, 1.0), 'normal': (0.17, 0.22, 0.7), 'hard': (0.10, 0.12, 0.7)}
 
@@ -363,7 +380,10 @@ def outro_onsets(sr, x, t0, env, off, fps):
 
 def outro_notes(notes, diff, ons, t0):
     """끝 마당(t0 ~)의 격자 노트를 걷고 ons 위에 다시 둔다. t0 앞에서 시작한 길게 누르기 · 슬라이드 줄은 그대로 둔다."""
+    cfg = t0 if isinstance(t0, dict) else {'t0': t0}
+    t0 = cfg['t0']
     th, gap, hold_at = OUT_SPEC[diff]
+    th *= cfg.get('scale', 1.0)
     T0 = t0 * 1000
     head = {}
     for n in notes:
@@ -374,6 +394,9 @@ def outro_notes(notes, diff, ons, t0):
     if not ons:
         return keep, len(notes) - len(keep)
     fin = max(ons, key=lambda o: o[1])                      # 마지막 한 방
+    if cfg.get('last'):                                     # 가장 센 것의 몫을 넘는 소리 가운데 마지막
+        big = [o for o in ons if o[1] >= fin[1] * cfg['last']]
+        fin = max(big, key=lambda o: o[0])
     pick = []
     for o in sorted(ons, key=lambda o: -o[1]):
         if o is fin or o[1] < th or o[0] < busy or o[0] > fin[0] - gap:
@@ -398,12 +421,25 @@ def outro_notes(notes, diff, ons, t0):
                 out.append([int(round(o[0] * 1000)), lane, 0, 0])
             prev = (o[0], lane)
     tf = int(round(fin[0] * 1000))
+    hl = int(round(cfg.get('hold', 0) * 1000))
+    if hl:                                                   # 마지막 한 방 앞에서 길게 누르던 것은 그 앞에서 놓는다
+        for n in out:
+            if n[2] == 1 and n[0] < tf and n[0] + n[3] > tf - 100:
+                n[3] = tf - 100 - n[0]
+                if n[3] < 300:
+                    n[2], n[3] = 0, 0
+    kd = 1 if hl else 0
     if diff == 'easy':
-        out.append([tf, 2, 0, 0])
+        out.append([tf, 2, kd, hl])
     else:
-        out += [[tf, 1, 0, 0], [tf, 4, 0, 0]]                     # 양손 동시로 맺는다
+        out += [[tf, 1, kd, hl], [tf, 4, kd, hl]]                 # 양손 동시로 맺는다 (hold — 둘 다 길게)
     return out, len(notes) - len(out)                           # 걷어 낸 노트 수 − 새로 둔 노트 수
 
+
+# 곡 전체 템포를 이 BPM 둘레(±3)에서만 찾는다 — 자기상관이 엉뚱한 배수를 고를 때
+#   Sun of Victory — 16분 결이 0.159 초(가운데 · 높은 소리 자기상관 0.16 · 0.32 · 0.64)인데 저절로는 그 셋을 한 박으로 잡아 127 BPM 이 됐다
+#     (마디 길이가 1.83 ~ 1.92 초로 흔들리고 군데군데 115 ms 어긋남) → 94.5 BPM (한 박 0.635 초 · 8분 = 킥) 둘레로 · 템포가 조금씩 흔들려 곧은 격자는 쓰지 않는다
+BPM_HINT = {'sunvictory': 94.5}
 
 # 템포가 처음부터 끝까지 한결같은 곡 — 따라가는 격자(track_grid) 대신 곧은 격자 · BPM 은 정해 두고 자리(위상)만 곡 전체로 잰다
 #   Genesis — 80.000 BPM 그대로 (곡 전체로 맞춰 보니 8 초마다 잰 자리가 다 ±7 ms 안 · 2026-11-12)
@@ -800,7 +836,7 @@ def main():
         x = x[:int(TAIL[key] * sr)]
     dur = len(x) / sr
     fps, off, env, cen, rdb, mid_db = analyse(sr, x)
-    bpm0, lp = local_period(env, fps)
+    bpm0, lp = local_period(env, fps, around=BPM_HINT.get(key))
     lt = np.array([p[0] for p in lp])
     ld = np.array([p[1] for p in lp])
     # 부드럽게 (가운데 값 · 이동 평균)
@@ -878,7 +914,7 @@ def main():
         F = {k: np.array([feat(k, t) for t in grid]) for k in ('all', 'low', 'mid', 'high')}
         C = np.array([cen[int(min(len(cen) - 1, max(0, (t - off) * fps)))] for t in grid])
         R = np.array([rdb[int(min(len(rdb) - 1, max(0, (t - off) * fps)))] for t in grid])
-    OUT_ON = outro_onsets(sr, x, OUTRO[key], env, off, fps) if key in OUTRO else None
+    OUT_ON = outro_onsets(sr, x, outro_t0(OUTRO[key]), env, off, fps) if key in OUTRO else None
     metric = np.where(pos == 0, 1.0, np.where(pos % 4 == 0, 0.8, np.where(pos % 2 == 0, 0.55, 0.35)))
 
     loud = R - np.percentile(R, 95)                 # 0 이 가장 큰 쪽 · 음수

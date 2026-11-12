@@ -36,7 +36,7 @@ const PATH = 'playlists';
 const SET_KEY = 'plSet';
 const MAX_LISTS = 20;
 // 곡 길이 (ms) — 목록에 미리 적어 둔다 (리듬 채보의 dur). 새 곡은 한 번 틀면 재서 이 기기에 적어 둔다
-const DUR = { airplane: 147120, client: 168240, devotion: 159680, evilhigh: 147640, returnhome: 100600, cheonjiin: 153120, handicap: 147555, genesis: 184425,
+const DUR = { airplane: 147120, client: 168240, devotion: 159680, evilhigh: 147640, returnhome: 100600, cheonjiin: 153120, handicap: 147555, genesis: 184425, sangun: 153535, legacy: 149815, sunvictory: 122935,
               winterfloat: 163080, whitexmas: 120800, showtime: 126800 };
 
 function u_() { return (typeof currentUser !== 'undefined' && currentUser) ? currentUser : null; }
@@ -61,6 +61,10 @@ function loadOwn() {
         // 조건으로 여는 곡(Handicap ← 내담자 여러분께 HARD B 이상) — 아직 rhythmOwn 에 안 적혔어도 랭킹 기록이 채웠으면 연다 (읽기만)
         return Promise.all(songs().filter(function (s) { return s.needSpec && !OWN[s.key]; }).map(function (s) {
             const n = s.needSpec;
+            if (n.play) {                                  // 그 곡을 한 번 친 기록이 어느 난이도에든 있으면 (Legacy ← 山君)
+                return Promise.all(['easy', 'normal', 'hard'].map(function (d) { return db.ref('rhythmRank/' + n.song + '/' + d + '/' + c).once('value').then(function (r) { return !!(r && r.val()); }).catch(function () { return false; }); }))
+                    .then(function (rs) { if (rs.some(Boolean)) OWN[s.key] = 1; });
+            }
             return db.ref('rhythmRank/' + n.song + '/' + n.diff + '/' + c).once('value').then(function (r) {
                 const v = r && r.val();
                 if (v && v.r && R_ORDER.indexOf(v.r) >= 0 && R_ORDER.indexOf(v.r) <= R_ORDER.indexOf(n.rank)) OWN[s.key] = 1;
@@ -687,7 +691,7 @@ function buy(k, src) {
     const s = song(k);
     if (!s || !isLocked(s)) return;
     if (!s.price) {                                        // 조건으로 여는 곡 — 포인트로 못 연다
-        const msg = '「' + s.title + '」은(는) 리듬 게임에서 ' + (s.need || '조건') + ' 을 받으면 열립니다.';
+        const msg = s.needMsg && s.needSpec && s.needSpec.play ? '「' + s.title + '」은(는) 리듬 게임에서 ' + s.needMsg + '.' : '「' + s.title + '」은(는) 리듬 게임에서 ' + (s.need || '조건') + ' 을 받으면 열립니다.';
         try { if (typeof showCustomAlert === 'function' && !restOn()) showCustomAlert(msg); else alert(msg); } catch (e) { }
         return;
     }

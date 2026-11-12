@@ -85,7 +85,20 @@ const SONGS = [
     //          · 박이 느려 노트가 성겨 노말 한 박 노트 수를 늘림 (HARDER)
     //   ★ 2026-11-12 사용자 「하드가 너무 쉬운데 15레벨 정도로 어렵게」 — 하드 777 → 1176 개 (선율 음에 박이 같이 세게 오면 다른 손 동시) · 레벨 15
     //   표지 — 주신 사진(푸른 하늘 십자가)을 정사각 720 으로
-    { key: 'genesis', title: 'Genesis', artist: '광시', audio: 'snd/rhythm-genesis.mp3', chart: 'rhythm/genesis.json', color: '#9fc3ea', cover: 'rhythm/genesis-cover.jpg', price: 20000 }
+    { key: 'genesis', title: 'Genesis', artist: '광시', audio: 'snd/rhythm-genesis.mp3', chart: 'rhythm/genesis.json', color: '#9fc3ea', cover: 'rhythm/genesis-cover.jpg', price: 20000 },
+    // ★ 2026-11-12 사용자 — 山君 · Legacy · Sun of Victory (아티스트 Benz · 셋 다 마스터링 · 음질 상향)
+    //   山君 「이제 리듬게임에 노래 또 넣을 건데. 아티스트는 Benz. 커버는 이걸로 하고, 마스터링이나 음질 향상도 해줘」 · 제목은 받은 파일에 적힌 「山君」 · 열려 있음
+    //     음원 — 20 ~ 40 Hz 웅웅임이 다른 곡보다 17 dB 넘게 커서 걷고 · 가운데 몸통 조금 · 밝은 위를 눅이고 · 좌우 조금 넓게 · -14 LUFS
+    //            148.65 초에 남은 화음이 뚝 끊겨(Handicap 과 같은 꼴) 끊기기 전 화음을 이어 5 초 동안 잦아들게 했다 (153.5 초)
+    //   Legacy 「이건 이 표지로 · 아티스트 Benz · 마스터링 · 음질 상향 · 둘 다 난이도는 16(하드) · 山君을 플레이해야 해금 (난이도 점수 상관 없음)」
+    //     음원 — 47 Hz 저음이 아주 두꺼워(20 ~ 40 Hz 가 다른 곡보다 25 dB) 조금 덜고 · 가운데 · 위를 살리고 · 좌우가 좁아(-11 dB) 넓게 · -14 LUFS · 끝은 스스로 잦아든다
+    //   山君 · Legacy 하드 레벨 16 (초당 6.3 ~ 6.4 · tools/rhythm-chart.py HARDER · LV_FIX) · 끝은 마지막 한 방에 양손 길게 누르기 (OUTRO)
+    //   Sun of Victory 「이거 Sun of Victory 로 넣어 주고 · 해금 조건은 15000 포인트 · 마스터링이랑 음질 향상」 (아티스트는 따로 말이 없어 Benz)
+    //     음원 — 낮은 웅웅임 조금 · 가운데 몸통 · 밝은 위를 조금 눅이고 · 좌우 조금 넓게 · -14 LUFS · 끝 0.4 초만 닫는다
+    //     채보 — 16분 결이 0.159 초인데 저절로는 127 BPM 으로 잡혀 어긋나 94.5 BPM 둘레로 찾게 함 (BPM_HINT)
+    { key: 'sangun', title: '山君', artist: 'Benz', audio: 'snd/rhythm-sangun.mp3', chart: 'rhythm/sangun.json', color: '#8fa3e6', cover: 'rhythm/sangun-cover.jpg' },
+    { key: 'legacy', title: 'Legacy', artist: 'Benz', audio: 'snd/rhythm-legacy.mp3', chart: 'rhythm/legacy.json', color: '#d6d6d6', cover: 'rhythm/legacy-cover.jpg', need: { song: 'sangun', play: true } },
+    { key: 'sunvictory', title: 'Sun of Victory', artist: 'Benz', audio: 'snd/rhythm-sunvictory.mp3', chart: 'rhythm/sunvictory.json', color: '#9fd3ff', cover: 'rhythm/sunvictory-cover.jpg', price: 15000 }
 ];
 const DIFFS = [['easy', 'EASY', '이지', '#5fd18a'], ['normal', 'NORMAL', '노말', '#ffc94a'], ['hard', 'HARD', '하드', '#ff5f73']];
 const LANES = 6;                      // 채보의 칸 수 — 화면에서는 가로 자리로 바꾼다 (xOfLane)
@@ -127,11 +140,18 @@ function owned(s) {
 // 🔓 조건 해금 — 「내담자 여러분께」 HARD B 이상 같은 것 (2026-11-11 사용자 「Handicap 은 내담자 여러분께 하드 모드 B 이상 받아야 열리게」)
 //   랭킹 기록(rhythmRank/<곡>/<난이도>/<사번>)의 최고 랭크로 본다 — 예전에 받아 둔 것도 친다. 되면 rhythmOwn 에 적는다.
 function rankIdx(r) { for (let i = 0; i < RANKS.length; i++) if (RANKS[i][0] === r) return i; return RANKS.length; }
+//   need.play — 그 곡을 한 번 끝까지 치기만 하면 (난이도 · 점수 상관없이 · 2026-11-12 사용자 「Legacy 는 山君을 플레이해야 해금 — 난이도 점수 상관 없음」)
 function needText(s) {
     const n = s && s.need; if (!n) return '';
     const t = SONGS.find(function (x) { return x.key === n.song; });
+    if (n.play) return '「' + (t ? t.title : n.song) + '」 한 번 플레이';
     const d = DIFFS.find(function (x) { return x[0] === n.diff; });
     return '「' + (t ? t.title : n.song) + '」 ' + (d ? d[1] : n.diff) + ' ' + n.rank + ' 이상';
+}
+function needMsg(s) {
+    const n = s && s.need; if (!n) return '';
+    if (n.play) { const t = SONGS.find(function (x) { return x.key === n.song; }); return '「' + (t ? t.title : n.song) + '」을(를) 한 번 플레이하면 열립니다'; }
+    return needText(s) + ' 을 받으면 열립니다';
 }
 function grantNeed(s) {
     const u = u_();
@@ -148,6 +168,10 @@ function checkNeeds() {
     const todo = SONGS.filter(function (s) { return s.need && !owned(s); });
     if (!todo.length) return Promise.resolve(false);
     return Promise.all(todo.map(function (s) {
+        if (s.need.play) {                                   // 아무 난이도 기록이든 있으면
+            return Promise.all(DIFFS.map(function (d) { return db.ref(RANK_PATH + '/' + s.need.song + '/' + d[0] + '/' + u.code).once('value').then(function (snap) { const v = snap && snap.val(); return !!(v && v.at || v && v.s != null); }).catch(function () { return false; }); }))
+                .then(function (rs) { return rs.some(Boolean) ? grantNeed(s) : false; });
+        }
         return db.ref(RANK_PATH + '/' + s.need.song + '/' + s.need.diff + '/' + u.code).once('value').then(function (snap) {
             const v = snap && snap.val();
             if (!v || !(Number(v.s) > 0)) return false;
@@ -158,23 +182,23 @@ function checkNeeds() {
 }
 function needModal(s) {
     const old = UI.querySelector('.rg-buymodal'); if (old) old.remove();
-    const b = bestOf(s.need.song, s.need.diff);
+    const b = s.need.play ? null : bestOf(s.need.song, s.need.diff);
     const m = document.createElement('div'); m.className = 'rg-modal rg-buymodal';
     m.innerHTML = '<div class="rg-box" style="gap:10px;align-items:center;text-align:center;min-width:260px;">'
         + '<b style="font-size:16px;">🔒 「' + esc(s.title) + '」</b>'
-        + '<div style="font-size:13px;color:#ccd;line-height:1.7;">' + esc(needText(s)) + ' 을 받으면 열립니다'
+        + '<div style="font-size:13px;color:#ccd;line-height:1.7;">' + esc(needMsg(s))
         + (b ? '<br><small style="color:#99a;">이 기기 최고 ' + rankOf(b.score, b.ap)[0] + ' · ' + (b.score / 10000).toFixed(2) + '%</small>' : '') + '</div>'
         + '<div style="display:flex;gap:10px;"><button class="rg-btn rg-go" data-k="go">그 곡으로</button><button class="rg-btn" data-k="no">닫기</button></div></div>';
     UI.appendChild(m);
     m.onclick = function (e) { if (e.target === m) m.remove(); };
     m.querySelector('[data-k="no"]').onclick = function () { m.remove(); };
-    m.querySelector('[data-k="go"]').onclick = function () { m.remove(); SET.song = s.need.song; SET.diff = s.need.diff; saveSet(); songTop = null; menu(); };
+    m.querySelector('[data-k="go"]').onclick = function () { m.remove(); SET.song = s.need.song; if (s.need.diff) SET.diff = s.need.diff; saveSet(); songTop = null; menu(); };
 }
 function buySong(s) {
     const u = u_();
     if (!s || !u) return { ok: false, why: '로그인이 필요합니다' };
     if (owned(s)) return { ok: true };
-    if (!s.price) return { ok: false, why: needText(s) + ' 을 받으면 열립니다' };
+    if (!s.price) return { ok: false, why: needMsg(s) };
     const pts = Math.floor(Number(u.points) || 0);
     if (pts < s.price) return { ok: false, why: '포인트가 모자랍니다 (보유 ' + pts.toLocaleString() + ' P)' };
     u.points = pts - s.price;
@@ -675,7 +699,7 @@ function close() {
 }
 window.rhythmOpen = open;
 // 🎧 플레이리스트(playlist.js)가 곡 목록을 빌려 쓴다 (2026-11-11) — 곡을 새로 넣으면 플레이리스트에도 저절로 들어간다
-window.rhythmSongs = function () { return SONGS.map(function (s) { return { key: s.key, title: s.title, artist: s.artist, audio: s.audio, cover: s.cover, color: s.color, price: s.price || 0, need: s.need ? needText(s) : '', needSpec: s.need || null, locked: !owned(s) }; }); };
+window.rhythmSongs = function () { return SONGS.map(function (s) { return { key: s.key, title: s.title, artist: s.artist, audio: s.audio, cover: s.cover, color: s.color, price: s.price || 0, need: s.need ? needText(s) : '', needMsg: s.need ? needMsg(s) : '', needSpec: s.need || null, locked: !owned(s) }; }); };
 window.rhythmCheckNeeds = checkNeeds;
 // 플레이리스트에서 해금 — { ok, why }
 window.rhythmBuy = function (key) { return buySong(SONGS.find(function (s) { return s.key === key; })); };
@@ -1729,8 +1753,8 @@ function result() {
     // 꿈결 — 하드 · D 이상
     // 🔓 이 판으로 조건을 채운 곡 (Handicap ← 내담자 여러분께 HARD B 이상)
     SONGS.forEach(function (x) {
-        if (!x.need || owned(x) || x.need.song !== sk || x.need.diff !== dk) return;
-        if (rankIdx(rk[0]) > rankIdx(x.need.rank)) return;
+        if (!x.need || owned(x) || x.need.song !== sk) return;
+        if (!x.need.play && (x.need.diff !== dk || rankIdx(rk[0]) > rankIdx(x.need.rank))) return;     // play — 끝까지 쳤으면 그걸로
         if (grantNeed(x)) {
             const box = UI && UI.querySelector('.rg-tbl');
             if (box) box.insertAdjacentHTML('beforeend', '<div style="font-size:12px;color:' + x.color + ';">🔓 「' + esc(x.title) + '」 열림</div>');
