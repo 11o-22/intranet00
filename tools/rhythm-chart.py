@@ -306,17 +306,21 @@ SWING = {'handicap': (0, 1 / 3, 2 / 3, 5 / 6), 'genesis': (0, 1 / 3, 2 / 3, None
 #   normal — 노말 한 박에 노트 수 배 · hard — 하드 노트 수(노말의 HARD_X 배)에 또 곱함
 #   zig — 지그재그 줄 수 배 · two — 8분 지그재그 가운데 양손으로 하는 몫 (보통 0.4) · chord — 노말 동시 몫 배
 #   fill16 — 하드에서 그래도 모자라면 박을 선율 옆 16분 자리까지 (다른 손)
-HARDER = {'handicap': {'normal': 1.1, 'hard': 0.98, 'alt': True, 'fill16': True},
+HARDER = {'handicap': {'normal': 1.1, 'hard': 1.105, 'alt': True, 'fill16': True},
           # Genesis — 「어렵게」는 아니지만 박이 느려서(80 BPM · 한 박 0.75 초) 한 박 기준으로 고르면 다른 곡보다 노트가 성기다 (노말 초당 2.4)
           #   → 노말 한 박 노트 수만 늘려 느린 곡들(Devotion · 내담자 여러분께 — 노말 2.7 ~ 2.8 · 하드 4.7) 보다 조금 촘촘하게 · 하드는 노말을 따라 는다
-          'genesis': {'normal': 1.3}}
+          'genesis': {'normal': 1.3, 'hard': 1.32, 'alt': True, 'chords': True}}
+#   ★ 2026-11-12 사용자 「새로 넣은 리듬게임 하드가 너무 쉬운데 15레벨 정도로 어렵게」 — Genesis 하드 (노말은 그대로)
+#     셋잇단 격자는 한 박에 세 칸뿐이라 선율 · 박만으로는 초당 4.3 개에서 찬다 → 선율 음에 박이 같이 세게 오면 다른 손 동시(chords)를 셋잇단 한 칸 간격까지 · 하드 노트 수 1.32 배 · 박 칸 번갈아(alt)
+#   ★ 2026-11-12 사용자 「그김에 핸디캡도 채보 더 넣고 한 100정도」 — Handicap 하드 0.98 → 1.105 (880 → 980 개쯤)
 #   ✗ 처음(2026-11-11)엔 'normal': 1.35, 'hard': 1.15, 'zig': 1.8, 'two': 0.65, 'chord': 1.8, 'fill16': True 로 촘촘하게 했다 (노말 629 · 하드 1070 · 초당 8)
 #     → 사용자 「너무 촘촘해서 안 될 것 같아. 딱 쇼타임 정도로만 맞춰주고 레벨은 17로」 — Showtime! (노말 초당 4.0 · 하드 6.68) 에 맞춘 값으로
 
 
 # 사용자가 정한 레벨 — 다시 뽑아도 이 값 (2026-11-11 사용자 「쇼타임은 하드 레벨을 17로」)
 #   하드를 선율 따라가기로 다시 짠 뒤(2026-11-11)에도 하드 레벨 표시는 그 전 값 그대로 둔다 — 꿈결 +50 (레벨 15 이상)이 이 표시에 붙어 있다
-LV_FIX = {'showtime': {'hard': 17}, 'handicap': {'hard': 15, 'normal': 10},   # Handicap 하드 17 (2026-11-11 사용자) → 15 (2026-11-12 사용자 「핸디캡 하드 레벨 15로 낮추자」) · 노말은 그때 뽑힌 10 그대로 (2026-11-12 새 판 끝 마당이 성겨져 평균이 조금 내려도)
+LV_FIX = {'showtime': {'hard': 17}, 'handicap': {'hard': 15, 'normal': 10}, 'genesis': {'hard': 15},   # Genesis 하드 15 (2026-11-12 사용자)
+          # Handicap 하드 17 (2026-11-11 사용자) → 15 (2026-11-12 사용자 「핸디캡 하드 레벨 15로 낮추자」) · 노말은 그때 뽑힌 10 그대로 (2026-11-12 새 판 끝 마당이 성겨져 평균이 조금 내려도)
           'airplane': {'hard': 15}, 'client': {'hard': 11}, 'devotion': {'hard': 11}, 'evilhigh': {'hard': 15},
           'returnhome': {'hard': 15}, 'winterfloat': {'hard': 15}, 'whitexmas': {'hard': 13}}
 
@@ -759,16 +763,17 @@ def hard_chart(grid, K, pos, ok, F, R, active, MEL, zig_span, first_ok, last_ok,
                 hold_on[ln] = False
             used_until[ln] = max(used_until.get(ln, -1), i)
         # 동시 후보 — 선율 음이 반 마디 첫머리(킥 자리)에 오고 킥이 셀 때 · 다른 손 바깥 칸(선율이 왼쪽이면 5 · 오른쪽이면 0)
-        if i in mel and pos[i] % 8 == 0 and hl == 0 and busy == 0 and F['low'][i] >= 0.45:
+        #   chords (HARDER) — 선율 음 어디든 박(킥 · 스네어 · 하이햇)이 같이 세게 울리면 후보 (박 자리를 먼저)
+        if i in mel and hl == 0 and busy == 0 and ((pos[i] % 8 == 0 and F['low'][i] >= 0.45) or (S.get('chords') and drum(i) >= 0.3)):
             ln2 = 5 if ln <= 2 else 0
             if used_until.get(ln2, -1) < i:
-                chord_c.append((float(F['low'][i]) + (0.5 if pos[i] == 0 else 0), i, t, ln2))
+                chord_c.append((float(F['low'][i]) + (0.5 if pos[i] == 0 else 0) + (0.3 if pos[i] % 4 == 0 else 0), i, t, ln2))
         if i in mel:
             prev_mel = i
     # 동시 — 노트가 모자란 만큼 킥이 센 자리부터 · 두 박에 한 번 (모자라면 한 박에 한 번까지)
     room = want - len(notes)
     put = []
-    for gap_b in (2, 1):                                   # 두 박에 한 번 → 모자라면 한 박에 한 번까지
+    for gap_b in (2, 1) + ((1 / 3 - 1e-3,) if S.get('chords') else ()):     # 두 박에 한 번 → 모자라면 한 박에 한 번까지 (chords — 셋잇단 한 칸까지)
         for _, i, t, ln2 in sorted(chord_c, reverse=True):
             if room <= 0:
                 break
@@ -932,6 +937,7 @@ def main():
             S['slide_n'] = S['slide_n'] * HX.get('zig', 1)
             S['fill16'] = bool(HX.get('fill16'))
             S['alt'] = bool(HX.get('alt'))
+            S['chords'] = bool(HX.get('chords'))
         ok = np.array([(grid[i] >= first_ok and grid[i] <= last_ok and active[i] and (pos[i] in S['mods']) and not DEAD[i]) for i in range(K)])
         # 지그재그 자리를 먼저 잡고 — 그 사이는 다른 노트를 비운다
         zigs = []

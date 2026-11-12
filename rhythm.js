@@ -73,6 +73,7 @@ const SONGS = [
     //   받은 음원은 142.6 초에 남은 화음이 뚝 끊긴다 — 끊기기 전 화음을 부분음으로 재서 위상까지 맞춰 이어 붙이고 5 초 동안 잦아들게 했다 (147.6 초)
     //   앞 몸통은 지난번 마스터와 한 샘플도 다르지 않다 (같은 올림) · 채보는 그대로 (곡 길이만 늘고 하드 레벨 15)
     //   채보 — 다시 뽑음 · 몸통 촘촘함 그대로 · 끝 마당은 새로 울린 소리 위에 두고 마지막 한 방에 양손 동시로 맺는다 (tools/rhythm-chart.py OUTRO)
+    //   ★ 2026-11-12 사용자 「핸디캡도 채보 더 넣고 한 100정도」 — 하드 880 → 979 개
     //   need — 그 곡 · 그 난이도에서 그 랭크 이상을 받으면 열린다 (needMet · checkNeeds)
     { key: 'handicap', title: 'Handicap', artist: 'Benz', audio: 'snd/rhythm-handicap.mp3', chart: 'rhythm/handicap.json', color: '#6fd3a0', cover: 'rhythm/handicap-cover.jpg?v=2', need: { song: 'client', diff: 'hard', rank: 'B' } },
     // ★ 2026-11-12 사용자 「이것도 리듬게임에 넣어줘. 아티스트 이름은 광시 로 해주고 20000 포인트로 사야 할 수 있게. 표지 사진도 참고해」 · 제목은 받은 파일 이름(genesis)대로 「Genesis」
@@ -81,6 +82,7 @@ const SONGS = [
     //   채보 — 80 BPM 에 한 박을 셋으로 나누는 곡(12/8) — 격자를 박의 0 · 1/3 · 2/3 에 (tools/rhythm-chart.py SWING · 넷째 칸은 안 씀)
     //          · 템포가 처음부터 끝까지 80.000 이라 곧은 격자 (FIXED_BPM — 따라가는 격자는 조용한 앞 · 134 ~ 146 초에서 어긋났다)
     //          · 박이 느려 노트가 성겨 노말 한 박 노트 수를 늘림 (HARDER)
+    //   ★ 2026-11-12 사용자 「하드가 너무 쉬운데 15레벨 정도로 어렵게」 — 하드 777 → 1176 개 (선율 음에 박이 같이 세게 오면 다른 손 동시) · 레벨 15
     //   표지 — 주신 사진(푸른 하늘 십자가)을 정사각 720 으로
     { key: 'genesis', title: 'Genesis', artist: '광시', audio: 'snd/rhythm-genesis.mp3', chart: 'rhythm/genesis.json', color: '#9fc3ea', cover: 'rhythm/genesis-cover.jpg', price: 20000 }
 ];
