@@ -1531,6 +1531,9 @@ function enterRoom(room, w) {
 // 출몰지 — 걸음을 세다가 ENC_STEPS 걸음이 차면 다음 수상한 장소에서 (위 onMove 와 같은 셈)
 function wildStep(w) {
     if (!tutOf().done) { BR.last = null; return; }
+    // 🧸 둘이 같이 (doll-duo.js · 2026-11-13) — 파티원은 파티장을 따라다닐 뿐 제 걸음으로는 만나지 않는다 (파티장의 걸음으로 같이 만난다)
+    const duo = window.DOLLDUO;
+    if (duo && duo.following && duo.following()) { BR.last = null; return; }
     const k = 'wild', x = w.x / RS[k], y = w.y / RS[k];
     const L = BR.last;
     BR.last = { x: x, y: y };
@@ -1550,7 +1553,8 @@ function wildStep(w) {
     encSave(o);
     BR.last = null;
     try {
-        window.DOLLBT.wild({ loc: 'wild' }).then(function () { BR.off = Date.now() + 2500; BR.last = null; });
+        const go = (duo && duo.leading && duo.leading()) ? duo.encounter() : window.DOLLBT.wild({ loc: 'wild' });      // 파티장 — 둘이 같이 싸운다
+        go.then(function () { BR.off = Date.now() + 2500; BR.last = null; });
     } catch (e) { console.warn('[🧸] 조우', e); }
 }
 

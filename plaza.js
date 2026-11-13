@@ -2097,6 +2097,35 @@ function lsItem(code) {
     if (LS.lead || !lsPeerWears(code)) return [];
     return [LS_ITEM];
 }
+// ── 🧸 밖에서 넣는 것 (doll-duo.js — 출몰지 「같이 잡기」 · 2026-11-13)
+//   메뉴 — window.plazaPeerItems(사번) → [[열쇠, 글자]…] 를 남을 눌렀을 때의 메뉴에 끼운다 · 고르면 window.plazaPeerPick(열쇠, 사번)
+//   따라가기 — window.plazaFollowOf() 가 같은 방에 있는 사원의 사번을 주면 그 사원 뒤 한 걸음 자리로 걷는다 (그동안은 제 손으로 못 움직인다 · 🪢 목줄과 같은 걸음)
+const XF_GAP = 110;
+function xItem(code) {
+    try {
+        const f = window.plazaPeerItems;
+        const a = (typeof f === 'function' && run && code && code !== myCode()) ? f(code) : null;
+        return Array.isArray(a) ? a.filter(function (x) { return Array.isArray(x) && x.length >= 2; }).map(function (x) { return ['x:' + x[0], x[1]]; }) : [];
+    } catch (e) { return []; }
+}
+function xPick(k, code) {
+    if (String(k).indexOf('x:') !== 0) return false;
+    closeCarryMenu();
+    try { if (typeof window.plazaPeerPick === 'function') window.plazaPeerPick(String(k).slice(2), code); } catch (e) { console.warn('[광장] 메뉴', e); }
+    return true;
+}
+function xFollowStep() {
+    let c = '';
+    try { c = (typeof window.plazaFollowOf === 'function') ? (window.plazaFollowOf() || '') : ''; } catch (e) { c = ''; }
+    const q = (c && run && run.peers) ? run.peers[c] : null;
+    if (!q || q.x == null) return false;
+    const r = roomOf();
+    const gx = Math.max(P.EDGE + P.INSET, Math.min(r.w - P.EDGE - P.INSET, q.x + ((q.face || 1) < 0 ? -1 : 1) * XF_GAP));
+    const dx = gx - run.x, dy = q.y - run.y;
+    if (Math.abs(dx) <= 6 && Math.abs(dy) <= 6) { if (run.tx != null) { run.tx = null; run.ty = null; run.tseg = null; } return true; }
+    if (run.tx == null || Math.abs(run.tx - gx) > 3 || Math.abs((run.ty == null ? run.y : run.ty) - q.y) > 3) walkTo(gx, q.y);
+    return true;
+}
 function lsLeadStop(quiet) {
     const L = LS.lead;
     if (!L) return;
@@ -4009,8 +4038,10 @@ function carryTap(cx, cy) {
         stItem(big).forEach(function (x) { items.push(x); });
         pkItem(big).forEach(function (x) { items.push(x); });
         lsItem(big).forEach(function (x) { items.push(x); });          // 🪢 끌고가기 · 놓아주기
+        xItem(big).forEach(function (x) { items.push(x); });           // 🧸 같이 잡기 (출몰지)
         items.push(INFO_ITEM);
         return openMenu(cx, cy, nameIn(big), items, function (k) {
+            if (xPick(k, big)) return;
             if (k === 'info') { infoOpen(big); return; }
             if (k === 'bonk') { wfBonk(big); return; }
             if (k === 'tickle') { askPick('tk', big); return; }
@@ -4031,7 +4062,8 @@ function carryTap(cx, cy) {
         const any = peerAt(cx, cy);
         if (!any) return false;
         const bk = wfBonkItem(any);                    // 🪄 도깨비 방망이를 쥐었으면 「때리기」
-        return openMenu(cx, cy, nameIn(any), bk.concat(tkItem(any), msItem(any), stItem(any), pkItem(any), lsItem(any), [INFO_ITEM]), function (k) {
+        return openMenu(cx, cy, nameIn(any), bk.concat(tkItem(any), msItem(any), stItem(any), pkItem(any), lsItem(any), xItem(any), [INFO_ITEM]), function (k) {
+            if (xPick(k, any)) return;
             if (k === 'bonk') { wfBonk(any); return; }
             if (k === 'tickle') { askPick('tk', any); return; }
             if (k === 'massage') { askPick('ms', any); return; }
@@ -4073,8 +4105,10 @@ function carryTap(cx, cy) {
     stItem(pick).forEach(function (x) { items.push(x); });
     pkItem(pick).forEach(function (x) { items.push(x); });
     lsItem(pick).forEach(function (x) { items.push(x); });         // 🪢 끌고가기 · 놓아주기
+    xItem(pick).forEach(function (x) { items.push(x); });          // 🧸 같이 잡기 (출몰지)
     items.push(INFO_ITEM);
     return openMenu(cx, cy, nameIn(pick), items, function (k) {
+        if (xPick(k, pick)) return;
         if (k === 'info') { infoOpen(pick); return; }
         if (k === 'wish') { wfUse(pick); return; }
         if (k === 'bonk') { wfBonk(pick); return; }
@@ -5382,6 +5416,8 @@ function tick(ts) {
     if (askLocked()) { ix = 0; iy = 0; run.tx = null; run.ty = null; run.tseg = null; run.ax = 0; run.ay = 0; }
     // 🪢 금 목줄에 끌려가는 동안은 제 손으로 못 움직인다 — 끄는 사람 뒤 한 걸음 자리로 걷는다 (2026-11-08)
     if (lsLedActive()) { ix = 0; iy = 0; run.ax = 0; run.ay = 0; lsFollowStep(); }
+    // 🧸 출몰지 2인 파티 — 파티장을 따라다니는 동안도 제 손으로 못 움직인다 (doll-duo.js · 2026-11-13)
+    else if (xFollowStep()) { ix = 0; iy = 0; run.ax = 0; run.ay = 0; }
     // 🎉 이벤트 무대 「고정」 — 서 있는 동안은 그 자리에 붙어 있다. 조이스틱 · 바닥 짚기로는 안 내려오고 [내려오기] 를 눌러야 내려온다
     //   (2026-11-09 사용자 「내려오기 버튼 누르기 전까지는 못 내려오게」)
     if (run.evFix) { ix = 0; iy = 0; run.ax = 0; run.ay = 0; run.tx = null; run.ty = null; run.tseg = null; run.x = run.evFix.x; run.y = run.evFix.y; run.vx = run.vy = 0; }
