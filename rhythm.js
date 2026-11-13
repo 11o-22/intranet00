@@ -228,7 +228,7 @@ if (SET.sv !== 2) { SET.offset = 0; SET.vis = 0; SET.sv = 2; saveJ(SET_KEY, SET)
 function saveSet() { saveJ(SET_KEY, SET); }
 // 👥 듀얼 — 지금 듀얼(없으면 null) · 값들 (아래 「듀얼」 마당)
 const DUEL_PATH = 'rhythmDuel', DUEL_INV = 'rhythmDuelInv';
-const DC = { INV_MS: 30000, LOAD_MS: 45000, START_MS: 4200, FLUSH_MS: 180, DELAY: 650, PART_MS: 8000, MINI: 0.27, RES_WAIT: 9000 };
+const DC = { INV_MS: 30000, LOAD_MS: 45000, START_MS: 4200, FLUSH_MS: 180, DELAY: 650, PART_MS: 8000, MINI: 0.27, RES_WAIT: 9000, FIN_MS: 32000, FIN_CUE: 1800 };
 let DUEL = null;
 function sgn(v) { return (v > 0 ? '+' : '') + v; }
 
@@ -1781,6 +1781,10 @@ function draw(now) {
 //   둘이 한 곡을 **파트별로 번갈아** 친다. 곡 고르기의 [DUEL] → 접속해 있는 사원을 골라 신청 → 상대가 [수락] 하면
 //   둘 다 곡을 받아 두고 같은 때(서버 시각)에 시작한다.
 //   · 파트 — 마디 넷(8 초쯤 · 마디가 긴 곡은 둘)마다 넘어간다. 신청한 쪽이 먼저. 슬라이드 · 지그재그 줄은 끊지 않는다 (줄이 시작한 파트의 몫).
+//   · ★ 마지막 하이라이트는 **둘이 같이** 친다 (2026-11-13 사용자 「리듬 듀얼 마지막에 하이라이트 부분은 둘이서 같이 하는 식으로 바꾸자」)
+//     채보의 fin(ms · tools/rhythm-finale.py 가 곡 소리에서 잰 마지막 후렴 머리) 부터 곡 끝까지 — 그 노트는 두 사람 판에 다 내려오고
+//     저마다 따로 판정한다. 작은 화면에는 상대가 같은 노트를 치는 모습이 그대로 보인다. 들어가기 직전에 「같이!」.
+//     fin 이 없는 채보는 마지막 노트 32 초 앞의 파트 머리. 적어도 한 번씩은 혼자 친다 (파트가 셋이 안 되는 곡은 합주 없음).
 //   · 내 화면에는 **내 파트의 노트만** 내려온다. 상대 파트에는 판이 비고, **오른쪽 위 작은 화면**에 상대가 치는 모습
 //     (상대 몫의 노트 · 맞힌 자리 · 판정 · 정확도)이 보인다.
 //     친 것은 0.18 초마다 묶어 보내고, 작은 화면은 0.65 초 늦춰 그린다 — 소식이 닿기 전에 노트가 지나가 버리지 않게.
@@ -1819,16 +1823,32 @@ function duelCuts(chart) {
     return cuts;
 }
 function duelPartAt(cuts, t) { let k = 0; while (k < cuts.length && t >= cuts[k] - 40) k++; return k; }
+// 합주(마지막 하이라이트)가 시작되는 파트 — 이 번호부터는 둘 다 친다. 합주가 없으면 파트 수보다 큰 수
+function duelFinK(chart, cuts) {
+    if (!cuts || cuts.length < 2) return 1e9;
+    let fin = Number(chart && chart.fin);
+    if (!(fin > 0)) {
+        const c = chart && chart.charts && (chart.charts.hard || chart.charts.normal || chart.charts.easy);
+        const last = c && c.notes && c.notes.length ? c.notes[c.notes.length - 1][0] : Number(chart && chart.dur) || 0;
+        fin = last - DC.FIN_MS;
+    }
+    let k = 2, best = 1e12;
+    for (let i = 1; i < cuts.length; i++) { const d = Math.abs(cuts[i] - fin); if (d < best) { best = d; k = i + 1; } }   // 가장 가까운 파트 머리 (둘째 파트 뒤부터)
+    return k;
+}
 // 모든 노트 → 내 몫만 돌려준다 (상대 몫은 DUEL.O — 오른쪽 위 작은 화면)
 function duelSplit(notes, chart) {
     const my = DUEL;
     const cuts = my.cuts = duelCuts(chart);
     const cp = {};
     notes.forEach(function (n) { if (n.k === 2 && cp[n.ch] == null) cp[n.ch] = duelPartAt(cuts, n.t); });
+    const finK = my.finK = duelFinK(chart, cuts);
+    my.fin = finK <= cuts.length ? cuts[finK - 1] : 1e12;          // 여기서부터 같이 친다 (ms)
     const mine = [], theirs = [];
     notes.forEach(function (n) {
         n.pt = n.k === 2 ? cp[n.ch] : duelPartAt(cuts, n.t);
-        ((n.pt % 2) === my.mine ? mine : theirs).push(n);
+        if (n.pt >= finK) { n.fin = 1; mine.push(n); theirs.push(Object.assign({}, n)); }      // 합주 — 내 판에도 · 상대 판(작은 화면)에도 (판정은 따로라 한 벌 더)
+        else ((n.pt % 2) === my.mine ? mine : theirs).push(n);
     });
     // 내 노트 — 앞 노트의 끝과 얼마나 떨어져 있나 (「내 차례」 알림)
     let end = -1e9;
@@ -1955,10 +1975,10 @@ function duelHud(g, now, tnow) {
     const dur = P.chart.dur, cuts = my.cuts;
     let a = 0;
     for (let k = 0; k <= cuts.length; k++) {
-        const b = k < cuts.length ? cuts[k] : dur, mine = (k % 2) === my.mine;
-        g.globalAlpha = mine ? 0.8 : 0.16;
-        g.fillStyle = mine ? P.s.color : '#fff';
-        g.fillRect(VW * a / dur, 0, Math.max(1, VW * (b - a) / dur - 1), 3);
+        const b = k < cuts.length ? cuts[k] : dur, both = k >= my.finK, mine = (k % 2) === my.mine;
+        g.globalAlpha = both ? 0.95 : mine ? 0.8 : 0.16;
+        g.fillStyle = both ? '#ffe9a8' : mine ? P.s.color : '#fff';                   // 합주는 금빛 · 한 줄로 잇는다
+        g.fillRect(VW * a / dur, 0, Math.max(1, VW * (b - a) / dur - (both ? 0 : 1)), both ? 4 : 3);
         a = b;
     }
     g.globalAlpha = 1;
@@ -1976,7 +1996,15 @@ function duelHud(g, now, tnow) {
     for (let i = P.head; i < P.notes.length; i++) { if (!P.notes[i].done) { nx = P.notes[i]; break; } }
     const left = nx ? nx.t - now : 1e9;
     g.save(); g.textAlign = 'center'; g.textBaseline = 'alphabetic';
-    if (nx && nx.gap > 2600 && left > 0 && left <= 1700) {
+    const toFin = my.fin - now;                                  // 합주까지 — 직전 1.8 초 동안 「같이!」 (들어가서 0.5 초 더)
+    if (toFin <= DC.FIN_CUE && toFin > -500 && now > 0) {
+        g.globalAlpha = Math.max(0, Math.min(1, (DC.FIN_CUE - toFin) / 250, (toFin + 500) / 300));
+        g.shadowColor = '#ffd76a'; g.shadowBlur = 18;
+        g.fillStyle = '#fff3c4'; g.font = '600 ' + Math.round(VH * 0.085) + 'px Georgia, serif';
+        g.fillText('같이!', VW / 2, VH * 0.5);
+    } else if (now >= my.fin) {
+        // 합주 동안에는 차례 알림이 없다
+    } else if (nx && nx.gap > 2600 && left > 0 && left <= 1700) {
         g.globalAlpha = Math.max(0, Math.min(1, (1700 - left) / 250) * Math.min(1, left / 250));
         g.shadowColor = P.s.color; g.shadowBlur = 16;
         g.fillStyle = '#fff'; g.font = '600 ' + Math.round(VH * 0.075) + 'px Georgia, serif';
@@ -1996,7 +2024,8 @@ function duelMini(g, now, tnow) {
     const x0 = Math.round(VW - w - 12 - SAFE.r), y0 = Math.round(10 + SAFE.t);
     const mnow = now - DC.DELAY;
     duelApply(O, mnow);
-    const their = (duelPartAt(my.cuts, mnow) % 2) !== my.mine && mnow > 0;
+    const mpt = duelPartAt(my.cuts, mnow);
+    const their = mnow > 0 && (mpt >= my.finK || (mpt % 2) !== my.mine);      // 상대가 치는 동안 (합주도) 밝게
     const vis = 7000 / SET.speed;
     const pOf = function (t) { return 1 - (t - mnow) / vis; };
     g.save();
@@ -2401,6 +2430,6 @@ window.rhythmState = function () {
     console.log({ 모드: MODE, 곡: SET.song, 난이도: SET.diff, 속도: SET.speed, 판정싱크: SET.offset, 화면싱크: SET.vis, 점수: P && Math.round(P.score), 콤보: P && P.combo, 판정: P && P.cnt, 소리: AU.ctx && AU.ctx.state });
 };
 window.rhythmDebug = { P: function () { return P; }, now: function () { return songMs(); }, mode: function () { return MODE; }, L: function () { return L; }, lag: function () { return AU.lag; }, headLag: headLag, vis: function () { return visMs(); }, clock: function () { return clockMs(); }, cal: function () { return C; }, set: SET, rankOf: rankOf, previewChunk: previewChunk, previewAt: previewAt, drawOnce: function () { if (P && L) draw(P.lastVis || 0); },
-    duel: function () { return DUEL; }, DC: DC, duelCuts: duelCuts, duelCreate: duelCreate, duelLeave: duelLeave, safe: function () { return SAFE; } };   // 시험 · 콘솔
+    duel: function () { return DUEL; }, DC: DC, duelCuts: duelCuts, duelFinK: duelFinK, duelCreate: duelCreate, duelLeave: duelLeave, safe: function () { return SAFE; } };   // 시험 · 콘솔
 console.log('[🎵 리듬] rhythmOpen() — 상담사 전용');
 })();
