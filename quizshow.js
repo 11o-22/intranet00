@@ -13,11 +13,18 @@
 //   단상의 비어 있는 명패 칸(앞에서부터)에 그 닉네임이 적히고, 그 단상 뒤에 선다 (걸어 다니지 않는다 — 붙박이).
 //   4명 이상 초대하면 앞줄 단상(6인용 그림)이 하나 더 놓인다. 사회자는 오른쪽 단상.
 //
-//   퀴즈는 사회자가 말로 낸다. 쇼가 도는 동안 사회자가
-//       「정답.」           → **직전에 말한 참가자** 머리 위에 초록 O
-//       「땡」 · 「오답.」   → 직전에 말한 참가자 머리 위에 빨간 X
-//   (그 말만 따로 — 「정답은 3번」 처럼 다른 말이 붙으면 채점이 아니다. 한 번 말한 답에는 한 번만 채점한다.)
-//   한 사람에 세 문제. 다 채점되면 그 자리에서, 쇼를 끝내면 덜 푼 사람도 맞힌 수대로 받는다.
+//   문제는 사회자가 [✏️ 문제 내기] 에 적는다 — 무대 **가운데 화면**에 뜬다 (2026-11-13 사용자 「중앙 빈 화면에 장착자가 쓴 문제가 뜨게」 · 채팅에도 한 줄).
+//   채점은 **사회자가 누른 사람**에게 들어간다 (2026-11-13 사용자 「정답은 장착자가 눌러서 누른 사람한테」) —
+//       참가자(머리 · 명패)를 누르면 지목 (머리 위 ▼ · 아래에 채점 띠) → 띠의 [O] · [X] 를 누르거나,
+//       「정답」 이 들어간 말 → O · 「오답」 · 「땡」 이 들어간 말 → X   (「정답입니다!」 · 「오답입니다」 — 그 말만 따로가 아니어도 된다)
+//       ※ 「정답이 아닙니다」 는 X · 물음표가 붙은 「정답?」 은 채점이 아니다 · 「땡큐」 는 땡이 아니다. 지목 없이 한 말은 채점이 아니다.
+//       한 번 채점하면 지목이 풀린다 (다음 문제는 다시 눌러서).
+//   채점되면 그 사람 머리 위와 **가운데 화면**에 초록 O · 빨간 X 가 크게 뜨고, 소리가 난다 —
+//       정답: 「띵 띠로링」 + 박수 · 오답: 「삐」 + 「우우」 (음원 없이 그 자리에서 만든다 · 광장 🔊 를 끄면 안 난다).
+//   사회자는 [🚶 내려가기] 로 단상에서 내려와 무대 바닥을 걸어 다닐 수 있다 ([🎤 단상으로] 로 돌아간다). 손님은 단상에 붙박이.
+//   한 사람에 세 문제. 다 채점되면 그 자리에서 셈한다. **온 사람이 모두 세 문제를 다 풀면** 쇼가 저절로 끝난다
+//   (2026-11-13 사용자 「모든 사람들이 퀴즈를 다 맞추거나 틀렸을 때에 마무리」 · 거절한 사람은 빼고 · 아직 안 온 사람은 기다린다).
+//   끝나면 **커튼이 닫히고** (열 때의 거꾸로) 광장으로 돌아간다. [쇼를 끝낸다] 로 먼저 끝내면 덜 푼 사람도 맞힌 수대로 받는다.
 //       1개 10,000 P · 2개 10,000 P + 5,000 꿈결 · 3개 20,000 P + 10,000 꿈결
 //   ※ 상은 한 사원에 하루 한 번 (자정 기준) — 사회자와 손님이 짜고 되풀이해 받는 길을 막는다. (사용자가 정한 값은 아니다 — 바꾸려면 settle 의 quizDay)
 //   🔒 오답 하나에 가두리 10분 (2026-11-13 사용자 「오답 시 오답 횟수 당 가두리 10분」) — 셈할 때 정해지고, **무대에서 내려올 때** 갇힌다
@@ -36,11 +43,11 @@
 //   🎺 커튼이 걷히는 순간 「Showtime!」 이 처음부터 크게 나고(빰), 두 마디 뒤부터는 잔잔하게 깔린다 (2026-11-13 사용자 · 아래 「쇼타임」).
 //
 // ■ 광장 쪽 (plaza.js)
-//   R.quiz (그림 quiz-show2 · gate · fit · camX · padTop · full · pud) · goRoom 의 문지기 · plazaPin / plazaPinned · plazaOnPaint · plazaOnMySay · plazaOnPeerSay
+//   R.quiz (그림 quiz-show2 · gate · fit · camX · padTop · full · pud · floor · x1) · goRoom 의 문지기 · plazaPin(p, 풀 때 설 자리) / plazaPinned · plazaOnPaint · plazaOnMySay
 //
 // ■ 적히는 자리
 //   quizShow/<사회자 사번> = { id, host, name, at, inst, inv: { 사번: { at, st: p|y|n } }, seat: { s1..s6: { c, nick, at } },
-//                              mark: { 사번: { q1..q3: 1(O) | 2(X) } }, last: { c, v, k, at }, paid: { 사번: { n, at, skip } }, end }
+//                              mark: { 사번: { q1..q3: 1(O) | 2(X) } }, last: { c, v, k, at }, paid: { 사번: { n, at, skip } }, q: { t, at } (화면의 문제), fin (모두 다 풂), end }
 //   quizWin/<사번>/<열쇠>  = { pts, dream, n, wrong, by, name, at, claimed }   받을 상 · 오답 가두리 (그 사원 화면이 받고 지운다 — 나가 있었으면 들어올 때)
 //   quizDay/<사번>         = 'YYYY-MM-DD'                      그날 상을 받았다
 //
@@ -65,6 +72,8 @@ const Q = {
     MAX: 6,                        // 한 쇼에 부를 수 있는 손님
     PER: 3,                        // 한 사람에 문제 셋
     PRIZE: { 1: { pts: 10000, dream: 0 }, 2: { pts: 10000, dream: 5000 }, 3: { pts: 20000, dream: 10000 } },
+    FIN_MS: 6000,                  // 모두 다 풀면 이만큼 뒤에 막이 내린다 (마지막 O · X 를 볼 틈)
+    Q_MAX: 80,                     // 화면에 띄우는 문제의 길이
     CAGE_MIN: 10,                  // 오답 하나에 가두리 10분 (2026-11-13 사용자 「오답 시 오답 횟수 당 가두리 10분」) — 무대에서 내려올 때 갇힌다
     LIFE_MS: 3 * 3600000,          // 안 끝내고 두어도 이만큼 지나면 끝난 쇼로 본다
     KEEP_MS: 10 * 60000,           // 끝난 쇼의 기록을 남겨 두는 동안
@@ -84,6 +93,9 @@ const Q = {
         s4: { x: 508, y: 1215, f: -1 }, s5: { x: 706, y: 1215, f: -1 }, s6: { x: 967, y: 1215, f: -1 }      // s4 — 앞단상 몸통(x 484 부터) 안쪽에 서야 다리가 상판 밑으로 안 삐져나온다
     },
     FILL3: ['s1', 's2', 's3'], FILL6: ['s1', 's2', 's3', 's6', 's5', 's4'],
+    WALK: { x: 1390, y: 1450 },    // 사회자가 단상에서 내려설 자리 (무대 바닥 — 걸어 다니는 띠는 plaza.js 의 R.quiz.floor · x1)
+    // 가운데 화면 (방 그림 좌표 — 그림에서 쟀다 · 모서리 장식 안쪽) : x · y · 폭 · 높이
+    SCREEN: [566, 594, 744, 232],
     // 명패 (방 그림 좌표 — 그림에서 쟀다)
     PLATE: {
         s1: [350, 1010, 114, 40], s2: [530, 1010, 114, 40], s3: [716, 1010, 114, 40],
@@ -265,42 +277,58 @@ function sweepMine() {
 setInterval(function () { try { sweepMine(); } catch (e) { } }, 20000);
 
 // ==========================================
-// 채점 — 사회자의 「정답.」 · 「땡」 · 「오답.」 → 직전에 말한 참가자
+// 채점 — 사회자가 참가자를 **누르고**(지목), 「정답」 · 「오답」 · 「땡」 이 든 말을 하면 그 사람에게 O · X
 // ==========================================
-let lastSay = null;                          // { c, at } — 사회자 화면에서 본, 마지막으로 말한 참가자
+//   (2026-11-13 사용자 「정답은 장착자가 눌러서 누른 사람한테」 · 「그 말만 해야 되는 게 아니라 그 말들이 들어가면 — 정답입니다 · 오답입니다」)
+//   · 누르면 지목된다 (사회자 화면에만 ▼ 표 · 아래에 「🎯 닉네임 — ⭕ ❌」 띠). 띠의 ⭕ ❌ 를 눌러도 되고, 채팅으로 말해도 된다.
+//   · 채점 한 번에 지목이 풀린다 — 단추를 누르고 말까지 해도 두 번 들어가지 않는다.
+//   · 말 — 「오답」 · 「땡」 이 들면 X. 「정답」 이 들면 O — 다만 「정답이 아닙니다」 는 X, 물음표가 붙은 말(「정답은?」)은 채점이 아니다.
+//   · 지목한 사람이 없으면 말만으로는 채점되지 않는다 (처음에는 「직전에 말한 참가자」 였다 — 누르는 것으로 바뀜).
+let sel = '';                                // 지목한 참가자의 사번 (사회자 화면)
+let hintAt = 0;
 function verdictOf(t) {
-    t = String(t || '').trim();
-    if (/^정답[\s.!~…]*$/.test(t)) return 1;
-    if (/^(땡+|오답)[\s.!~…]*$/.test(t)) return 2;
+    t = String(t || '');
+    if (/오답|땡(?!큐)/.test(t)) return 2;
+    if (/정답/.test(t)) {
+        if (/정답\s*(이|은|은\s*커녕|이라고는)?\s*(아니|아닙|아냐|아님)/.test(t)) return 2;
+        if (/[?？]/.test(t)) return 0;
+        return 1;
+    }
     return 0;
 }
 (function hooks() {
-    const p0 = window.plazaOnPeerSay, m0 = window.plazaOnMySay;
-    window.plazaOnPeerSay = function (code, text, st) {
-        try { if (typeof p0 === 'function') p0.apply(this, arguments); } catch (e) { }
+    const m0 = window.plazaOnMySay;
+    window.plazaOnMySay = function (text) {
+        try { if (typeof m0 === 'function') m0.apply(this, arguments); } catch (e) { }
         try {
             const s = myHost();
             if (!s || roomNow() !== ROOM) return;
-            if (seatOf(s, code)) lastSay = { c: code, at: now() };
-        } catch (e) { }
-    };
-    window.plazaOnMySay = function (text) {
-        try { if (typeof m0 === 'function') m0.apply(this, arguments); } catch (e) { }
-        try { judge(text); } catch (e) { console.warn('[퀴즈쇼]', e); }
+            const v = verdictOf(text);
+            if (!v) return;
+            if (!sel || !seatOf(s, sel)) {
+                if (now() - hintAt > 20000) { hintAt = now(); sys('📺 채점할 참가자를 먼저 눌러 주세요 — 누른 사람에게 ⭕ · ❌ 가 들어갑니다.'); }
+                return;
+            }
+            judge(sel, v);
+        } catch (e) { console.warn('[퀴즈쇼]', e); }
     };
 })();
-function judge(text) {
+function pick(code) {                        // 지목 — 같은 사람을 다시 누르면 푼다
+    const s = myHost();
+    if (!s || !code || !seatOf(s, code)) { sel = ''; paintHost(); return; }
+    if (doneAll(s, code)) { sys('📺 ' + nickOf(s, code) + ' — 이미 세 문제를 다 풀었습니다.'); sel = ''; paintHost(); return; }
+    sel = (sel === code) ? '' : code;
+    paintHost();
+}
+function doneAll(s, code) { return markList(s, code).every(function (v) { return v; }); }
+function judge(code, v) {
     const s = myHost(), d = db_(), me = u_();
-    if (!s || !d || !me || roomNow() !== ROOM) return;
-    const v = verdictOf(text);
-    if (!v) return;
-    if (!lastSay || !seatOf(s, lastSay.c)) { sys('📺 직전에 말한 참가자가 없습니다 — 참가자가 답을 말한 뒤에 채점됩니다.'); return; }
-    const code = lastSay.c;
+    if (!s || !d || !me || roomNow() !== ROOM || (v !== 1 && v !== 2) || !seatOf(s, code)) return false;
     const list = markList(s, code);
     let k = -1;
     for (let i = 0; i < Q.PER; i++) if (!list[i]) { k = i; break; }
-    if (k < 0) { sys('📺 ' + nickOf(s, code) + ' — 이미 세 문제를 다 풀었습니다.'); lastSay = null; return; }
-    lastSay = null;                                            // 한 번 말한 답에 한 번만 채점한다
+    sel = '';                                                  // 채점 한 번에 지목이 풀린다
+    if (k < 0) { sys('📺 ' + nickOf(s, code) + ' — 이미 세 문제를 다 풀었습니다.'); paintHost(); return false; }
     const key = 'q' + (k + 1);
     // 내 화면에 먼저 (서버 값이 돌아오면 같은 값이다)
     s.mark = s.mark || {}; s.mark[code] = s.mark[code] || {}; s.mark[code][key] = v;
@@ -309,9 +337,43 @@ function judge(text) {
     up['mark/' + code + '/' + key] = v;
     up['last'] = s.last;
     try { d.ref(PATH + '/' + me.code).update(up); } catch (e) { }
-    paintMarks(); pop(s.last);
+    paintStage(); pop(s.last);
     sys('📺 ' + nickOf(s, code) + ' — ' + (v === 1 ? '⭕ 정답' : '❌ 오답') + ' (' + (k + 1) + '/' + Q.PER + ' · 맞힌 ' + rightN(s, code) + '개)');
     if (k + 1 >= Q.PER) settle(s, code);
+    return true;
+}
+// 문제 — 사회자가 적은 글이 가운데 화면에 뜬다 (비우면 지운다)
+function ask(text) {
+    const s = myHost(), d = db_(), me = u_();
+    if (!s || !d || !me) return false;
+    const t = String(text || '').replace(/\s+/g, ' ').trim().slice(0, Q.Q_MAX);
+    if (!t) { delete s.q; try { d.ref(PATH + '/' + me.code + '/q').remove(); } catch (e) { } paintStage(); return true; }
+    s.q = { t: t, at: now() };
+    try { d.ref(PATH + '/' + me.code + '/q').set(s.q); } catch (e) { }
+    qSeen = qKey(s);
+    sys('📺 문제 — ' + t);
+    paintStage();
+    return true;
+}
+// 모두 다 풀었나 — 거절하지 않은 초대 손님이 모두 앉아 세 문제씩 채점됐다
+function allDone(s) {
+    const inv = invOf(s);
+    const need = Object.keys(inv).filter(function (c) { return inv[c] && inv[c].st !== 'n'; });
+    if (!need.length) return false;
+    return need.every(function (c) { return seatOf(s, c) && doneAll(s, c); });
+}
+// 다 풀렸으면 막을 내린다 (사회자 화면이 맡는다) — FIN_MS 뒤에. 그동안 화면에 「끝」 이 뜬다.
+function finCheck() {
+    const s = myHost(), d = db_(), me = u_();
+    if (!s || !d || !me || ending || !allDone(s)) return;
+    if (!s.fin) {
+        s.fin = now(); finSaid[s.id] = 1;
+        try { d.ref(PATH + '/' + me.code + '/fin').set(s.fin); } catch (e) { }
+        sys('🎉 모든 참가자가 문제를 마쳤습니다 — 곧 막이 내립니다.');
+        paintStage();
+        return;
+    }
+    if (now() - Number(s.fin) >= Q.FIN_MS) endShow();
 }
 function nickOf(s, code) { const k = seatOf(s, code); const st = k && seatsOf(s)[k]; return (st && st.nick) || nameOf(code); }
 
@@ -448,7 +510,7 @@ window.quizShowMenu = function () {
     const w = box('<div style="font-size:13px; color:#f3e6d2; font-weight:bold; margin-bottom:4px;">🎤 초대 — ' + SHOW.replace('📺 ', '') + '</div>'
         + '<div style="font-size:10px; color:#a88d6a; margin-bottom:12px; line-height:1.6;">어느 무대로 부를지 고릅니다. 한 번에 1 ~ ' + Q.MAX + '명까지 초대할 수 있습니다.</div>'
         + '<button id="qz-pick-quiz" class="game-btn" style="width:100%; ' + B_GOLD + ' padding:14px; font-size:13px;">🎓 화요 퀴즈쇼</button>'
-        + '<div style="font-size:10px; color:#a88d6a; margin:6px 2px 12px; line-height:1.6;">손님은 단상 뒤에 섭니다. 한 사람에 세 문제 — 사회자가 「정답.」 · 「땡」 · 「오답.」 이라고 말하면 직전에 말한 참가자가 채점됩니다.<br>맞힌 수대로 1개 ' + prizeText(Q.PRIZE[1]) + ' · 2개 ' + prizeText(Q.PRIZE[2]) + ' · 3개 ' + prizeText(Q.PRIZE[3]) + ' (한 사원에 하루 한 번)<br>틀리면 오답 하나에 🔒 가두리 ' + Q.CAGE_MIN + '분 — 무대에서 내려올 때 갇힙니다.</div>'
+        + '<div style="font-size:10px; color:#a88d6a; margin:6px 2px 12px; line-height:1.6;">손님은 단상 뒤에 섭니다. 한 사람에 세 문제 — 문제는 가운데 화면에 띄우고, 참가자를 눌러 지목한 뒤 「정답」 · 「오답」 · 「땡」 이 든 말을 하면 채점됩니다. 모두 다 풀면 막이 내립니다.<br>맞힌 수대로 1개 ' + prizeText(Q.PRIZE[1]) + ' · 2개 ' + prizeText(Q.PRIZE[2]) + ' · 3개 ' + prizeText(Q.PRIZE[3]) + ' (한 사원에 하루 한 번)<br>틀리면 오답 하나에 🔒 가두리 ' + Q.CAGE_MIN + '분 — 무대에서 내려올 때 갇힙니다.</div>'
         + '<button class="game-btn" disabled style="width:100%; ' + B_GREY + ' padding:14px; font-size:13px; opacity:.55;">🛋 심야 토크쇼 — 준비 중</button>'
         + '<button id="qz-x" class="game-btn" style="width:100%; margin-top:12px !important; ' + B_GREY + '">닫는다</button>');
     w.querySelector('#qz-x').style.marginTop = '12px';
@@ -517,7 +579,8 @@ function pickGuests(more) {
 }
 // ── 진행 (사회자) · 현황 (손님)
 function statusRows(s) {
-    const st = seatsOf(s), inv = invOf(s);
+    const st = seatsOf(s), inv = invOf(s), me = u_();
+    const canPick = !!(me && s.host === me.code && roomNow() === ROOM);      // 사회자 — 무대의 작은 사람을 누르기 어려울 때 여기서 지목한다
     const seated = {};
     let h = '';
     seatKeys(s).forEach(function (k, i) {
@@ -530,6 +593,7 @@ function statusRows(s) {
             + '<div style="flex:0 0 auto; width:20px; font-size:10px; color:#a88d6a;">' + (i + 1) + '</div>'
             + '<div style="flex:1; min-width:0; font-size:12px; color:#f3e6d2;">' + esc(v.nick || nameOf(v.c)) + ' <span style="font-size:9.5px; color:#a88d6a;">· ' + esc(nameOf(v.c)) + '</span></div>'
             + '<div style="flex:0 0 auto; font-size:13px; letter-spacing:3px; font-weight:bold;">' + ml.map(function (m) { return m === 1 ? '<span style="color:#3ddc6a;">O</span>' : (m === 2 ? '<span style="color:#ff4a4a;">X</span>' : '<span style="color:#5a3f22;">·</span>'); }).join('') + '</div>'
+            + ((canPick && !ml.every(function (m) { return m; })) ? '<button class="game-btn qz-pick" data-c="' + esc(v.c) + '" style="flex:0 0 auto; margin:0; padding:6px 9px; font-size:11px; background:linear-gradient(145deg,#6a4a22,#2a1b0e) !important; border-color:#c79a5b !important; color:#f3e6d2 !important;">🎯 지목</button>' : '')
             + (pd ? '<div style="flex:0 0 auto; font-size:9.5px; text-align:right; line-height:1.5; color:' + (pd.skip ? '#a88d6a' : '#c79a5b') + ';">' + (pd.skip ? '오늘은 이미 받음' : (Q.PRIZE[pd.n] ? prizeText(Q.PRIZE[pd.n]) : '상 없음'))
                 + (pd.cage ? '<br><span style="color:#ff8a8a;">🔒 가두리 ' + pd.cage + '분</span>' : '') + '</div>' : '')
             + '</div>';
@@ -551,23 +615,28 @@ function manage() {
     const left = Q.MAX - Object.keys(invOf(s)).length;
     const w = box('<div style="font-size:13px; color:#f3e6d2; font-weight:bold; margin-bottom:4px;">🎓 화요 퀴즈쇼' + (host ? ' — 진행' : '') + '</div>'
         + '<div style="font-size:10px; color:#a88d6a; margin-bottom:8px; line-height:1.6;">' + (host
-            ? '「정답.」 → 직전에 말한 참가자에게 <b style="color:#3ddc6a;">O</b> · 「땡」 · 「오답.」 → <b style="color:#ff4a4a;">X</b>. 한 사람에 세 문제이고, 다 채점되면 그 자리에서 상이 나갑니다. 쇼를 끝내면 덜 푼 사람도 맞힌 수대로 받습니다.'
+            ? '참가자를 <b>눌러 지목</b>한 뒤 「정답」 · 「오답」 · 「땡」 이 든 말을 하면(또는 아래 띠의 ⭕ ❌) 그 사람에게 <b style="color:#3ddc6a;">O</b> · <b style="color:#ff4a4a;">X</b> 가 들어갑니다. 한 사람에 세 문제 — 다 채점되면 그 자리에서 상이 나가고, <b>모두 다 풀면 막이 내립니다.</b>'
             : esc(s.name || nameOf(s.host)) + ' 사회자의 무대 — 한 사람에 세 문제. 맞힌 수대로 1개 ' + prizeText(Q.PRIZE[1]) + ' · 2개 ' + prizeText(Q.PRIZE[2]) + ' · 3개 ' + prizeText(Q.PRIZE[3]) + ' (하루 한 번)') + '<br>오답 하나에 🔒 가두리 ' + Q.CAGE_MIN + '분 — 무대에서 내려올 때 갇힙니다.</div>'
         + '<div id="qz-status">' + statusRows(s) + '</div>'
         + '<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;">'
         + (!inRoom ? '<button id="qz-in" class="game-btn" style="flex:1 1 100%; ' + B_GOLD + '">무대로 들어간다</button>' : '')
         + (host && left > 0 ? '<button id="qz-more" class="game-btn" style="flex:1; ' + B_BROWN + '">더 초대 (' + left + ')</button>' : '')
-        + (host ? '<button id="qz-end" class="game-btn" style="flex:1; ' + B_RED + '">쇼를 끝낸다</button>' : '')
+        + (host ? '<button id="qz-end" class="game-btn" style="flex:1; ' + B_RED + '">지금 끝낸다</button>' : '')
         + (inRoom ? '<button id="qz-out" class="game-btn" style="flex:1; ' + B_BROWN + '">무대에서 나간다</button>' : '')
         + '<button id="qz-x" class="game-btn" style="flex:1; ' + B_GREY + '">닫는다</button></div>');
     const q = function (id) { return w.querySelector('#' + id); };
     q('qz-x').onclick = shut;
+    w.addEventListener('click', function (e) {                 // 🎯 지목 (현황은 쇼가 바뀔 때마다 다시 그려지므로 창에서 받는다)
+        const b = e.target && e.target.closest ? e.target.closest('.qz-pick') : null;
+        if (!b) return;
+        e.stopPropagation(); shut(); sel = ''; pick(b.dataset.c);
+    });
     if (q('qz-in')) q('qz-in').onclick = function () { shut(); enter(s.host); };
     if (q('qz-more')) q('qz-more').onclick = function () { pickGuests(true); };
     if (q('qz-out')) q('qz-out').onclick = function () { shut(); leave(); };
     if (q('qz-end')) q('qz-end').onclick = function () {
         const w2 = box('<div style="text-align:center; padding:10px 4px 2px;"><div style="font-size:15px; color:#f3e6d2; letter-spacing:1px; margin-bottom:10px;">화요 퀴즈쇼의 막을 내립니까?</div>'
-            + '<div style="font-size:11px; color:#a88d6a; line-height:1.7;">덜 푼 사람도 지금까지 맞힌 수대로 상을 받고, 모두 광장으로 돌아갑니다.</div></div>'
+            + '<div style="font-size:11px; color:#a88d6a; line-height:1.7;">모두 다 풀면 저절로 막이 내립니다. 지금 내리면 덜 푼 사람도 지금까지 맞힌 수대로 상을 받고, 모두 광장으로 돌아갑니다.</div></div>'
             + '<div style="display:flex; gap:8px; margin-top:16px;"><button id="qz-n" class="game-btn" style="flex:1; ' + B_GREY + '">아직이다</button>'
             + '<button id="qz-y" class="game-btn" style="flex:1; ' + B_RED + '">막을 내린다</button></div>');
         w2.querySelector('#qz-n').onclick = manage;
@@ -702,6 +771,7 @@ function bgmOk() {
 }
 // 누른 그 손길 안에서 소리 길을 열어 둔다 — 소리는 연출이 끝난 뒤(몇 초 뒤)에 나는데, 아이폰은 손길 없이 처음 트는 소리를 막는다
 function bgmUnlock() {
+    try { sfxCtx(true); } catch (e) { }                         // 🔔 정답 · 오답 소리 길도 같이 연다
     try {
         const a = bgmEl();
         if (a._open || !a.paused) return;
@@ -775,6 +845,7 @@ function enter(host) {
 }
 function leave() {
     going = '';
+    hostDown = false; sel = ''; closeShow = null;
     bgmStop();
     try { if (typeof window.plazaPin === 'function') window.plazaPin(null); } catch (e) { }
     try { if (roomNow() === ROOM) window.plazaGo(START); } catch (e) { }
@@ -783,6 +854,7 @@ function leave() {
 }
 function seenIntro() { try { return sessionStorage.getItem('qzIntro') || ''; } catch (e) { return ''; } }
 function markIntro(id) { try { sessionStorage.setItem('qzIntro', String(id)); } catch (e) { } }
+let hostDown = false;                        // 사회자가 단상에서 내려와 있다 (걸어 다닌다 · 2026-11-13 사용자 「장착자는 단상에서 내려와서 움직일 수 있게」)
 function mySpot(s) {
     const me = u_(); if (!me || !s) return null;
     if (s.host === me.code) return Q.HOST;
@@ -790,12 +862,23 @@ function mySpot(s) {
     return k ? Q.SEAT[k] : null;
 }
 function seat() {
-    const s = curShow(), sp = mySpot(s);
+    const s = curShow(), sp = mySpot(s), me = u_();
     if (!sp || roomNow() !== ROOM || typeof window.plazaPin !== 'function') return;
     let p = null;
     try { p = window.plazaPinned(); } catch (e) { }
+    if (s.host === me.code && hostDown) {                      // 내려와 있다 — 붙박이를 풀고 무대 바닥에 세운다 (그 뒤로는 제 발로 걷는다)
+        if (p) window.plazaPin(null, Q.WALK);
+        return;
+    }
     if (p && Math.abs(p.x - sp.x) < 1 && Math.abs(p.y - sp.y) < 1) return;
     window.plazaPin(sp);
+}
+function hostWalk(down) {
+    const s = myHost();
+    if (!s || roomNow() !== ROOM) return;
+    hostDown = (down == null) ? !hostDown : !!down;
+    seat(); paintHost();
+    sys(hostDown ? '🚶 단상에서 내려왔습니다 — 무대 바닥을 걸어 다닐 수 있습니다.' : '🎤 단상으로 돌아왔습니다.');
 }
 
 // ==========================================
@@ -819,7 +902,24 @@ function seat() {
         '@keyframes qzPop{0%{transform:scale(.2);opacity:0}12%{transform:scale(1.25);opacity:1}22%{transform:scale(1)}80%{transform:scale(1);opacity:1}100%{transform:scale(1.1) translateY(-18%);opacity:0}}',
         '#plaza-ov.qz-on #plaza-who{display:none !important;}',                    /* 「같이 있는 사람」 줄이 간판을 덮는다 — 이 방은 명패가 그 몫을 한다 */
         '#plaza-ov.qz-on .plaza-tag{display:none !important;}',                     /* 머리 위 이름표 — 앞줄 것이 뒷줄 얼굴을 덮는다. 누구인지는 명패(닉네임)와 📺 현황이 알려 준다 */
-        '#qz-ctl{position:absolute;right:12px;top:62px;z-index:60;padding:8px 14px;border-radius:14px;border:1px solid #c79a5b;background:rgba(42,27,14,.9);color:#f3e6d2;font-size:12px;font-weight:bold;box-shadow:0 3px 12px rgba(0,0,0,.5);}'
+        '#qz-ctl{position:absolute;right:12px;top:62px;z-index:60;padding:8px 14px;border-radius:14px;border:1px solid #c79a5b;background:rgba(42,27,14,.9);color:#f3e6d2;font-size:12px;font-weight:bold;box-shadow:0 3px 12px rgba(0,0,0,.5);}',
+        // 사회자 단추 (문제 내기 · 내려가기) — 📺 단추 아래로
+        '.qz-hbtn{position:absolute;right:12px;z-index:60;padding:8px 14px;border-radius:14px;border:1px solid #c79a5b;background:rgba(42,27,14,.9);color:#f3e6d2;font-size:12px;font-weight:bold;box-shadow:0 3px 12px rgba(0,0,0,.5);}',
+        '#qz-ask{top:102px;}', '#qz-walk{top:142px;}',
+        // 가운데 화면의 문제
+        '#qz-scr{position:absolute;display:flex;align-items:center;justify-content:center;text-align:center;overflow:hidden;pointer-events:none;transform-origin:0 0;box-sizing:border-box;padding:0 6px;',
+        '  color:#f4eeff;font-weight:bold;line-height:1.28;word-break:keep-all;overflow-wrap:anywhere;text-shadow:0 0 10px rgba(170,140,255,.85),0 2px 0 #140d3a;}',
+        '#qz-scr.fin{color:#ffe9a8;text-shadow:0 0 12px rgba(255,200,90,.9),0 2px 0 #3a2408;}',
+        // 사회자가 누르는 자리 · 지목 표 · 채점 띠
+        '.qz-hit{position:absolute;pointer-events:auto;cursor:pointer;background:transparent;-webkit-tap-highlight-color:transparent;}',
+        '.qz-sel{position:absolute;pointer-events:none;color:#ffd76a;font-weight:900;line-height:1;text-align:center;text-shadow:0 0 6px rgba(255,200,60,.95),0 1px 0 #3a2408;animation:qzSel .6s ease-in-out infinite alternate;}',
+        '@keyframes qzSel{from{transform:translateY(0)}to{transform:translateY(-24%)}}',
+        '#qz-bar{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 84px);z-index:61;display:flex;align-items:center;gap:8px;padding:7px 9px 7px 14px;',
+        '  border-radius:999px;border:1px solid #c79a5b;background:rgba(30,19,9,.95);color:#f3e6d2;font-size:13px;font-weight:bold;box-shadow:0 4px 16px rgba(0,0,0,.6);white-space:nowrap;max-width:94vw;}',
+        '#qz-bar .nm{overflow:hidden;text-overflow:ellipsis;max-width:40vw;}',
+        '#qz-bar button{flex:0 0 auto;width:44px;height:44px;border-radius:50%;border:2px solid;font-size:22px;font-weight:900;line-height:1;display:flex;align-items:center;justify-content:center;background:#150d06;padding:0;}',
+        '#qz-bar .o{color:#3ddc6a;border-color:#3ddc6a;}', '#qz-bar .x{color:#ff4a4a;border-color:#ff4a4a;}',
+        '#qz-bar .c{width:30px;height:30px;font-size:13px;color:#a88d6a;border:1px solid #5a3f22;}'
     ].join('\n');
     document.head.appendChild(st);
 })();
@@ -827,14 +927,14 @@ let popKey = '';                             // 마지막으로 띄운 O · X (�
 function lastKey(s) { const l = s && s.last; return l ? [s.id, l.c, l.k, l.v, l.at].join('|') : ''; }
 function stage() { try { return (typeof window.plazaStage === 'function') ? window.plazaStage() : null; } catch (e) { return null; } }
 function clearStage() {
-    Array.prototype.forEach.call(document.querySelectorAll('.qz-layer, .qz-plate, .qz-pips, .qz-pop, #qz-ctl'), function (e) { e.remove(); });     // 커튼 층(#qz-curplay)도 .qz-layer 다
+    Array.prototype.forEach.call(document.querySelectorAll('.qz-layer, .qz-plate, .qz-pips, .qz-pop, #qz-ctl, #qz-scr, .qz-hit, .qz-sel, #qz-bar, .qz-hbtn'), function (e) { e.remove(); });     // 커튼 층(#qz-curplay)도 .qz-layer 다
     const ov = document.getElementById('plaza-ov'); if (ov) ov.classList.remove('qz-on');
 }
 function px(v, z) { return Math.round(v * z) + 'px'; }
 function paintStage() {
     const sg = stage();
     if (!sg || sg.room !== ROOM) { if (document.querySelector('.qz-layer, #qz-ctl')) clearStage(); return; }
-    const s = curShow();
+    const s = curShow() || (closing ? closeShow : null);
     const el = sg.el, z = sg.z;
     // ── 단상 · 커튼 그림
     const need = function (id, src, zi, on, clip) {
@@ -919,12 +1019,134 @@ function paintStage() {
         b.onclick = function (e) { e.stopPropagation(); manage(); };
         ov.appendChild(b);
     }
+    paintScreen(sg, s);
+    paintHost();
 }
+// 가운데 화면 — 사회자가 낸 문제 (2026-11-13 사용자 「토크쇼 중앙 빈 화면에 장비 장착자가 쓴 문제가 뜨게」). 모두 다 풀면 「끝」.
+function paintScreen(sg, s) {
+    const el = sg.el, z = sg.z, R = Q.SCREEN;
+    let p = el.querySelector('#qz-scr');
+    const fin = !!(s && s.fin);
+    const text = s ? (fin ? '🎉 모든 문제가 끝났습니다' : String((s.q && s.q.t) || '')) : '';
+    if (!text) { if (p) p.remove(); return; }
+    if (!p) { p = document.createElement('div'); p.id = 'qz-scr'; el.appendChild(p); }
+    const sig = text + '|' + z;
+    if (p._sig === sig) return;
+    p._sig = sig;
+    // 방 그림 크기 그대로 적고 통째로 줄인다 (명패와 같은 길) — 글이 길면 글자를 줄여 화면 안에 다 들인다
+    p.style.left = px(R[0], z); p.style.top = px(R[1], z); p.style.width = R[2] + 'px'; p.style.height = R[3] + 'px';
+    p.style.transform = 'scale(' + z + ')';
+    p.style.zIndex = '70';                                     // 걷힌 커튼(위쪽) 앞 · 사람 뒤
+    p.classList.toggle('fin', fin);
+    p.textContent = text;
+    let fs = Math.max(26, Math.min(92, Math.sqrt(R[2] * R[3] / (Math.max(1, Array.from(text).length) * 1.25))));
+    for (let i = 0; i < 16; i++) {
+        p.style.fontSize = fs.toFixed(1) + 'px';
+        if (p.scrollHeight <= R[3] + 1 && p.scrollWidth <= R[2] + 1) break;
+        fs *= 0.92;
+        if (fs < 18) break;
+    }
+}
+// 사회자 화면에만 — 문제 내기 · 내려가기 단추 / 참가자를 누르는 자리 / 지목 표(▼) · 채점 띠
+function paintHost() {
+    const sg = stage(), me = u_(), s = curShow();
+    const host = !!(sg && sg.room === ROOM && s && me && s.host === me.code);
+    const ov = (sg && sg.ov) || document.getElementById('plaza-ov');
+    const drop = function (q) { Array.prototype.forEach.call(document.querySelectorAll(q), function (e) { e.remove(); }); };
+    if (!host) { drop('.qz-hit, .qz-sel, #qz-bar, .qz-hbtn'); return; }
+    const el = sg.el, z = sg.z, kk = sg.k || z;
+    // ── 단추 둘
+    const hbtn = function (id, label, fn) {
+        let b = ov.querySelector('#' + id);
+        if (!b) {
+            b = document.createElement('button'); b.id = id; b.className = 'qz-hbtn';
+            b.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+            b.onclick = function (e) { e.stopPropagation(); fn(); };
+            ov.appendChild(b);
+        }
+        if (b.textContent !== label) b.textContent = label;
+    };
+    hbtn('qz-ask', '✏️ 문제 내기', askBox);
+    hbtn('qz-walk', hostDown ? '🎤 단상으로' : '🚶 내려가기', function () { hostWalk(); });
+    // ── 누르는 자리 — 머리(몸)와 명패. 앞줄 것이 뒷줄 것 위에 온다 (보이는 대로)
+    const st = seatsOf(s), keep = {};
+    ['s1', 's2', 's3', 's4', 's5', 's6'].forEach(function (k) {
+        const v = st[k];
+        if (!v || !v.c || seatKeys(s).indexOf(k) < 0) return;
+        const sp = Q.SEAT[k], r = Q.PLATE[k], front = k > 's3';
+        const rects = [
+            ['h', sp.x * z - 64 * z, sp.y * z - (Q.HEAD + 12) * kk, 128 * z, 132 * kk],
+            ['p', (r[0] - 8) * z, (r[1] - 4) * z, (r[2] + 16) * z, (r[3] + 44) * z]
+        ];
+        rects.forEach(function (q) {
+            const id = 'qz-hit-' + k + '-' + q[0];
+            keep[id] = 1;
+            let h = el.querySelector('#' + id);
+            if (!h) {
+                h = document.createElement('div'); h.id = id; h.className = 'qz-hit';
+                h.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+                h.addEventListener('click', function (e) { e.stopPropagation(); pick(h.dataset.c); });
+                el.appendChild(h);
+            }
+            h.dataset.c = v.c;
+            h.style.left = Math.round(q[1]) + 'px'; h.style.top = Math.round(q[2]) + 'px';
+            h.style.width = Math.max(24, Math.round(q[3])) + 'px'; h.style.height = Math.max(24, Math.round(q[4])) + 'px';
+            h.style.zIndex = String(Q.ZTOP + (front ? 6 : 5));
+        });
+    });
+    Array.prototype.forEach.call(el.querySelectorAll('.qz-hit'), function (h) { if (!keep[h.id]) h.remove(); });
+    // ── 지목 표 · 채점 띠
+    if (sel && (!seatOf(s, sel) || doneAll(s, sel))) sel = '';
+    let mk = el.querySelector('.qz-sel'), bar = ov.querySelector('#qz-bar');
+    if (!sel) { if (mk) mk.remove(); if (bar) bar.remove(); return; }
+    const sk = seatOf(s, sel), sp = Q.SEAT[sk];
+    const fz = Math.max(16, Math.round(64 * z));
+    if (!mk) { mk = document.createElement('div'); mk.className = 'qz-sel'; mk.textContent = '▼'; el.appendChild(mk); }
+    mk.style.fontSize = fz + 'px'; mk.style.width = (fz * 2) + 'px';
+    mk.style.left = Math.round(sp.x * z - fz) + 'px'; mk.style.top = Math.round(sp.y * z - Q.HEAD * kk - fz * 1.1) + 'px';
+    mk.style.zIndex = String(Q.ZTOP + 2);
+    const label = '🎯 ' + nickOf(s, sel) + ' (' + (markList(s, sel).filter(function (m) { return m; }).length + 1) + '/' + Q.PER + ')';
+    if (!bar) {
+        bar = document.createElement('div'); bar.id = 'qz-bar';
+        bar.innerHTML = '<span class="nm"></span><button class="o" title="정답">O</button><button class="x" title="오답">X</button><button class="c" title="지목 풀기">✕</button>';
+        bar.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+        bar.querySelector('.o').onclick = function (e) { e.stopPropagation(); if (sel) judge(sel, 1); };
+        bar.querySelector('.x').onclick = function (e) { e.stopPropagation(); if (sel) judge(sel, 2); };
+        bar.querySelector('.c').onclick = function (e) { e.stopPropagation(); sel = ''; paintHost(); };
+        ov.appendChild(bar);
+    }
+    const nm = bar.querySelector('.nm');
+    if (nm.textContent !== label) nm.textContent = label;
+}
+// ✏️ 문제 내기 — 적은 글이 가운데 화면에 뜬다
+function askBox() {
+    const s = myHost(); if (!s) return;
+    const w = box('<div style="font-size:13px; color:#f3e6d2; font-weight:bold; margin-bottom:4px;">✏️ 문제 내기</div>'
+        + '<div style="font-size:10px; color:#a88d6a; margin-bottom:8px; line-height:1.6;">적은 글이 무대 가운데 화면에 뜹니다 (' + Q.Q_MAX + '자까지). 채팅에도 한 줄 남습니다.</div>'
+        + '<textarea id="qz-qt" maxlength="' + Q.Q_MAX + '" rows="3" style="width:100%; box-sizing:border-box; padding:10px; border-radius:8px; border:1px solid #c79a5b; background:#f3e6d2; color:#1a1008; font-size:14px; font-weight:bold; line-height:1.5; resize:none;"></textarea>'
+        + '<div style="display:flex; gap:8px; margin-top:12px;">'
+        + '<button id="qz-qx" class="game-btn" style="flex:1; ' + B_GREY + '">닫는다</button>'
+        + '<button id="qz-qc" class="game-btn" style="flex:1; ' + B_BROWN + '">화면을 비운다</button>'
+        + '<button id="qz-qg" class="game-btn" style="flex:1.4; ' + B_GOLD + '">화면에 띄운다</button></div>');
+    const ta = w.querySelector('#qz-qt');
+    ta.value = (s.q && s.q.t) || '';
+    ta.addEventListener('keydown', function (e) { e.stopPropagation(); });
+    setTimeout(function () { try { ta.focus(); } catch (e) { } }, 60);
+    w.querySelector('#qz-qx').onclick = shut;
+    w.querySelector('#qz-qc').onclick = function () { ask(''); shut(); };
+    w.querySelector('#qz-qg').onclick = function () {
+        if (!String(ta.value || '').trim()) { alert_('문제를 적어 주세요.'); return; }
+        ask(ta.value); shut();
+    };
+}
+let qSeen = '';                              // 마지막으로 알린 문제 (같은 문제를 채팅에 두 번 안 적는다)
+function qKey(s) { return s ? (s.id + '|' + (s.q ? (s.q.at + '|' + s.q.t) : '')) : ''; }
+const finSaid = {};
 // 명패 아래 세 칸 — 푼 문제 (O 초록 · X 빨강)
 function paintMarks() {
     const sg = stage();
     if (!sg || sg.room !== ROOM) return;
-    const s = curShow(), el = sg.el, z = sg.z, st = seatsOf(s);
+    const s = curShow() || (closing ? closeShow : null), el = sg.el, z = sg.z, st = seatsOf(s);
     ['s1', 's2', 's3', 's4', 's5', 's6'].forEach(function (k) {
         const id = 'qz-pp-' + k, r = Q.PLATE[k];
         let p = el.querySelector('#' + id);
@@ -980,6 +1202,52 @@ function curtainOpen(box) {
     });
     return p.then(function () { box.remove(); });
 }
+// 커튼 닫기 (쇼가 끝났을 때 · 2026-11-13 사용자 「쇼가 끝나면(정산이 끝나면) 반대로 커튼이 닫히게」) — 열 때의 거꾸로.
+//   프레임 5 → 4 → 3 → 2 → 1 차례로 **나타난다** (덜 닫힌 장부터 · 더 닫힌 장이 위). 다 닫히면 프레임 1 이 무대를 다 가린다.
+function curtainClose() {
+    const sg = stage();
+    if (!sg || sg.room !== ROOM) return Promise.resolve();
+    const old = sg.el.querySelector('#qz-curplay'); if (old) old.remove();
+    const box = document.createElement('div');
+    box.id = 'qz-curplay'; box.className = 'qz-layer';
+    box.style.zIndex = String(Q.ZTOP + 30);                    // 채점 표 · 누르는 자리까지 다 덮는다
+    CUR.forEach(function (f, i) {
+        const im = document.createElement('img');
+        im.className = 'qz-layer'; im.alt = ''; im.src = DIR + f;
+        im.style.zIndex = String(CUR.length - i);
+        im.style.opacity = '0';
+        box.appendChild(im);
+    });
+    sg.el.appendChild(box);
+    return Promise.race([curtainReady(box), wait(3000)]).then(function () {
+        const ims = Array.prototype.slice.call(box.querySelectorAll('img')).reverse();      // 5 → 1
+        let p = wait(30);
+        ims.forEach(function (im, i) {
+            p = p.then(function () {
+                if (!box.isConnected) return;
+                im.style.transition = 'opacity ' + IN.CURTAIN + 'ms ease-in-out';
+                im.style.opacity = '1';
+                return wait(i === ims.length - 1 ? IN.CURTAIN + 60 : Math.round(IN.CURTAIN * 0.7));
+            });
+        });
+        return p;
+    });
+}
+// 쇼가 끝났다 — 무대에 서 있으면 커튼이 닫힌 뒤 광장으로 돌아간다
+let closing = false, closeShow = null;
+function endLeave(old) {
+    if (closing) return;
+    closing = true;
+    closeShow = old || closeShow || null;                      // 닫히는 동안 무대(명패 · 단상)는 그대로 둔다
+    shut();
+    sel = ''; paintHost();
+    sys(old && old.end ? '📺 화요 퀴즈쇼의 막이 내립니다.' : '📺 화요 퀴즈쇼가 끝나 막이 내립니다.');
+    curtainClose().then(function () { return wait(IN.SHUT + 250); }).catch(function () { }).then(function () {
+        closing = false; closeShow = null;
+        if (roomNow() === ROOM && !curShow()) { sys('광장으로 돌아갑니다.'); leave(); }
+        else { const b = document.getElementById('qz-curplay'); if (b) b.remove(); }      // 그 사이 새 쇼가 열렸다 (드문 일) — 막만 걷는다
+    });
+}
 // 머리 위에 크게 — O (초록) · X (빨강)
 function pop(last) {
     const sg = stage();
@@ -998,7 +1266,132 @@ function pop(last) {
     e.style.width = size + 'px'; e.style.height = size + 'px';
     e.style.zIndex = String(Q.ZTOP);
     sg.el.appendChild(e);
-    setTimeout(function () { e.remove(); }, Q.POP_MS + 100);
+    // 가운데 화면에도 크게 (2026-11-13 사용자 「문제를 맞추거나 틀렸을 시에 중앙에 초록색 O나 빨간색 X」)
+    const R = Q.SCREEN, big = Math.max(64, Math.round(250 * z)), th2 = Math.max(8, Math.round(big * 0.15));
+    const c = document.createElement('div');
+    c.className = 'qz-pop ' + (last.v === 1 ? 'o' : 'x');
+    c.innerHTML = last.v === 1 ? '<i style="border-width:' + th2 + 'px"></i>' : '<i style="height:' + th2 + 'px"></i><i style="height:' + th2 + 'px"></i>';
+    c.style.left = Math.round((R[0] + R[2] / 2) * z - big / 2) + 'px'; c.style.top = Math.round((R[1] + R[3] / 2) * z - big / 2) + 'px';
+    c.style.width = big + 'px'; c.style.height = big + 'px';
+    c.style.zIndex = String(Q.ZTOP);
+    sg.el.appendChild(c);
+    setTimeout(function () { e.remove(); c.remove(); }, Q.POP_MS + 100);
+    sfxVerdict(last.v);                                        // 🔔 정답 — 띵 띠로링 + 박수 · 오답 — 삐 + 우우
+}
+
+// ==========================================
+// 🔔 소리 — 정답: 「띵 띠로링」 + 박수 · 오답: 「삐」 + 「우우」 (2026-11-13 사용자) — 음원 없이 그 자리에서 만든다
+// ==========================================
+//   무대에 있는 모두에게 난다 (O · X 가 뜰 때). 광장 위 🔊 를 꺼 두었으면 안 난다.
+//   손전화는 손길 없이 처음 내는 소리를 막는다 — 들어올 때 누른 손길에서 소리 길을 열어 둔다 (bgmUnlock).
+let SFX = null;
+function sfxCtx(make) {
+    try {
+        if (!SFX) {
+            if (!make) return null;
+            const C = window.AudioContext || window.webkitAudioContext;
+            if (!C) return null;
+            const ctx = new C(), out = ctx.createGain(), comp = ctx.createDynamicsCompressor();
+            out.gain.value = 0.85;
+            out.connect(comp); comp.connect(ctx.destination);
+            SFX = { ctx: ctx, out: out, clap: null };
+        }
+        if (SFX.ctx.state !== 'running' && SFX.ctx.state !== 'closed') { const p = SFX.ctx.resume(); if (p && p.catch) p.catch(function () { }); }
+        return SFX;
+    } catch (e) { return null; }
+}
+['pointerdown', 'keydown', 'touchend'].forEach(function (t) {      // 막혀 있던 소리 길 — 누를 때 다시 연다
+    document.addEventListener(t, function () { if (SFX && SFX.ctx.state === 'suspended') { try { SFX.ctx.resume(); } catch (e) { } } }, true);
+});
+// 종 한 번 — 맑은 소리 (바탕음에 배음 몇 개 · 금방 잦아든다)
+function sfxBell(S, f, t, dur, vol) {
+    const c = S.ctx;
+    [[1, 1], [2, 0.32], [3.01, 0.12], [4.2, 0.05]].forEach(function (h) {
+        const o = c.createOscillator(), g = c.createGain(), d = dur / (1 + (h[0] - 1) * 0.5);
+        o.type = 'sine'; o.frequency.value = f * h[0];
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol * h[1]), t + 0.008);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+        o.connect(g); g.connect(S.out);
+        o.start(t); o.stop(t + d + 0.05);
+    });
+}
+// 박수 — 짧은 손뼉 소리 수백 개를 흩어 놓은 한 벌 (처음에 몰리고 뒤로 잦아든다)
+function clapBuf(S) {
+    if (S.clap) return S.clap;
+    const c = S.ctx, sr = c.sampleRate, dur = 2.8, n = Math.floor(sr * dur), b = c.createBuffer(1, n, sr), d = b.getChannelData(0);
+    for (let i = 0; i < 420; i++) {
+        const t0 = 0.02 + Math.pow(Math.random(), 1.5) * (dur - 0.25);
+        const a = (0.25 + Math.random() * 0.75) * Math.min(1, t0 / 0.12) * Math.pow(1 - t0 / dur, 1.3);
+        const len = Math.floor(sr * (0.006 + Math.random() * 0.012)), k0 = Math.floor(t0 * sr), tone = 0.25 + Math.random() * 0.5;
+        let prev = 0, lp = 0;
+        for (let j = 0; j < len && k0 + j < n; j++) {
+            lp += ((Math.random() * 2 - 1) - lp) * tone;
+            d[k0 + j] += (lp - prev) * a * Math.exp(-j / (len * 0.35));
+            prev = lp;
+        }
+    }
+    let mx = 0;
+    for (let i = 0; i < n; i++) { const v = Math.abs(d[i]); if (v > mx) mx = v; }
+    if (mx > 0) for (let i = 0; i < n; i++) d[i] = d[i] / mx * 0.9;
+    S.clap = b;
+    return b;
+}
+function sfxClap(S, t) {
+    const c = S.ctx, src = c.createBufferSource(), g = c.createGain(), hp = c.createBiquadFilter(), lp = c.createBiquadFilter();
+    src.buffer = clapBuf(S);
+    hp.type = 'highpass'; hp.frequency.value = 700; lp.type = 'lowpass'; lp.frequency.value = 7000;
+    g.gain.value = 0.5;
+    src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(S.out);
+    src.start(t);
+}
+// 우우 — 낮은 목소리 여럿이 「우」 모음으로 처지며 끈다
+function sfxBoo(S, t, dur) {
+    const c = S.ctx, bus = c.createGain(), f1 = c.createBiquadFilter(), f2 = c.createBiquadFilter(), g2 = c.createGain();
+    bus.gain.setValueAtTime(0.0001, t);
+    bus.gain.exponentialRampToValueAtTime(0.55, t + 0.25);
+    bus.gain.setValueAtTime(0.55, t + dur - 0.55);
+    bus.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    f1.type = 'bandpass'; f1.frequency.value = 330; f1.Q.value = 3.5;
+    f2.type = 'bandpass'; f2.frequency.value = 800; f2.Q.value = 5;
+    g2.gain.value = 0.35;
+    f1.connect(bus); f2.connect(g2); g2.connect(bus); bus.connect(S.out);
+    for (let i = 0; i < 6; i++) {
+        const o = c.createOscillator(), g = c.createGain(), l = c.createOscillator(), lg = c.createGain();
+        const f0 = 105 + Math.random() * 70, st = t + Math.random() * 0.18;
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(f0 * 1.06, st);
+        o.frequency.linearRampToValueAtTime(f0 * (0.8 + Math.random() * 0.08), t + dur);
+        l.frequency.value = 4 + Math.random() * 3; lg.gain.value = f0 * 0.025;
+        l.connect(lg); lg.connect(o.frequency);
+        g.gain.value = 0.16 + Math.random() * 0.1;
+        o.connect(g); g.connect(f1); g.connect(f2);
+        o.start(st); o.stop(t + dur + 0.05); l.start(st); l.stop(t + dur + 0.05);
+    }
+}
+function sfxVerdict(v) {
+    try {
+        if (typeof window.eventBgmMuted === 'function' && window.eventBgmMuted()) return;
+        const S = sfxCtx(true);
+        if (!S) return;
+        const c = S.ctx, t = c.currentTime + 0.03;
+        if (v === 1) {
+            sfxBell(S, 1568, t, 0.55, 0.3);                                                                  // 띵
+            [1046.5, 1318.5, 1568, 2093].forEach(function (f, i) { sfxBell(S, f, t + 0.3 + i * 0.085, i === 3 ? 0.9 : 0.35, 0.24); });   // 띠로링
+            sfxClap(S, t + 0.32);                                                                            // 박수
+        } else {
+            const g = c.createGain(), lp = c.createBiquadFilter();                                           // 삐 —
+            lp.type = 'lowpass'; lp.frequency.value = 2600;
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.exponentialRampToValueAtTime(0.2, t + 0.015);
+            g.gain.setValueAtTime(0.2, t + 0.52);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.62);
+            [523.25, 554.37].forEach(function (f) { const o = c.createOscillator(); o.type = 'square'; o.frequency.value = f; o.connect(lp); o.start(t); o.stop(t + 0.66); });
+            lp.connect(g); g.connect(S.out);
+            sfxBoo(S, t + 0.4, 1.9);                                                                         // 우우
+        }
+        S.n = (S.n || 0) + 1; S.last = v;
+    } catch (e) { }
 }
 window.plazaOnPaint = (function (prev) {
     return function (room) {
@@ -1021,15 +1414,16 @@ function onShows(was) {
         if (s.last && lastKey(s) !== popKey) {
             if (prev && prev.id === s.id && lastKey(prev) !== lastKey(s)) pop(s.last); else popKey = lastKey(s);
         }
+        // 새 문제 — 채팅에도 한 줄 (작은 화면에서는 무대의 글씨가 작다). 들어오자마자 받은 것은 화면에만.
+        if (qKey(s) !== qSeen) {
+            if (prev && prev.id === s.id && s.q && s.q.t && qKey(prev) !== qKey(s)) sys('📺 문제 — ' + s.q.t);
+            qSeen = qKey(s);
+        }
+        if (s.fin && !finSaid[s.id]) { finSaid[s.id] = 1; if (prev && prev.id === s.id) sys('🎉 모든 참가자가 문제를 마쳤습니다 — 곧 막이 내립니다.'); }
         paintStage(); seat();
     }
-    // 내가 들어 있던 쇼가 끝났다
-    if (roomNow() === ROOM && !s) {
-        const old = going && SHOWS[going];
-        sys(old && old.end ? '📺 화요 퀴즈쇼의 막이 내렸습니다 — 광장으로 돌아갑니다.' : '📺 화요 퀴즈쇼가 끝나 광장으로 돌아갑니다.');
-        shut();
-        leave();
-    }
+    // 내가 들어 있던 쇼가 끝났다 — 커튼이 닫힌 뒤 광장으로
+    if (roomNow() === ROOM && !s) endLeave((going && (SHOWS[going] || (was && was[going]))) || null);
     if (document.getElementById('qz-status') && s) { try { document.getElementById('qz-status').innerHTML = statusRows(s); } catch (e) { } }
     chip();
 }
@@ -1039,9 +1433,10 @@ setInterval(function () {
         const inRoom = roomNow() === ROOM;
         if (inRoom) {
             const s = curShow();
-            if (!s) { sys('📺 화요 퀴즈쇼가 끝나 광장으로 돌아갑니다.'); shut(); leave(); return; }
+            if (!s) { endLeave((going && SHOWS[going]) || null); return; }
             paintStage(); seat();
         } else if (document.querySelector('.qz-layer, #qz-ctl')) clearStage();
+        finCheck();                                             // 사회자 — 모두 다 풀었으면 막을 내린다
         bgmTick(roomNow() === ROOM && !!curShow());
         cageTry();                                              // 무대에서 내려왔으면 오답 가두리를 건다
         // 초대장 — 한가할 때 띄운다
@@ -1399,7 +1794,7 @@ window.quizShowState = function () {
         console.table(Object.keys(seatsOf(s)).map(function (k) { const v = seatsOf(s)[k]; return { 자리: k, 명패: v.nick, 사원: nameOf(v.c), 채점: markList(s, v.c).map(function (m) { return m === 1 ? 'O' : (m === 2 ? 'X' : '·'); }).join(''), 셈: (s.paid && s.paid[v.c]) ? '끝' : '-' }; }));
     });
 };
-window.quizShowDebug = { Q: Q, IN: IN, shows: function () { return SHOWS; }, cur: curShow, verdictOf: verdictOf, paint: paintStage, enter: enter, leave: leave, pending: pendingShow, sweep: sweepMine, cage: cageMe, cageWait: cageWait, BGM: BGM, el: function () { return bgm; }, bgm: function () { return bgm ? { paused: bgm.paused, t: bgm.currentTime, want: bgmWant, muted: bgm.muted, open: !!bgm._open, src: bgm.src } : { want: bgmWant }; } };
+window.quizShowDebug = { Q: Q, IN: IN, shows: function () { return SHOWS; }, cur: curShow, verdictOf: verdictOf, paint: paintStage, enter: enter, leave: leave, pending: pendingShow, sweep: sweepMine, cage: cageMe, cageWait: cageWait, judge: judge, pick: pick, sel: function () { return sel; }, ask: ask, walk: hostWalk, down: function () { return hostDown; }, fin: finCheck, sfx: function () { return SFX ? { state: SFX.ctx.state, n: SFX.n || 0, last: SFX.last || 0 } : null; }, sfxTest: sfxVerdict, BGM: BGM, el: function () { return bgm; }, bgm: function () { return bgm ? { paused: bgm.paused, t: bgm.currentTime, want: bgmWant, muted: bgm.muted, open: !!bgm._open, src: bgm.src } : { want: bgmWant }; } };
 
 console.log('[토크쇼] 🎤 초대 — 화요 퀴즈쇼 (단상 · 명패 · 정답 O / 오답 X · 붉은 글씨 → 브라운관 꺼짐 → 커튼)');
 })();

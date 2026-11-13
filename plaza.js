@@ -456,13 +456,14 @@ R.event = { n: '🎉 이벤트 · 풀 파티', pn: '풀 파티', img: 'event-poo
 //   fit — 단상 두 개(손님 · 사회자)가 **한 화면에 다 들도록** 줄인다 (세로 손전화). camX — 화면 가운데에 둘 자리 (내가 어디 섰든 고정).
 //   padTop — 그렇게 줄여 그림이 창보다 짧아지면 이만큼(px) 내려 앉힌다 (위 띠 · 포인트 칸이 간판을 안 가리게). bg — 그림 위아래로 남는 자리의 빛깔.
 //   full — 파인애플(작아진 사람)이 이 방에서는 보통 크기 (단상 뒤에 서면 안 보인다 · 이벤트 맵과 같은 길).
-//   걸어 다니지 않는다 — 들어오면 제 자리(plazaPin)에 붙박인다. 그래서 나가는 길(spots)도 없다 (quizshow.js 의 [나가기]).
+//   손님은 걸어 다니지 않는다 — 들어오면 제 자리(plazaPin)에 붙박인다. 그래서 나가는 길(spots)도 없다 (quizshow.js 의 [나가기]).
+//   floor · x1 — 사회자가 단상에서 내려와 걸어 다니는 무대 바닥 (단상 앞 · 양옆 커튼 사이 · 2026-11-13 사용자 「장착자는 단상에서 내려와서 움직일 수 있게」).
 //   pud — 🌧 여우비 웅덩이가 놓일 바닥 (단상 앞 무대 바닥 · plazaFloor). floor 는 서는 줄일 뿐 걷는 바닥이 아니다.
 //   ★ 2026-11-13 사용자 「배경 전부 수정」 — 배경 · 단상을 새 그림으로 (단상이 위로 올라가고 · 6인용 단상은 가운데 앞). 양옆에 걷힌 커튼(끝 프레임)이 늘 남으므로
 //     화면 가운데(camX)를 그림 한가운데로 옮겨 두 커튼이 같은 폭으로 보이게 했다.
 R.quiz = { n: '📺 화요 퀴즈쇼', pn: '화요 퀴즈쇼', img: 'quiz-show2.webp', w: 1880, h: 2448, top: 150, cut: 648, k: 1, pix: 1, max: 1,
            gate: 'quizShowGate', full: 1, fit: [110, 1770], camX: 940, padTop: 96, bg: 'linear-gradient(180deg,#0a0916 0,#0a0916 22%,#1d0913 62%)',
-           floor: [1119, 1123], pud: [1500, 1570], spots: [] };
+           floor: [1430, 1560], x1: [330, 1550], pud: [1500, 1570], spots: [] };
 
 // ★ 돌아오는 길을 저절로 만든다 — 한쪽만 적어도 양쪽이 통한다
 (function link() {
@@ -4644,7 +4645,7 @@ function segX(r, seg) {
     if (seg === 'dn') return [r.x2[0], r.x2[1]];
     if (seg === 'tp') return [r.x0[0], r.x0[1]];
     if (typeof seg === 'number') return [r.stairs[seg].x[0], r.stairs[seg].x[1]];
-    return [P.EDGE, r.w - P.EDGE];
+    return r.x1 ? [r.x1[0], r.x1[1]] : [P.EDGE, r.w - P.EDGE];      // x1 — 길(바닥 띠)의 좌우 끝을 따로 정한 방 (📺 화요 퀴즈쇼 — 양옆 커튼 사이의 무대 바닥)
 }
 // 깊이 — 덱 -2 · 덱 계단 -1 · 길 0 · 계단 1 · 지하 2 (어느 쪽으로 갈아타야 하는지 셀 때)
 function segDeep(seg, r) {
@@ -8196,10 +8197,21 @@ window.plazaFloor = function () {
     return { band: [Number(b[0]), Number(b[1])], w: r.w, h: r.h, z: zz() };
 };
 // 📺 자리 붙박이 (quizshow.js · 2026-11-13) — 그 자리에 세워 두고 걸음을 막는다. 이벤트 무대 「고정」과 같은 길(run.evFix)이되 [내려오기] 단추가 없다.
-//   p = { x, y, f } (방 그림 좌표 · f 는 보는 쪽 1 왼쪽 · -1 오른쪽) · null 이면 푼다. 방을 옮기면 저절로 풀린다 (goRoom).
-window.plazaPin = function (p) {
+//   p = { x, y, f } (방 그림 좌표 · f 는 보는 쪽 1 왼쪽 · -1 오른쪽) · null 이면 푼다 (to 를 주면 그 자리에 내려 세운다). 방을 옮기면 저절로 풀린다 (goRoom).
+window.plazaPin = function (p, to) {
     if (!run || !run.me || !run.room) return false;
-    if (!p) { if (run.evFix && run.evFix.pin) run.evFix = null; return true; }
+    if (!p) {
+        if (run.evFix && run.evFix.pin) run.evFix = null;
+        // 풀면서 설 자리(to) — 그 방의 바닥 띠 안으로 잘라 세운다 (📺 사회자가 단상에서 내려올 때)
+        if (to && isFinite(Number(to.x)) && isFinite(Number(to.y))) {
+            run.tx = null; run.ty = null; run.tseg = null; run.vx = run.vy = 0; run.ax = 0; run.ay = 0;
+            run.x = Number(to.x); run.y = Number(to.y);
+            try { segStep(roomOf(), 0); } catch (e) { }
+            putOne(run.me, run.x, run.y);
+            try { send(false); } catch (e) { }
+        }
+        return true;
+    }
     const x = Number(p.x), y = Number(p.y);
     if (!isFinite(x) || !isFinite(y)) return false;
     run.evFix = { x: x, y: y, pin: 1 };
