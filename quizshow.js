@@ -43,7 +43,7 @@
 //   🎺 커튼이 걷히는 순간 「Showtime!」 이 처음부터 크게 나고(빰), 두 마디 뒤부터는 잔잔하게 깔린다 (2026-11-13 사용자 · 아래 「쇼타임」).
 //
 // ■ 광장 쪽 (plaza.js)
-//   R.quiz (그림 quiz-show2 · gate · fit · camX · padTop · full · pud · floor · x1) · goRoom 의 문지기 · plazaPin(p, 풀 때 설 자리) / plazaPinned · plazaOnPaint · plazaOnMySay
+//   R.quiz (그림 quiz-show3 · gate · fit · camX · padTop · full · pud · floor · x1) · goRoom 의 문지기 · plazaPin(p, 풀 때 설 자리) / plazaPinned · plazaOnPaint · plazaOnMySay
 //
 // ■ 적히는 자리
 //   quizShow/<사회자 사번> = { id, host, name, at, inst, inv: { 사번: { at, st: p|y|n } }, seat: { s1..s6: { c, nick, at } },
@@ -62,10 +62,11 @@ const ROOM = 'quiz';
 const START = 'plaza';
 const PATH = 'quizShow', WIN = 'quizWin', DAY = 'quizDay';
 const DIR = 'plaza/';
-// 그림 — 2026-11-13 사용자 「배경 전부 수정」 묶음 (배경은 plaza.js 의 R.quiz.img). 주신 그림(도트 한 칸 5픽셀)을 한 칸 한 점으로 줄여 둔 것.
-const T1_IMG = 'quiz2-t1.webp', T2_IMG = 'quiz2-t2.webp';                 // 단상 (기본 · 인원 추가)
-const CUR = ['quiz-cur1.webp', 'quiz-cur2.webp', 'quiz-cur3.webp', 'quiz-cur4.webp', 'quiz-cur5.webp'];   // 커튼 프레임 1 (닫힘) ~ 5
-const CUR_END = 'quiz-cur6.webp';                                          // 커튼 프레임 종료(유지) — 다 열린 뒤에도 남는다
+// 그림 — 2026-11-13 사용자 「배경 수정 3차」 묶음 「브라운의 심야 토크쇼 배경 이걸로 바꿔줘. 위치도 맞게 수정해 주고」 (배경은 plaza.js 의 R.quiz.img).
+//   주신 그림(도트 한 칸 5픽셀)을 한 칸 한 점으로 줄여 둔 것. 커튼의 거의 불투명한 점(알파 245~254)은 불투명으로, 거의 투명한 점(1~8)은 투명으로 맞췄다.
+const T1_IMG = 'quiz3-t1.webp', T2_IMG = 'quiz3-t2.webp';                 // 단상 (기본 · 인원 추가)
+const CUR = ['quiz3-cur1.webp', 'quiz3-cur2.webp', 'quiz3-cur3.webp', 'quiz3-cur4.webp', 'quiz3-cur5.webp'];   // 커튼 프레임 1 (닫힘) ~ 5
+const CUR_END = 'quiz3-cur6.webp';                                         // 커튼 프레임 종료(유지) — 다 열린 뒤에도 남는다
 const ADMIN = 'kario0987';
 
 const Q = {
@@ -83,28 +84,29 @@ const Q = {
     POP: 112, HEAD: 246,           // O · X 의 크기 · 발끝에서 머리 위까지 (사람 1배일 때의 키 — 사람 칸 384 가운데 머리끝 ~ 발끝이 240 쯤)
     HAIR_BACK: 84, HAIR_FRONT: 56, // 사람 머리가 가리는 폭 — 뒤통수 쪽(긴 머리) · 얼굴 쪽. 앞줄 사람이 뒷줄 명패를 이만큼 가린다
     // 서는 자리 (방 그림 좌표 · 발끝) — f 는 보는 쪽 (1 왼쪽 · -1 오른쪽)
-    //   ★ 2026-11-13 사용자 「배경 전부 수정」 — 새 그림에서 다시 쟀다 (단상이 112 올라갔고, 6인용 단상은 가운데 앞에 놓인다).
-    //   뒷줄은 의자 앞(마이크 왼쪽). 앞줄(6인용 단상)은 뒷줄 사람 바로 앞 — 뒷줄 명패 사이의 틈에 서야 명패의 닉네임을 덜 가린다
-    //   (단체 사진처럼 뒷줄은 머리가 위로 보인다). 앞줄 오른쪽 끝(s6)은 뒷단상을 벗어나 있어 아무것도 안 가린다 — 그래서 앞줄은 오른쪽부터 채운다.
-    //   발끝은 단상 윗면(뒷단상 1028 · 앞단상 1100 ~ 1128)보다 90 쯤 아래 — 사람(키 240 쯤)의 다리가 단상에 가려 **허리 위만** 보인다.
-    HOST: { x: 1470, y: 1123, f: 1 },
+    //   ★ 2026-11-13 사용자 「배경 수정 3차」 — 새 그림에서 다시 쟀다 (단상 · 의자 · 명패가 120 쯤 내려왔고, 6인용 단상은 왼쪽으로 40 쯤 옮겨 왔다).
+    //   뒷줄은 의자 앞 (의자 가운데 x — 298 · 500 · 709 · 사회자 1467). 앞줄(6인용 단상)은 뒷줄 사람 바로 앞 — 뒷줄 명패 사이의 틈에 서야 명패의 닉네임을 덜 가린다
+    //   (단체 사진처럼 뒷줄은 머리가 위로 보인다). 앞줄 오른쪽 끝(s6)은 뒷줄 명패를 벗어나 있어 아무것도 안 가린다 — 그래서 앞줄은 오른쪽부터 채운다.
+    //   발끝은 단상 윗면(뒷단상 1148 · 앞단상 1228 ~ 1248)보다 90 쯤 아래 — 사람(키 240 쯤)의 다리가 단상에 가려 **허리 위만** 보인다.
+    HOST: { x: 1468, y: 1243, f: 1 },
     SEAT: {
-        s1: { x: 300, y: 1123, f: -1 }, s2: { x: 492, y: 1123, f: -1 }, s3: { x: 706, y: 1123, f: -1 },
-        s4: { x: 508, y: 1215, f: -1 }, s5: { x: 706, y: 1215, f: -1 }, s6: { x: 967, y: 1215, f: -1 }      // s4 — 앞단상 몸통(x 484 부터) 안쪽에 서야 다리가 상판 밑으로 안 삐져나온다
+        s1: { x: 300, y: 1243, f: -1 }, s2: { x: 500, y: 1243, f: -1 }, s3: { x: 708, y: 1243, f: -1 },
+        s4: { x: 500, y: 1331, f: -1 }, s5: { x: 708, y: 1331, f: -1 }, s6: { x: 928, y: 1331, f: -1 }      // 앞단상 몸통(x 428 ~ 1128) 안쪽에 서야 다리가 상판 밑으로 안 삐져나온다
     },
     FILL3: ['s1', 's2', 's3'], FILL6: ['s1', 's2', 's3', 's6', 's5', 's4'],
-    WALK: { x: 1390, y: 1450 },    // 사회자가 단상에서 내려설 자리 (무대 바닥 — 걸어 다니는 띠는 plaza.js 의 R.quiz.floor · x1)
-    // 가운데 화면 (방 그림 좌표 — 그림에서 쟀다 · 모서리 장식 안쪽) : x · y · 폭 · 높이
-    SCREEN: [566, 594, 744, 232],
-    // 명패 (방 그림 좌표 — 그림에서 쟀다)
+    WALK: { x: 1390, y: 1500 },    // 사회자가 단상에서 내려설 자리 (무대 바닥 — 걸어 다니는 띠는 plaza.js 의 R.quiz.floor · x1)
+    // 가운데 화면 (방 그림 좌표 — 그림에서 쟀다 · 금테 안쪽 갈색 판 516 ~ 1356 × 556 ~ 960 에서 모서리 장식만큼 들여서) : x · y · 폭 · 높이
+    SCREEN: [562, 594, 756, 324],
+    // 명패 (방 그림 좌표 — 그림에서 쟀다 · 테두리 안쪽 낯)
     PLATE: {
-        s1: [350, 1010, 114, 40], s2: [530, 1010, 114, 40], s3: [716, 1010, 114, 40],
-        s4: [606, 1106, 114, 40], s5: [786, 1106, 114, 40], s6: [972, 1106, 116, 40],
-        host: [1328, 1002, 132, 40]
+        s1: [356, 1128, 108, 34], s2: [530, 1128, 112, 32], s3: [718, 1128, 112, 32],
+        s4: [568, 1220, 106, 32], s5: [742, 1220, 112, 30], s6: [930, 1220, 112, 30],
+        host: [1334, 1126, 122, 32]
     },
-    // 층 — 사람은 100 + 발끝 y. 걷힌 커튼(위쪽) < 뒷줄 사람 < 뒷단상 < 앞줄 사람 < 앞단상 < 걷힌 커튼(아래 자락) < O · X
-    //   걷힌 커튼(끝 프레임)은 두 겹으로 깐다 — 위쪽은 사람 뒤(말풍선이 커튼에 안 가리게), CUR_SPLIT 아래 자락은 단상 앞(그림대로 단상 끝을 덮는다).
-    Z1: 1240, Z2: 1332, ZCUR_LOW: 60, ZCUR: 3000, CUR_SPLIT: 1000, ZTOP: 4200
+    PLATE_BG: '#d0a07d', PLATE_EDGE: '#140a0c',     // 명패의 낯빛 · 테두리 (글자가 커서 명패를 늘려 그릴 때 같은 빛깔로)
+    // 층 — 사람은 100 + 발끝 y. 걷힌 커튼(위쪽) < 뒷줄 사람(1343) < 뒷단상 < 앞줄 사람(1431) < 앞단상 < 무대 바닥을 걷는 사회자(1550 ~) < 걷힌 커튼(아래 자락) < O · X
+    //   걷힌 커튼(끝 프레임)은 두 겹으로 깐다 — 위쪽은 사람 뒤(말풍선이 커튼에 안 가리게), CUR_SPLIT 아래 자락은 단상 앞(그림대로 단상 끝을 덮는다 · 단상 윗면 1148 바로 위에서 가른다).
+    Z1: 1360, Z2: 1450, ZCUR_LOW: 60, ZCUR: 3000, CUR_SPLIT: 1120, ZTOP: 4200
 };
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
@@ -908,7 +910,7 @@ function hostWalk(down) {
         '#qz-ask{top:102px;}', '#qz-walk{top:142px;}',
         // 가운데 화면의 문제
         '#qz-scr{position:absolute;display:flex;align-items:center;justify-content:center;text-align:center;overflow:hidden;pointer-events:none;transform-origin:0 0;box-sizing:border-box;padding:0 6px;',
-        '  color:#f4eeff;font-weight:bold;line-height:1.28;word-break:keep-all;overflow-wrap:anywhere;text-shadow:0 0 10px rgba(170,140,255,.85),0 2px 0 #140d3a;}',
+        '  color:#fff1d8;font-weight:bold;line-height:1.28;word-break:keep-all;overflow-wrap:anywhere;text-shadow:0 0 10px rgba(255,186,110,.75),0 2px 0 #1e0c06;}',      /* 갈색 판에 맞춘 따뜻한 빛 (3차 그림) */
         '#qz-scr.fin{color:#ffe9a8;text-shadow:0 0 12px rgba(255,200,90,.9),0 2px 0 #3a2408;}',
         // 사회자가 누르는 자리 · 지목 표 · 채점 띠
         '.qz-hit{position:absolute;pointer-events:auto;cursor:pointer;background:transparent;-webkit-tap-highlight-color:transparent;}',
@@ -997,8 +999,8 @@ function paintStage() {
         p.style.left = px(left, z); p.style.top = px(r[1], z); p.style.width = W + 'px'; p.style.height = r[3] + 'px';
         p.style.transform = 'scale(' + z + ')';
         p.style.zIndex = String(zi);
-        p.style.background = grown ? '#e0b9a1' : 'transparent';
-        p.style.boxShadow = grown ? '0 0 0 4px #2a1a22' : 'none';
+        p.style.background = grown ? Q.PLATE_BG : 'transparent';
+        p.style.boxShadow = grown ? '0 0 0 4px ' + Q.PLATE_EDGE : 'none';
         p.style.fontSize = fs.toFixed(1) + 'px';
         p.textContent = text;
     };
@@ -1582,7 +1584,7 @@ function noise() {
 // 그림을 미리 받아 둔다 — 연출 도중에 빈 칸이 뜨지 않게
 const pre = {};
 function preload() {
-    [WORDS_IMG, 'quiz-burst.webp', 'quiz-show2.webp', T1_IMG, T2_IMG, CUR_END].concat(CUR).forEach(function (f) {
+    [WORDS_IMG, 'quiz-burst.webp', 'quiz-show3.webp', T1_IMG, T2_IMG, CUR_END].concat(CUR).forEach(function (f) {
         if (pre[f]) return;
         const im = new Image();
         pre[f] = new Promise(function (res) { im.onload = im.onerror = function () { res(); }; });
