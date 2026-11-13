@@ -228,7 +228,7 @@ if (SET.sv !== 2) { SET.offset = 0; SET.vis = 0; SET.sv = 2; saveJ(SET_KEY, SET)
 function saveSet() { saveJ(SET_KEY, SET); }
 // 👥 듀얼 — 지금 듀얼(없으면 null) · 값들 (아래 「듀얼」 마당)
 const DUEL_PATH = 'rhythmDuel', DUEL_INV = 'rhythmDuelInv';
-const DC = { INV_MS: 30000, LOAD_MS: 45000, START_MS: 4200, FLUSH_MS: 180, DELAY: 650, PART_MS: 8000, MINI: 0.27, RES_WAIT: 9000, FIN_MS: 32000, FIN_CUE: 1800, DELAY_MAX: 2000, CK_N: 6, CK_MAX: 9, CK_WAIT: 450, CK_MS: 3200 };
+const DC = { INV_MS: 30000, LOAD_MS: 45000, START_MS: 4200, FLUSH_MS: 180, DELAY: 650, PART_MS: 8000, MINI: 0.27, RES_WAIT: 9000, FIN_MS: 32000, FIN_CUE: 1800, DELAY_MAX: 2000, CK_N: 6, CK_MAX: 9, CK_WAIT: 450, CK_MS: 3200, GONE_MS: 20000 };
 let DUEL = null;
 function sgn(v) { return (v > 0 ? '+' : '') + v; }
 
@@ -1838,7 +1838,7 @@ function draw(now) {
 //   · 잠긴 곡은 둘 다 열어 둔 곡이라야 한다.
 //   적히는 자리
 //     rhythmDuel/<신청한 사번>/m  = { id, host, hn, guest, gn, song, diff, at, st: inv|acc|no|busy|lock|cancel|go,
-//                                     rdy: { 사번: 1 }, startAt (곡의 0 초가 오는 서버 시각), res: { 사번: { s, c, n, m, mc, t } }, quit: 나간 사번 }
+//                                     rdy: { 사번: 1 }, startAt (곡의 0 초가 오는 서버 시각), res: { 사번: { s, c, n, m, mc, t } }, quit: 나간 사번, gone: { 사번: true } (접속이 끊긴 동안) }
 //     rhythmDuel/<신청한 사번>/ev/<사번>/e<차례> = '노트,판정;노트,판정…'   (판정 c · n · m · 길게 누르기 꼬리 C · M,뗀 때)
 //     rhythmDuel/<신청한 사번>/ck/q = { id, n, t }  받는 쪽의 핑 · ck/a = { id, n, h: 신청한 쪽 시각 }  그 답     (시계 맞추기)
 //     rhythmDuelInv/<받는 사번>   = { id, host, hn, song, diff, at }     신청 — 받는 쪽 화면이 듣는다 (리듬 게임을 열어 두지 않아도)
@@ -2242,7 +2242,54 @@ function duelWatch() {
         });
     }
     my.mref.on('value', function (snap) { if (DUEL === my) duelOnMeta(snap && snap.val()); });
-    try { my.mref.child('quit').onDisconnect().set(my.me); } catch (e) { }       // 접속이 끊기면 나간 것으로
+    duelPresence(my);
+}
+// ── 접속 — 끊겼다고 바로 「나갔다」로 치지 않는다 (2026-11-13 사용자 「듀얼로 하다가 갑자기 상대가 나갔다면서 쫓겨나는데」)
+//   ✗ 전에는 접속이 끊기는 순간 서버가 m/quit 에 내 사번을 적었다 (onDisconnect). 휴대폰은 판 도중에도 접속이 잠깐씩 끊겼다 붙는데
+//     (와이파이 ↔ 데이터 · 신호가 약한 곳 · 화면을 잠깐 내렸을 때), 그때마다 상대 화면이 「○○ 님이 나갔습니다」 로 곡 고르기로 쫓겨났다.
+//     끊긴 쪽은 그것도 모른 채 혼자 쳤다.
+//   이제는 끊기면 m/gone/<사번> 만 선다. 다시 붙으면 스스로 지우고 다시 걸어 둔다 (.info/connected).
+//   곡 · 채보는 각자 기기에서 흐르므로 판은 그대로 이어지고, 끊긴 동안 친 것은 붙는 대로 한꺼번에 건너간다.
+//   DC.GONE_MS(20 초) 넘게 안 돌아오면 그때 「접속이 끊겼습니다」 로 접는다 (m/quit 도 적어 — 뒤늦게 돌아온 상대가 혼자 치지 않게).
+//   ✕ → 나가기 · 닫기는 전처럼 바로 나간 것이다 (m/quit).
+function duelPresence(my) {
+    const db = db_(); if (!db) return;
+    const g = my.mref.child('gone/' + my.me);
+    const arm = function () { try { g.onDisconnect().set(true); g.remove(); } catch (e) { } };
+    arm();
+    try {
+        my.conRef = db.ref('.info/connected');
+        my.conFn = my.conRef.on('value', function (snap) { if (DUEL === my && snap && snap.val() === true) arm(); });
+    } catch (e) { }
+}
+// 상대 접속을 기다리는 동안 — 위쪽에 작게
+function duelNet(on) {
+    if (!UI) return;
+    const old = UI.querySelector('.rg-duelnet');
+    if (!on) { if (old) old.remove(); return; }
+    if (old) return;
+    const el = document.createElement('div'); el.className = 'rg-duelnet';
+    el.style.cssText = 'position:absolute;left:50%;top:calc(8px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:5;pointer-events:none;padding:5px 12px;border-radius:999px;background:rgba(10,10,20,.78);border:1px solid rgba(255,255,255,.16);color:#ccd;font-size:11px;white-space:nowrap;';
+    el.textContent = '📡 상대 접속을 기다리는 중…';
+    UI.appendChild(el);
+}
+function duelGoneCheck(my, m) {
+    const live = my.st === 'load' || my.st === 'play';
+    const gone = live && !!(m && m.gone && m.gone[my.opp]);
+    if (!gone) {
+        if (my.goneT) { clearTimeout(my.goneT); my.goneT = 0; }
+        duelNet(false);
+        return;
+    }
+    duelNet(true);
+    if (my.goneT) return;
+    my.goneT = setTimeout(function () {
+        my.goneT = 0;
+        if (DUEL !== my || (my.st !== 'load' && my.st !== 'play')) return;
+        if (!(my.m && my.m.gone && my.m.gone[my.opp])) return;
+        try { my.mref.update({ quit: my.me }); } catch (e) { }
+        duelEnded(esc(my.oppName) + ' 님의 접속이 끊겼습니다');
+    }, DC.GONE_MS);
 }
 function duelOnMeta(m) {
     const my = DUEL; if (!my) return;
@@ -2258,6 +2305,7 @@ function duelOnMeta(m) {
         return;
     }
     if ((my.st === 'load' || my.st === 'play') && (m.st === 'cancel' || (m.quit && m.quit !== my.me))) { duelEnded(esc(my.oppName) + ' 님이 나갔습니다'); return; }
+    duelGoneCheck(my, m);                                    // 상대 접속이 끊겼으면 바로 접지 않고 기다린다
     if (my.st === 'load') duelGo();
     if (m.res && m.res[my.opp] && !my.oppRes) { my.oppRes = m.res[my.opp]; if (my.st === 'result') duelResultPaint(); }
 }
@@ -2287,13 +2335,14 @@ function duelLeave() {
 function duelDrop() {
     const my = DUEL; DUEL = null;
     if (!my) return;
-    clearTimeout(my.to); clearTimeout(my.to2); clearTimeout(my.to3);
+    clearTimeout(my.to); clearTimeout(my.to2); clearTimeout(my.to3); clearTimeout(my.goneT); my.goneT = 0;
     try { my.mref.off(); } catch (e) { }
     try { if (my.evRef) my.evRef.off(); } catch (e) { }
     try { if (my.ckRef) my.ckRef.off(); } catch (e) { }
-    try { my.mref.child('quit').onDisconnect().cancel(); } catch (e) { }
+    try { if (my.conRef && my.conFn) my.conRef.off('value', my.conFn); } catch (e) { }          // 내 것만 뗀다 (같은 자리를 다른 파일도 듣는다)
+    try { my.mref.child('gone/' + my.me).onDisconnect().cancel(); } catch (e) { }
     try { if (my.st === 'result' && my.me === my.host) { my.ref.child('ev').remove(); my.ref.child('ck').remove(); } } catch (e) { }      // 다 본 흔적은 치운다
-    if (UI) Array.prototype.forEach.call(UI.querySelectorAll('.rg-duelwait,.rg-duelquit'), function (e) { e.remove(); });
+    if (UI) Array.prototype.forEach.call(UI.querySelectorAll('.rg-duelwait,.rg-duelquit,.rg-duelnet'), function (e) { e.remove(); });
 }
 // ── 곡 받기 → 둘 다 준비되면 같은 때에 시작
 function duelLoad() {
