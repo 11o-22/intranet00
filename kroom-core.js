@@ -2934,6 +2934,9 @@ window.kroomLeave = function () {
 //   동료 한 사람 — **밖에 있는** 사원(접속해 있고, 탐사 중이 아니고, 이 일행이 아닌 사람)의 이름을 부른다.
 //   그쪽 화면에 창이 뜨고 60초 안에 응하면 시련 내내 눈에 +3 · 한 번 맞는 것을 대신 받아 준다(방패 1).
 //   같이 들어온 일행은 부를 수 없다.
+//   ★ 히든 직업을 받은 사원 · 🔥 재난의 길 · 🌀 교란자의 길에 있는 사원도 부를 수 없다 (2026-11-13 사용자
+//     「같은 히든이나 재앙의 길, 교란자의 길에 있는 사람들은 도우미로 못 부르게 · 부르려고 하면 『 해당 사람들은 부를 수 없습니다. 』 라고만」).
+//     명단에는 그대로 보인다 — 누가 그런 사람인지 드러내지 않는다. 이름을 누르면 그 문구만 뜬다 (부른 것으로 세지 않는다).
 //
 //   지면 죽지 않는다 — 심력 −30 · 거울이 사라지고, 다음 S 돌파 때 다시 선다.
 const TRIAL = { HP: 100, BASE: 20, STANCE: 4, HELP_BON: 3, HELP_SHIELD: 1, ASK_MS: 60000, LOSE_MIND: 30 };
@@ -3003,6 +3006,13 @@ function trialOutside() {
     return Object.keys(on).filter(function (c) { return on[c] && book[c] && c !== me().code && c !== ADMIN && !mine[c]; })
         .map(function (c) { return { code: c, name: book[c].name || c }; });
 }
+// 부를 수 없는 사람 — 히든 직업(지금 · 접어 둔 속성) · 재난의 길 · 교란자의 길 (사원 기록의 K 의 방 칸으로 본다)
+function trialBarred(code) {
+    const book = (typeof db !== 'undefined' && db.users) || {};
+    const k = book[code] && book[code].kroom;
+    if (!k || typeof k !== 'object' || stale(k)) return false;
+    return hadHidden(k) || onPath(k) || onJam(k);
+}
 window.kTrialList = function () {
     if (!kr || !kr.trial || kr.trial.round) return;
     const d = db_();
@@ -3020,6 +3030,10 @@ window.kTrialAsk = function (code) {
     if (!kr || !kr.trial || kr.trial.round || !code) return;
     const d = db_(); if (!d) { kTrialStart(); return; }
     const u = me(), k = prof();
+    if (trialBarred(code)) {
+        show('시련', trialBox('『 해당 사람들은 부를 수 없습니다. 』'), darkChoiceBtn('다른 사람을 부른다.', 'kTrialList()') + darkChoiceBtn('혼자 마주 선다.', 'kTrialStart()'));
+        return;
+    }
     const id = 't' + now().toString(36);
     kr.trial.asked[code] = 1;
     const book = (typeof db !== 'undefined' && db.users) || {};
