@@ -20,10 +20,14 @@
 //   한 사람에 세 문제. 다 채점되면 그 자리에서, 쇼를 끝내면 덜 푼 사람도 맞힌 수대로 받는다.
 //       1개 10,000 P · 2개 10,000 P + 5,000 꿈결 · 3개 20,000 P + 10,000 꿈결
 //   ※ 상은 한 사원에 하루 한 번 (자정 기준) — 사회자와 손님이 짜고 되풀이해 받는 길을 막는다. (사용자가 정한 값은 아니다 — 바꾸려면 settle 의 quizDay)
+//   🔒 오답 하나에 가두리 10분 (2026-11-13 사용자 「오답 시 오답 횟수 당 가두리 10분」) — 셈할 때 정해지고, **무대에서 내려올 때** 갇힌다
+//      (문제를 다 풀고도 쇼가 끝날 때까지는 단상에 서 있는다). 광장 → 백일몽 → … 빈 가두리 (gaduri.js by 'quiz' · 때가 되면 저절로 풀린다).
+//      이미 갇혀 있으면 남은 때에 더한다. 갇혀 있는 동안은 새 초대장으로 무대에 못 선다. 하루 한 번 제한은 상에만 — 가두리는 틀릴 때마다.
 //   명패 아래 동그라미 셋이 푼 문제다 (초록 · 빨강). 오른쪽 위 [📺 화요 퀴즈쇼] — 현황 · 더 초대 · 쇼를 끝낸다 · 나간다.
 //
 //   들어갈 때 (쇼마다 처음 한 번 · 다시 들어갈 때는 커튼만) —
-//   붉은 글씨 여섯 장이 영화처럼 지나가고 → 「나는」 이 선 화면을 찢고 나오고 → 브라운관이 꺼지듯
+//   붉은 글씨 여섯 장이 빠르게 지나가고 (지지직거리며 서고 → 종이처럼 찢겨 나가면 그 아래 다음 글씨 · 2026-11-13 사용자 「흐려지는 게 아니라
+//   사진처럼 찢어지거나 지지직 · 빨랐으면」) → 「나는」 이 선 화면을 찢고 나오고 → 브라운관이 꺼지듯
 //   (화면 압축 → 수평선 → 빛의 점 → 암전) → 같은 붉은색의 커튼이 걷히며 무대가 열린다.
 //
 // ■ 광장 쪽 (plaza.js)
@@ -32,7 +36,7 @@
 // ■ 적히는 자리
 //   quizShow/<사회자 사번> = { id, host, name, at, inst, inv: { 사번: { at, st: p|y|n } }, seat: { s1..s6: { c, nick, at } },
 //                              mark: { 사번: { q1..q3: 1(O) | 2(X) } }, last: { c, v, k, at }, paid: { 사번: { n, at, skip } }, end }
-//   quizWin/<사번>/<열쇠>  = { pts, dream, n, by, name, at }   받을 상 (그 사원 화면이 받고 지운다 — 나가 있었으면 들어올 때)
+//   quizWin/<사번>/<열쇠>  = { pts, dream, n, wrong, by, name, at, claimed }   받을 상 · 오답 가두리 (그 사원 화면이 받고 지운다 — 나가 있었으면 들어올 때)
 //   quizDay/<사번>         = 'YYYY-MM-DD'                      그날 상을 받았다
 //
 // ■ 콘솔
@@ -52,6 +56,7 @@ const Q = {
     MAX: 6,                        // 한 쇼에 부를 수 있는 손님
     PER: 3,                        // 한 사람에 문제 셋
     PRIZE: { 1: { pts: 10000, dream: 0 }, 2: { pts: 10000, dream: 5000 }, 3: { pts: 20000, dream: 10000 } },
+    CAGE_MIN: 10,                  // 오답 하나에 가두리 10분 (2026-11-13 사용자 「오답 시 오답 횟수 당 가두리 10분」) — 무대에서 내려올 때 갇힌다
     LIFE_MS: 3 * 3600000,          // 안 끝내고 두어도 이만큼 지나면 끝난 쇼로 본다
     KEEP_MS: 10 * 60000,           // 끝난 쇼의 기록을 남겨 두는 동안
     NICK_MAX: 6,
@@ -107,6 +112,7 @@ function seatOf(s, code) {
 function marksOf(s, code) { const m = s && s.mark && s.mark[code]; return (m && typeof m === 'object') ? m : {}; }
 function markList(s, code) { const m = marksOf(s, code); const out = []; for (let i = 1; i <= Q.PER; i++) out.push(Number(m['q' + i]) || 0); return out; }
 function rightN(s, code) { return markList(s, code).filter(function (v) { return v === 1; }).length; }
+function wrongN(s, code) { return markList(s, code).filter(function (v) { return v === 2; }).length; }
 function myHost() { const me = u_(); const s = me && SHOWS[me.code]; return live(s) ? s : null; }          // 내가 사회자인 쇼
 function guestShows() {                                                                                    // 내가 초대받은 쇼들
     const me = u_(); if (!me) return [];
@@ -180,14 +186,26 @@ function inviteMore(codes) {
 function settle(s, code) {
     const d = db_(), me = u_();
     if (!d || !me || !s || s.host !== me.code) return Promise.resolve(false);
-    const n = rightN(s, code);
+    const n = rightN(s, code), wrong = wrongN(s, code), cage = wrong * Q.CAGE_MIN;
     return d.ref(PATH + '/' + me.code + '/paid/' + code).transaction(function (v) {
         if (v) return;                                         // 이미 셈했다
-        return { n: n, at: now() };
+        const o = { n: n, at: now() };
+        if (cage) o.cage = cage;
+        return o;
     }).then(function (r) {
         if (!r || !r.committed) return false;
+        // 받을 것을 그 사원 앞으로 적는다 — 상(pz 가 있으면) · 가두리(오답이 있으면). 둘 다 없으면 안 적는다.
+        const send = function (pz) {
+            if (!pz && !wrong) return true;
+            try { d.ref(WIN + '/' + code).push({ pts: pz ? pz.pts : 0, dream: pz ? pz.dream : 0, n: n, wrong: wrong, by: me.code, name: me.name || me.code, at: now() }); } catch (e) { }
+            try {
+                addHistoryLog(me, '[토크쇼] 🎤 화요 퀴즈쇼 — ' + nameOf(code) + ' 사원 정답 ' + n + '개' + (pz ? ' (' + prizeText(pz) + ')' : '') + (wrong ? ' · 오답 ' + wrong + '개 (가두리 ' + cage + '분)' : ''));
+                saveFields({ history: 1 });
+            } catch (e) { }
+            return true;
+        };
         const pz = Q.PRIZE[n];
-        if (!pz) return true;                                  // 하나도 못 맞혔다
+        if (!pz) return send(null);                            // 하나도 못 맞혔다 — 상은 없고 가두리만
         const day = today();
         return d.ref(DAY + '/' + code).transaction(function (v) {
             if (v === day) return;                             // 오늘 이미 받았다
@@ -195,11 +213,9 @@ function settle(s, code) {
         }).then(function (r2) {
             if (!r2 || !r2.committed) {
                 try { d.ref(PATH + '/' + me.code + '/paid/' + code + '/skip').set(1); } catch (e) { }
-                return true;
+                return send(null);                             // 상은 하루 한 번 — 가두리는 그대로
             }
-            try { d.ref(WIN + '/' + code).push({ pts: pz.pts, dream: pz.dream, n: n, by: me.code, name: me.name || me.code, at: now() }); } catch (e) { }
-            try { addHistoryLog(me, '[토크쇼] 🎤 화요 퀴즈쇼 — ' + nameOf(code) + ' 사원 정답 ' + n + '개 (' + prizeText(pz) + ')'); saveFields({ history: 1 }); } catch (e) { }
-            return true;
+            return send(pz);
         });
     }).catch(function () { return false; });
 }
@@ -286,22 +302,34 @@ function judge(text) {
 function nickOf(s, code) { const k = seatOf(s, code); const st = k && seatsOf(s)[k]; return (st && st.nick) || nameOf(code); }
 
 // ==========================================
-// 상 받기 — 내 앞으로 온 것 (quizWin/<나>)
+// 받기 — 내 앞으로 온 것 (quizWin/<나>) : 상 · 오답 가두리
 // ==========================================
+//   상은 받는 대로 넣는다 (claimed). 가두리는 **무대에서 내려온 뒤에** 건다 — 문제를 다 풀고도 쇼가 끝날 때까지는 단상에 서 있는다.
+//   가두리까지 건 뒤에야 줄을 지운다 (그 전에 화면을 닫아도 다시 들어올 때 이어서 건다).
 let winRef = null;
+const cageWait = {};                         // { 줄 열쇠: { min, wrong, name } } — 무대에서 내려오기를 기다리는 가두리
+let caging = false;
 function watchWin(code) {
     const d = db_(); if (!d) return;
     if (winRef) { try { winRef.off(); } catch (e) { } }
+    Object.keys(cageWait).forEach(function (k) { delete cageWait[k]; });
     winRef = d.ref(WIN + '/' + code);
     winRef.on('child_added', function (snap) {
         const id = snap.key, v = snap.val(), me = u_();
-        if (!v || v.claimed || !me || me.code !== code) return;
+        if (!v || !me || me.code !== code) return;
+        const wrong = Math.max(0, Math.floor(Number(v.wrong) || 0));
+        const after = function () {                            // 상을 넣은 뒤 — 가두리가 있으면 기다리게 걸어 두고, 없으면 줄을 지운다
+            if (wrong > 0) { cageWait[id] = { min: wrong * Q.CAGE_MIN, wrong: wrong, name: v.name || v.by || '' }; cageTry(); }
+            else { try { d.ref(WIN + '/' + code + '/' + id).remove(); } catch (e) { } }
+        };
+        if (v.claimed) { after(); return; }                    // 상은 이미 받았다 (가두리를 걸기 전에 화면을 닫았었다)
         d.ref(WIN + '/' + code + '/' + id).transaction(function (x) {
             if (!x || x.claimed) return;
             x.claimed = true; return x;
         }).then(function (r) {
             if (!r || !r.committed) return;
             const pts = Math.max(0, Math.floor(Number(v.pts) || 0)), dream = Math.max(0, Math.floor(Number(v.dream) || 0));
+            if (!pts && !dream) { after(); return; }
             try { if (pts && typeof changePoints === 'function') changePoints(pts); } catch (e) { }
             try { if (pts && typeof showPointGainEffect === 'function') showPointGainEffect(pts); } catch (e) { }
             const fin = function () {
@@ -309,7 +337,7 @@ function watchWin(code) {
                 try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
                 const t = '📺 화요 퀴즈쇼 — 정답 ' + (v.n || 0) + '개! +' + fmt(pts) + ' P' + (dream ? ' · +' + fmt(dream) + ' 꿈결' : '');
                 if (roomNow()) sys(t); else alert_(t);
-                try { d.ref(WIN + '/' + code + '/' + id).remove(); } catch (e) { }
+                after();
             };
             if (!dream) { fin(); return; }
             d.ref('users/' + code + '/kroom/dream').transaction(function (x) { return Math.max(0, Math.floor(Number(x) || 0)) + dream; })
@@ -319,6 +347,62 @@ function watchWin(code) {
         });
     });
 }
+// 오답 가두리 — 무대(퀴즈쇼 방)에 서 있는 동안은 기다린다. 내려오면 건다.
+function cageTry() {
+    const me = u_(), d = db_();
+    const ids = Object.keys(cageWait);
+    if (!me || !d || !ids.length || caging) return;
+    if (roomNow() === ROOM || document.getElementById('qz-intro')) return;
+    caging = true;
+    const id = ids[0], w = cageWait[id];
+    cageMe(w.min).then(function (res) {
+        delete cageWait[id];
+        try { d.ref(WIN + '/' + me.code + '/' + id).remove(); } catch (e) { }
+        const where = res && res.room ? ((window.GADURI_NAMES && window.GADURI_NAMES[res.room]) || res.room) + ' ' : '';
+        const t = res && res.ok ? '📺 화요 퀴즈쇼 — 오답 ' + w.wrong + '개 · ' + where + '가두리 ' + w.min + '분'
+            : (res && res.skip ? '' : '📺 화요 퀴즈쇼 — 오답 ' + w.wrong + '개. 가두리가 모두 차서 갇히지 않았습니다.');
+        if (res && res.ok) { try { addHistoryLog(me, '[토크쇼] 🎤 화요 퀴즈쇼 — 오답 ' + w.wrong + '개 · ' + where + '가두리 ' + w.min + '분 (' + w.name + ' 사회자)'); saveFields({ history: 1 }); } catch (e) { } }
+        if (t) sys(t);
+    }).catch(function () { }).then(function () { caging = false; if (Object.keys(cageWait).length) setTimeout(cageTry, 300); });
+}
+// 나를 가둔다 — 광장 → 백일몽 → … 빈 가두리 (gaduri.js · by 'quiz' · 때가 되면 저절로 풀린다). 이미 갇혀 있으면 그 가두리의 남은 때에 **더한다**.
+function cageMe(min) {
+    const d = db_(), me = u_();
+    if (!d || !me || me.code === ADMIN) return Promise.resolve({ skip: 1 });      // 상담사는 가두지 않는다
+    const ms = min * 60000;
+    let cur = '';
+    try { cur = (typeof window.gaduriOf === 'function') ? (window.gaduriOf(me.code) || '') : ''; } catch (e) { cur = ''; }
+    if (cur) {
+        return d.ref('gaduri/' + cur + '/' + me.code).transaction(function (v) {
+            if (!v) return;                                    // 그 사이 풀렸다 — 아래에서 새로 건다
+            if (v.auto || !Number(v.until)) return v;          // 격리에 딸린 것 · 상담사가 가둔 것(끝이 없다) — 그대로
+            v.until = Math.max(now(), Number(v.until)) + ms;
+            return v;
+        }).then(function (r) {
+            if (r && r.committed && r.snapshot.val()) return { ok: 1, room: cur };
+            return cageNew(ms);
+        });
+    }
+    return cageNew(ms);
+}
+function cageNew(ms) {
+    const d = db_(), me = u_();
+    const rooms = (typeof window.gaduriOrder === 'function') ? window.gaduriOrder() : ['plaza', 'dream', 'post'];
+    return new Promise(function (res) {
+        const put = function (i) {
+            if (i >= rooms.length) { res({ ok: 0 }); return; }
+            d.ref('gaduri/' + rooms[i]).transaction(function (box) {
+                box = box || {};
+                if (box[me.code]) return box;
+                if (Object.keys(box).length >= 3) return;      // 찼다 — 다음 가두리
+                box[me.code] = { at: now(), by: 'quiz', until: now() + ms, name: me.name || me.code };
+                return box;
+            }).then(function (r) { if (!r || !r.committed) put(i + 1); else res({ ok: 1, room: rooms[i] }); }).catch(function () { res({ ok: 0 }); });
+        };
+        put(0);
+    });
+}
+function caged() { const me = u_(); try { return !!(me && typeof window.gaduriOf === 'function' && window.gaduriOf(me.code)); } catch (e) { return false; } }
 
 // ==========================================
 // 창 — 갈색 틀 (토크쇼와 같은 빛깔)
@@ -350,7 +434,7 @@ window.quizShowMenu = function () {
     const w = box('<div style="font-size:13px; color:#f3e6d2; font-weight:bold; margin-bottom:4px;">🎤 초대 — ' + SHOW.replace('📺 ', '') + '</div>'
         + '<div style="font-size:10px; color:#a88d6a; margin-bottom:12px; line-height:1.6;">어느 무대로 부를지 고릅니다. 한 번에 1 ~ ' + Q.MAX + '명까지 초대할 수 있습니다.</div>'
         + '<button id="qz-pick-quiz" class="game-btn" style="width:100%; ' + B_GOLD + ' padding:14px; font-size:13px;">🎓 화요 퀴즈쇼</button>'
-        + '<div style="font-size:10px; color:#a88d6a; margin:6px 2px 12px; line-height:1.6;">손님은 단상 뒤에 섭니다. 한 사람에 세 문제 — 사회자가 「정답.」 · 「땡」 · 「오답.」 이라고 말하면 직전에 말한 참가자가 채점됩니다.<br>맞힌 수대로 1개 ' + prizeText(Q.PRIZE[1]) + ' · 2개 ' + prizeText(Q.PRIZE[2]) + ' · 3개 ' + prizeText(Q.PRIZE[3]) + ' (한 사원에 하루 한 번)</div>'
+        + '<div style="font-size:10px; color:#a88d6a; margin:6px 2px 12px; line-height:1.6;">손님은 단상 뒤에 섭니다. 한 사람에 세 문제 — 사회자가 「정답.」 · 「땡」 · 「오답.」 이라고 말하면 직전에 말한 참가자가 채점됩니다.<br>맞힌 수대로 1개 ' + prizeText(Q.PRIZE[1]) + ' · 2개 ' + prizeText(Q.PRIZE[2]) + ' · 3개 ' + prizeText(Q.PRIZE[3]) + ' (한 사원에 하루 한 번)<br>틀리면 오답 하나에 🔒 가두리 ' + Q.CAGE_MIN + '분 — 무대에서 내려올 때 갇힙니다.</div>'
         + '<button class="game-btn" disabled style="width:100%; ' + B_GREY + ' padding:14px; font-size:13px; opacity:.55;">🛋 심야 토크쇼 — 준비 중</button>'
         + '<button id="qz-x" class="game-btn" style="width:100%; margin-top:12px !important; ' + B_GREY + '">닫는다</button>');
     w.querySelector('#qz-x').style.marginTop = '12px';
@@ -432,7 +516,8 @@ function statusRows(s) {
             + '<div style="flex:0 0 auto; width:20px; font-size:10px; color:#a88d6a;">' + (i + 1) + '</div>'
             + '<div style="flex:1; min-width:0; font-size:12px; color:#f3e6d2;">' + esc(v.nick || nameOf(v.c)) + ' <span style="font-size:9.5px; color:#a88d6a;">· ' + esc(nameOf(v.c)) + '</span></div>'
             + '<div style="flex:0 0 auto; font-size:13px; letter-spacing:3px; font-weight:bold;">' + ml.map(function (m) { return m === 1 ? '<span style="color:#3ddc6a;">O</span>' : (m === 2 ? '<span style="color:#ff4a4a;">X</span>' : '<span style="color:#5a3f22;">·</span>'); }).join('') + '</div>'
-            + (pd ? '<div style="flex:0 0 auto; font-size:9.5px; color:' + (pd.skip ? '#a88d6a' : '#c79a5b') + ';">' + (pd.skip ? '오늘은 이미 받음' : (Q.PRIZE[pd.n] ? prizeText(Q.PRIZE[pd.n]) : '상 없음')) + '</div>' : '')
+            + (pd ? '<div style="flex:0 0 auto; font-size:9.5px; text-align:right; line-height:1.5; color:' + (pd.skip ? '#a88d6a' : '#c79a5b') + ';">' + (pd.skip ? '오늘은 이미 받음' : (Q.PRIZE[pd.n] ? prizeText(Q.PRIZE[pd.n]) : '상 없음'))
+                + (pd.cage ? '<br><span style="color:#ff8a8a;">🔒 가두리 ' + pd.cage + '분</span>' : '') + '</div>' : '')
             + '</div>';
     });
     Object.keys(inv).forEach(function (c) {
@@ -453,7 +538,7 @@ function manage() {
     const w = box('<div style="font-size:13px; color:#f3e6d2; font-weight:bold; margin-bottom:4px;">🎓 화요 퀴즈쇼' + (host ? ' — 진행' : '') + '</div>'
         + '<div style="font-size:10px; color:#a88d6a; margin-bottom:8px; line-height:1.6;">' + (host
             ? '「정답.」 → 직전에 말한 참가자에게 <b style="color:#3ddc6a;">O</b> · 「땡」 · 「오답.」 → <b style="color:#ff4a4a;">X</b>. 한 사람에 세 문제이고, 다 채점되면 그 자리에서 상이 나갑니다. 쇼를 끝내면 덜 푼 사람도 맞힌 수대로 받습니다.'
-            : esc(s.name || nameOf(s.host)) + ' 사회자의 무대 — 한 사람에 세 문제. 맞힌 수대로 1개 ' + prizeText(Q.PRIZE[1]) + ' · 2개 ' + prizeText(Q.PRIZE[2]) + ' · 3개 ' + prizeText(Q.PRIZE[3]) + ' (하루 한 번)') + '</div>'
+            : esc(s.name || nameOf(s.host)) + ' 사회자의 무대 — 한 사람에 세 문제. 맞힌 수대로 1개 ' + prizeText(Q.PRIZE[1]) + ' · 2개 ' + prizeText(Q.PRIZE[2]) + ' · 3개 ' + prizeText(Q.PRIZE[3]) + ' (하루 한 번)') + '<br>오답 하나에 🔒 가두리 ' + Q.CAGE_MIN + '분 — 무대에서 내려올 때 갇힙니다.</div>'
         + '<div id="qz-status">' + statusRows(s) + '</div>'
         + '<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;">'
         + (!inRoom ? '<button id="qz-in" class="game-btn" style="flex:1 1 100%; ' + B_GOLD + '">무대로 들어간다</button>' : '')
@@ -502,7 +587,7 @@ function inviteCard(s) {
     const w = box('<div style="text-align:center; padding:8px 4px 2px;">'
         + '<div style="font-size:28px; margin-bottom:8px; text-shadow:0 0 14px rgba(199,154,91,.8);">💌</div>'
         + '<div style="font-size:16px; letter-spacing:2px; color:#f3e6d2; font-family:\'Nanum Myeongjo\',\'Noto Serif KR\',serif; text-shadow:0 0 10px rgba(199,154,91,.6);">화요 퀴즈쇼 초대장</div>'
-        + '<div style="font-size:11px; color:#a88d6a; margin-top:10px; line-height:1.7;">' + esc(s.name || nameOf(s.host)) + ' 사회자가 무대로 초대했습니다.<br>한 사람에 세 문제 — 맞힌 수대로 1개 ' + prizeText(Q.PRIZE[1]) + ' · 2개 ' + prizeText(Q.PRIZE[2]) + ' · 3개 ' + prizeText(Q.PRIZE[3]) + '</div>'
+        + '<div style="font-size:11px; color:#a88d6a; margin-top:10px; line-height:1.7;">' + esc(s.name || nameOf(s.host)) + ' 사회자가 무대로 초대했습니다.<br>한 사람에 세 문제 — 맞힌 수대로 1개 ' + prizeText(Q.PRIZE[1]) + ' · 2개 ' + prizeText(Q.PRIZE[2]) + ' · 3개 ' + prizeText(Q.PRIZE[3]) + '<br>틀리면 오답 하나에 🔒 가두리 ' + Q.CAGE_MIN + '분</div>'
         + '<div style="font-size:11px; color:#f3e6d2; margin:14px 0 6px;">명패에 적을 닉네임</div>'
         + '<input id="qz-nick" maxlength="' + Q.NICK_MAX + '" autocomplete="off" style="width:100%; box-sizing:border-box; padding:11px 10px; border-radius:8px; border:1px solid #c79a5b; background:#f3e6d2; color:#1a1008; font-size:15px; font-weight:bold; text-align:center; letter-spacing:1px;">'
         + '<div style="font-size:9.5px; color:#a88d6a; margin-top:5px;">' + Q.NICK_MAX + '자까지 · 단상의 비어 있는 명패에 적힙니다</div>'
@@ -531,6 +616,7 @@ function accept(s, nick) {
     const me = u_(), d = db_();
     if (!me || !d) return;
     if (!live(SHOWS[s.host])) { shut(); alert_('이미 끝난 쇼입니다.'); return; }
+    if (caged()) { alert_('🔒 가두리에 갇혀 있는 동안은 무대에 설 수 없습니다.\n풀려난 뒤에 [입장] 을 눌러 주세요.'); return; }
     const keys = seatKeys(SHOWS[s.host]);
     let got = '';
     d.ref(PATH + '/' + s.host + '/seat').transaction(function (v) {
@@ -579,6 +665,7 @@ function enter(host) {
     const s = SHOWS[host];
     if (!me || !live(s)) { alert_('이미 끝난 쇼입니다.'); return; }
     if (s.host !== me.code && !seatOf(s, me.code)) { alert_('초대장으로 먼저 자리에 앉아야 합니다.'); return; }
+    if (caged()) { alert_('🔒 가두리에 갇혀 있는 동안은 무대에 설 수 없습니다.'); return; }
     going = host;
     try { if (typeof window.plazaPanelClose === 'function') window.plazaPanelClose(); } catch (e) { }
     if (!roomNow()) { try { if (typeof window.plazaOpen === 'function') window.plazaOpen(); } catch (e) { } }
@@ -818,6 +905,7 @@ setInterval(function () {
             if (!s) { sys('📺 화요 퀴즈쇼가 끝나 광장으로 돌아갑니다.'); shut(); leave(); return; }
             paintStage(); seat();
         } else if (document.querySelector('.qz-layer, #qz-ctl')) clearStage();
+        cageTry();                                              // 무대에서 내려왔으면 오답 가두리를 건다
         // 초대장 — 한가할 때 띄운다
         const pend = pendingShow();
         if (pend && !later[pend.id] && !busy()) inviteCard(pend);
@@ -877,17 +965,22 @@ setInterval(function () {
 // 들어갈 때의 연출 — 붉은 글씨 → 화면을 찢고 → 브라운관 꺼짐 → 붉은 커튼
 // ==========================================
 //   글씨 여섯 장 · 찢고 나오는 여섯 장은 주신 그림(3배율)을 한 칸 한 점으로 줄여 둔 것 (한 칸 420 x 420 · 가로 셋 세로 둘).
+//   글씨 사이의 찢김(뜯긴 금 · 흰 속살)과 지지직(잡음 · 긁힌 줄)은 그림 없이 그린다.
 //   커튼은 그림 없이 글씨와 같은 붉은색으로 그린다 (사용자 「걷히는 커튼은 같은 붉은색 코드로」).
 const IN = {
     CELL: 420,
-    WORDS: [                                   // 칸 · 머무는 때(ms) · 들어오는 꼴
-        { c: 0, ms: 720, fx: 'slam' },         // 보라!
-        { c: 1, ms: 820, fx: 'left' },         // 내가 백만가면의 소유자요
-        { c: 2, ms: 820, fx: 'right' },        // 혼돈의 군주요 광기의 정점이요
-        { c: 3, ms: 820, fx: 'left' },         // 쾌락과 유희의 꿈이요
-        { c: 4, ms: 980, fx: 'right' },        // 전쟁의 선동자요 과학의 어버이요 낯은 네발짐승이요
-        { c: 5, ms: 1050, fx: 'slam' }         // 나는
+    // 글씨 — 칸 · 다 드러난 뒤 머무는 때(ms). 앞 장이 찢기는 동안(TEAR) 이미 그 아래로 보이기 시작한다.
+    //   (2026-11-13 사용자 「글씨 흐려지는 게 아니라 사진처럼 찢어지거나 지지직 거리는 효과랑 같이 · 지나가는 게 빨랐으면」 — 흐림을 없애고 빠르게)
+    WORDS: [
+        { c: 0, ms: 300 },                     // 보라!
+        { c: 1, ms: 240 },                     // 내가 백만가면의 소유자요
+        { c: 2, ms: 240 },                     // 혼돈의 군주요 광기의 정점이요
+        { c: 3, ms: 240 },                     // 쾌락과 유희의 꿈이요
+        { c: 4, ms: 330 },                     // 전쟁의 선동자요 과학의 어버이요 낯은 네발짐승이요
+        { c: 5, ms: 520 }                      // 나는
     ],
+    TEAR: 210,                                 // 한 장이 찢겨 나가는 때
+    GL: 150,                                   // 글씨가 지지직거리며 서는 때
     BURST: [150, 150, 170, 190, 210, 620],     // 찢고 나오는 여섯 장 — 장마다 머무는 때
     CRT: 1050, DARK: 380, CURTAIN: 1900
 };
@@ -899,12 +992,25 @@ const IN = {
         '#qz-intro .qi-cell{position:absolute;left:50%;top:50%;background-repeat:no-repeat;will-change:transform,opacity;}',
         '#qz-intro .qi-grain{position:absolute;inset:-20%;opacity:.07;pointer-events:none;background-image:repeating-linear-gradient(0deg,rgba(255,255,255,.5) 0 1px,transparent 1px 3px);animation:qiGrain .18s steps(2) infinite;}',
         '@keyframes qiGrain{0%{transform:translateY(0)}100%{transform:translateY(3px)}}',
-        // 글씨 — 쾅 박히기 · 옆에서 스치기
-        '@keyframes qiSlam{0%{transform:translate(-50%,-50%) scale(2.6);opacity:0;filter:brightness(1.75) drop-shadow(0 0 10px rgba(190,0,0,.8)) blur(6px)}14%{transform:translate(-50%,-50%) scale(.96);opacity:1;filter:brightness(1.75) drop-shadow(0 0 10px rgba(190,0,0,.8)) blur(0px)}22%{transform:translate(-50%,-50%) scale(1.03)}82%{transform:translate(-50%,-50%) scale(1.08);opacity:1}100%{transform:translate(-50%,-50%) scale(1.5);opacity:0;filter:brightness(1.75) drop-shadow(0 0 10px rgba(190,0,0,.8)) blur(3px)}}',
-        '@keyframes qiHold{0%{transform:translate(-50%,-50%) scale(2.6);opacity:0;filter:brightness(1.75) drop-shadow(0 0 10px rgba(190,0,0,.8)) blur(6px)}14%{transform:translate(-50%,-50%) scale(.96);opacity:1;filter:brightness(1.75) drop-shadow(0 0 10px rgba(190,0,0,.8)) blur(0px)}22%{transform:translate(-50%,-50%) scale(1.03)}100%{transform:translate(-50%,-50%) scale(1.08);opacity:1}}',
-        '@keyframes qiLeft{0%{transform:translate(-125%,-50%) scale(1.15) skewX(-14deg);opacity:0;filter:brightness(1.75) drop-shadow(0 0 10px rgba(190,0,0,.8)) blur(5px)}16%{transform:translate(-53%,-50%) scale(1) skewX(0);opacity:1;filter:brightness(1.75) drop-shadow(0 0 10px rgba(190,0,0,.8)) blur(0px)}80%{transform:translate(-47%,-50%) scale(1.04);opacity:1}100%{transform:translate(30%,-50%) scale(1.1) skewX(14deg);opacity:0;filter:brightness(1.75) drop-shadow(0 0 10px rgba(190,0,0,.8)) blur(5px)}}',
-        '@keyframes qiRight{0%{transform:translate(25%,-50%) scale(1.15) skewX(14deg);opacity:0;filter:brightness(1.75) drop-shadow(0 0 10px rgba(190,0,0,.8)) blur(5px)}16%{transform:translate(-47%,-50%) scale(1) skewX(0);opacity:1;filter:brightness(1.75) drop-shadow(0 0 10px rgba(190,0,0,.8)) blur(0px)}80%{transform:translate(-53%,-50%) scale(1.04);opacity:1}100%{transform:translate(-130%,-50%) scale(1.1) skewX(-14deg);opacity:0;filter:brightness(1.75) drop-shadow(0 0 10px rgba(190,0,0,.8)) blur(5px)}}',
-        '@keyframes qiShake{0%,100%{transform:translate(0,0)}20%{transform:translate(-7px,4px)}40%{transform:translate(6px,-5px)}60%{transform:translate(-4px,-3px)}80%{transform:translate(4px,3px)}}',
+        // 글씨 — 흐림(blur) 없이. 지지직거리며 서고(띠가 좌우로 어긋난다), 종이처럼 찢겨 나간다.
+        '#qz-intro .qi-page{position:absolute;inset:0;}',
+        '@keyframes qiGl{0%{clip-path:inset(6% 0 64% 0);transform:translate(-50%,-50%) translateX(-7%)}16%{clip-path:inset(50% 0 16% 0);transform:translate(-50%,-50%) translateX(6%)}',
+        '  32%{clip-path:inset(0 0 0 0);transform:translate(-50%,-50%) translateX(-3%) skewX(-10deg)}48%{clip-path:inset(28% 0 42% 0);transform:translate(-50%,-50%) translateX(8%)}',
+        '  64%{clip-path:inset(0 0 0 0);transform:translate(-50%,-50%) translateX(2%) skewX(6deg)}80%{clip-path:inset(60% 0 4% 0);transform:translate(-50%,-50%) translateX(-5%)}',
+        '  100%{clip-path:inset(0 0 0 0);transform:translate(-50%,-50%)}}',
+        '@keyframes qiDrift{0%{transform:translate(-50%,-50%) scale(1)}100%{transform:translate(-50%,-50%) scale(1.08)}}',
+        // 찢김 — 한 장을 위아래 두 쪽으로 가른다. 한쪽 끝을 축으로 벌어져(쐐기꼴 틈) 날아간다. 가장자리는 뜯긴 종이의 흰 속살.
+        '#qz-intro .qi-half{position:absolute;inset:0;z-index:2;will-change:transform;}',
+        '#qz-intro .qi-half .qi-pg{position:absolute;inset:0;background:#000;}',
+        '#qz-intro .qi-half .qi-rip{position:absolute;inset:0;background:#f4f1ea;}',
+        '@keyframes qiTopL{0%{transform:translateY(0) rotate(0)}30%{transform:translateY(-.5%) rotate(-1.5deg)}100%{transform:translateY(-60%) rotate(-9deg)}}',
+        '@keyframes qiBotL{0%{transform:translateY(0) rotate(0)}30%{transform:translateY(.5%) rotate(1.5deg)}100%{transform:translateY(60%) rotate(9deg)}}',
+        '@keyframes qiTopR{0%{transform:translateY(0) rotate(0)}30%{transform:translateY(-.5%) rotate(1.5deg)}100%{transform:translateY(-60%) rotate(9deg)}}',
+        '@keyframes qiBotR{0%{transform:translateY(0) rotate(0)}30%{transform:translateY(.5%) rotate(-1.5deg)}100%{transform:translateY(60%) rotate(-9deg)}}',
+        // 지지직 — 잡음 한 겹 · 가로로 긁힌 줄
+        '#qz-intro .qi-static{position:absolute;inset:0;z-index:3;opacity:0;pointer-events:none;image-rendering:pixelated;background-size:192px 192px;}',
+        '#qz-intro .qi-scr{position:absolute;left:0;right:0;height:2px;z-index:3;opacity:0;pointer-events:none;background:rgba(255,228,228,.92);box-shadow:0 0 6px rgba(255,70,70,.9);}',
+        '@keyframes qiShake{0%,100%{transform:translate(0,0)}20%{transform:translate(-9px,4px)}40%{transform:translate(8px,-5px)}60%{transform:translate(-6px,-3px)}80%{transform:translate(5px,3px)}}',
         '@keyframes qiFlash{0%{opacity:.85}100%{opacity:0}}',
         '#qz-intro .qi-flash{position:absolute;inset:0;background:#8a0000;opacity:0;pointer-events:none;z-index:2;}',
         // 브라운관 꺼짐 — 화면 압축 → 수평선 → 빛의 점 → 암전
@@ -928,10 +1034,30 @@ const IN = {
     ].join('\n');
     document.head.appendChild(st);
 })();
+// 글씨 그림 — 주신 글씨는 어두운 붉은색이라 검은 바탕에서 묻힌다. 밝기만 1.75배 올려 **그림에 구워 두었다** (-b).
+//   전에는 화면에서 필터(brightness · blur)로 올렸는데, 손전화에서 그 필터가 움직이는 내내 글씨를 흐리게 만들었다 (2026-11-13 사용자 영상).
+const WORDS_IMG = 'quiz-words-b.webp';
+// 지지직 잡음 — 작은 그림 한 장을 만들어 두고 깔아 쓴다
+let noiseUrl = '';
+function noise() {
+    if (noiseUrl) return noiseUrl;
+    try {
+        const c = document.createElement('canvas'); c.width = c.height = 96;
+        const g = c.getContext('2d'), im = g.createImageData(96, 96), d = im.data;
+        for (let i = 0; i < d.length; i += 4) {
+            const v = 150 + Math.random() * 105;
+            d[i] = v; d[i + 1] = v * (0.72 + Math.random() * 0.28); d[i + 2] = v * (0.72 + Math.random() * 0.28);
+            d[i + 3] = Math.random() < 0.42 ? 60 + Math.random() * 150 : 0;
+        }
+        g.putImageData(im, 0, 0);
+        noiseUrl = c.toDataURL('image/png');
+    } catch (e) { noiseUrl = ''; }
+    return noiseUrl;
+}
 // 그림을 미리 받아 둔다 — 연출 도중에 빈 칸이 뜨지 않게
 const pre = {};
 function preload() {
-    ['quiz-words.webp', 'quiz-burst.webp', 'quiz-show.webp', 'quiz-t1.webp', 'quiz-t2.webp'].forEach(function (f) {
+    [WORDS_IMG, 'quiz-burst.webp', 'quiz-show.webp', 'quiz-t1.webp', 'quiz-t2.webp'].forEach(function (f) {
         if (pre[f]) return;
         const im = new Image();
         pre[f] = new Promise(function (res) { im.onload = im.onerror = function () { res(); }; });
@@ -948,7 +1074,7 @@ function intro(full, behind) {
     const old = document.getElementById('qz-intro'); if (old) old.remove();
     const ov = document.createElement('div');
     ov.id = 'qz-intro';
-    ov.innerHTML = '<div class="qi-film"></div><div class="qi-grain"></div><div class="qi-flash"></div>';
+    ov.innerHTML = '<div class="qi-film"></div><div class="qi-grain"></div><div class="qi-flash"></div><div class="qi-static"></div><div class="qi-scr"></div><div class="qi-scr"></div>';
     ['pointerdown', 'click', 'touchstart', 'wheel'].forEach(function (ev) { ov.addEventListener(ev, function (e) { e.stopPropagation(); e.preventDefault(); }, { passive: false }); });
     document.body.appendChild(ov);
     const film = ov.querySelector('.qi-film'), flash = ov.querySelector('.qi-flash');
@@ -968,25 +1094,101 @@ function intro(full, behind) {
     const doFlash = function (ms) { flash.style.animation = 'none'; void flash.offsetWidth; flash.style.animation = 'qiFlash ' + (ms || 260) + 'ms ease-out forwards'; };
     const shake = function (ms) { film.style.animation = 'none'; void film.offsetWidth; film.style.animation = 'qiShake ' + (ms || 260) + 'ms linear 1'; };
 
-    // 글씨 — 마지막 「나는」 은 사라지지 않고 남는다. 그 화면을 찢고 나온다.
+    // ── 지지직 — 잡음이 잠깐 덮이고 가로로 긁힌 줄이 튄다
+    const stat = ov.querySelector('.qi-static'), scrs = ov.querySelectorAll('.qi-scr');
+    const fizz = function (ms, k) {
+        const url = noise();
+        if (url && !stat.style.backgroundImage) stat.style.backgroundImage = 'url(' + url + ')';
+        const t0 = performance.now();
+        const step = function () {
+            const on = performance.now() - t0 < ms && ov.isConnected;
+            stat.style.opacity = on ? String((k || 0.5) * (0.6 + Math.random() * 0.4)) : '0';
+            stat.style.backgroundPosition = Math.round(Math.random() * 192) + 'px ' + Math.round(Math.random() * 192) + 'px';
+            Array.prototype.forEach.call(scrs, function (e) { e.style.opacity = on && Math.random() < 0.7 ? '1' : '0'; e.style.top = (4 + Math.random() * 92).toFixed(1) + '%'; e.style.height = (1 + Math.round(Math.random() * 2)) + 'px'; });
+            if (on) setTimeout(step, 32);
+        };
+        step();
+    };
+    // 글씨 한 띠가 옆으로 어긋났다 돌아온다 (머무는 동안 한 번)
+    const slip = function (pg) {
+        const w = pg && pg.querySelector('.qi-cell'); if (!w || !pg.isConnected) return;
+        const g = w.cloneNode(false);
+        const a = 12 + Math.random() * 50, h = 10 + Math.random() * 16;
+        g.style.animation = 'none';
+        g.style.clipPath = g.style.webkitClipPath = 'inset(' + a.toFixed(1) + '% 0 ' + Math.max(0, 100 - a - h).toFixed(1) + '% 0)';
+        g.style.transform = 'translate(-50%,-50%) translateX(' + ((Math.random() < 0.5 ? -1 : 1) * (4 + Math.random() * 6)).toFixed(1) + '%)';
+        pg.appendChild(g);
+        setTimeout(function () { g.remove(); }, 60);
+    };
+    // ── 찢김 — 뜯긴 금 한 줄 (가로로 · 살짝 기울고 · 들쭉날쭉)
+    const tearLine = function () {
+        const n = 56, base = 43 + Math.random() * 14, slope = Math.random() * 12 - 6, pts = [];
+        const f = 1 + Math.random() * 1.5, ph = Math.random() * 6.28, amp = 0.8 + Math.random() * 0.9;   // 느린 물결 — 종이는 곧게 안 찢긴다
+        let j = 0;
+        for (let i = 0; i <= n; i++) {
+            const x = i / n * 100;
+            j = j * 0.55 + (Math.random() - 0.5) * 2.2;                        // 잔 결
+            if (Math.random() < 0.07) j += (Math.random() - 0.5) * 3.2;        // 가끔 크게 뜯긴 데
+            pts.push([x, base + slope * (x - 50) / 100 + amp * Math.sin(x / 100 * 6.28 * f + ph) + j]);
+        }
+        return pts;
+    };
+    const poly = function (pts) { return 'polygon(' + pts.map(function (p) { return p[0].toFixed(2) + '% ' + p[1].toFixed(2) + '%'; }).join(',') + ')'; };
+    // 앞 장(pg)을 찢어 낸다 — 위아래 두 쪽이 한쪽 끝을 축으로 벌어지며 날아간다. 그 틈으로 아래 장이 드러난다.
+    const tear = function (pg, fromLeft) {
+        const line = tearLine();
+        const vh = Math.max(320, window.innerHeight);
+        const band = function () { return (5 + Math.random() * 11) / vh * 100; };      // 흰 속살의 폭 (5 ~ 16px)
+        const pivotY = fromLeft ? line[0][1] : line[line.length - 1][1];
+        const frozen = pg.cloneNode(true);
+        const fw = frozen.querySelector('.qi-cell');
+        if (fw) { fw.style.animation = 'none'; fw.style.transform = 'translate(-50%,-50%) scale(1.04)'; fw.style.clipPath = fw.style.webkitClipPath = 'none'; }
+        Array.prototype.forEach.call(frozen.querySelectorAll('.qi-cell'), function (c, i) { if (i) c.remove(); });
+        const half = function (top) {
+            const hw = document.createElement('div');
+            hw.className = 'qi-half';
+            hw.style.transformOrigin = (fromLeft ? '0%' : '100%') + ' ' + pivotY.toFixed(2) + '%';
+            const c = frozen.cloneNode(true);
+            c.className = 'qi-pg';
+            const body = top ? [[0, 0], [100, 0]].concat(line.slice().reverse()) : [[0, 100], [100, 100]].concat(line.slice().reverse());
+            c.style.clipPath = c.style.webkitClipPath = poly(body);
+            // 뜯긴 가장자리 — 금에서 틈 쪽으로 들쭉날쭉 번진 흰 띠
+            const out = line.map(function (p) { return [p[0], p[1] + (top ? 1 : -1) * band()]; });
+            const rip = document.createElement('div');
+            rip.className = 'qi-rip';
+            rip.style.clipPath = rip.style.webkitClipPath = poly(line.concat(out.reverse()));
+            hw.appendChild(c); hw.appendChild(rip);
+            hw.style.animation = (top ? (fromLeft ? 'qiTopL' : 'qiTopR') : (fromLeft ? 'qiBotL' : 'qiBotR')) + ' ' + IN.TEAR + 'ms cubic-bezier(.55,0,.9,.5) forwards';
+            return hw;
+        };
+        const t = half(true), b = half(false);
+        film.appendChild(t); film.appendChild(b);
+        pg.remove();
+        shake(150); fizz(120, 0.45);
+        return wait(IN.TEAR).then(function () { t.remove(); b.remove(); });
+    };
+    // 글씨 — 한 장씩. 지지직거리며 서고, 다음 장이 깔리면 앞 장이 찢겨 나간다. 마지막 「나는」 은 남는다 — 그 화면을 찢고 나온다.
     let holder = null;
     const words = function () {
-        let p = Promise.resolve();
+        film.innerHTML = '';
+        const px = Math.round(size());
+        let cur = null, p = Promise.resolve();
         IN.WORDS.forEach(function (w, i) {
             const lastW = i === IN.WORDS.length - 1;
             p = p.then(function () {
-                film.innerHTML = '';
-                const e = cellEl('quiz-words.webp', w.c, Math.round(size()));
-                e.style.filter = 'brightness(1.75) drop-shadow(0 0 10px rgba(190,0,0,.8)) blur(0px)';   // 주신 글씨는 어두운 붉은색이라 검은 바탕에서 묻힌다 — 빛만 올린다 (움직이는 동안의 값은 @keyframes 에 같은 꼴로 있다)
-                e.style.animation = (lastW ? 'qiHold' : (w.fx === 'slam' ? 'qiSlam' : (w.fx === 'left' ? 'qiLeft' : 'qiRight'))) + ' ' + w.ms + 'ms cubic-bezier(.2,.8,.2,1) forwards';
-                if (lastW) {
-                    holder = document.createElement('div');
-                    holder.style.cssText = 'position:absolute;inset:0;transform:scale(1);';
-                    holder.appendChild(e);
-                    film.appendChild(holder);
-                } else film.appendChild(e);
-                if (w.fx === 'slam') { doFlash(240); shake(240); }
-                return wait(w.ms);
+                const pg = document.createElement('div');
+                pg.className = 'qi-page';
+                const e = cellEl(WORDS_IMG, w.c, px);
+                const stay = IN.GL + w.ms + IN.TEAR + 400;
+                e.style.animation = 'qiGl ' + IN.GL + 'ms steps(1,end) 1, qiDrift ' + stay + 'ms linear ' + IN.GL + 'ms forwards';
+                pg.appendChild(e);
+                if (lastW) { pg.style.transform = 'scale(1)'; holder = pg; }
+                film.insertBefore(pg, film.firstChild);                   // 찢기는 앞 장 아래에 깔린다
+                const was = cur; cur = pg;
+                if (!was) { doFlash(220); shake(200); fizz(IN.GL, 0.6); return wait(IN.GL + w.ms); }
+                if (lastW) setTimeout(function () { doFlash(220); }, IN.TEAR);
+                setTimeout(function () { slip(pg); }, IN.TEAR + w.ms * 0.55);
+                return tear(was, i % 2 === 1).then(function () { return wait(w.ms); });
             });
         });
         return p;
@@ -995,7 +1197,8 @@ function intro(full, behind) {
     const burst = function () {
         let p = Promise.resolve();
         const px = Math.round(size());
-        if (!holder) { film.innerHTML = ''; holder = document.createElement('div'); holder.style.cssText = 'position:absolute;inset:0;transform:scale(1);'; film.appendChild(holder); }
+        if (!holder) { film.innerHTML = ''; holder = document.createElement('div'); holder.className = 'qi-page'; holder.style.transform = 'scale(1)'; film.appendChild(holder); }
+        fizz(160, 0.5);
         film.style.background = 'radial-gradient(ellipse at 50% 50%,#5c0000 0,#2a0000 50%,#070000 100%)';
         holder.style.transition = 'transform 1.5s cubic-bezier(.5,0,.9,.4)';
         let cur = null;
@@ -1068,7 +1271,7 @@ window.quizShowState = function () {
         console.table(Object.keys(seatsOf(s)).map(function (k) { const v = seatsOf(s)[k]; return { 자리: k, 명패: v.nick, 사원: nameOf(v.c), 채점: markList(s, v.c).map(function (m) { return m === 1 ? 'O' : (m === 2 ? 'X' : '·'); }).join(''), 셈: (s.paid && s.paid[v.c]) ? '끝' : '-' }; }));
     });
 };
-window.quizShowDebug = { Q: Q, IN: IN, shows: function () { return SHOWS; }, cur: curShow, verdictOf: verdictOf, paint: paintStage, enter: enter, leave: leave, pending: pendingShow, sweep: sweepMine };
+window.quizShowDebug = { Q: Q, IN: IN, shows: function () { return SHOWS; }, cur: curShow, verdictOf: verdictOf, paint: paintStage, enter: enter, leave: leave, pending: pendingShow, sweep: sweepMine, cage: cageMe, cageWait: cageWait };
 
 console.log('[토크쇼] 🎤 초대 — 화요 퀴즈쇼 (단상 · 명패 · 정답 O / 오답 X · 붉은 글씨 → 브라운관 꺼짐 → 커튼)');
 })();
