@@ -228,7 +228,7 @@ if (SET.sv !== 2) { SET.offset = 0; SET.vis = 0; SET.sv = 2; saveJ(SET_KEY, SET)
 function saveSet() { saveJ(SET_KEY, SET); }
 // 👥 듀얼 — 지금 듀얼(없으면 null) · 값들 (아래 「듀얼」 마당)
 const DUEL_PATH = 'rhythmDuel', DUEL_INV = 'rhythmDuelInv';
-const DC = { INV_MS: 30000, LOAD_MS: 45000, START_MS: 4200, FLUSH_MS: 180, DELAY: 650, PART_MS: 8000, MINI: 0.27, RES_WAIT: 9000, FIN_MS: 32000, FIN_CUE: 1800 };
+const DC = { INV_MS: 30000, LOAD_MS: 45000, START_MS: 4200, FLUSH_MS: 180, DELAY: 650, PART_MS: 8000, MINI: 0.27, RES_WAIT: 9000, FIN_MS: 32000, FIN_CUE: 1800, DELAY_MAX: 2000, CK_N: 6, CK_MAX: 9, CK_WAIT: 450, CK_MS: 3200 };
 let DUEL = null;
 function sgn(v) { return (v > 0 ? '+' : '') + v; }
 
@@ -468,7 +468,8 @@ function playClick(v) {
 //   ★ 2026-11-10 사용자 「박자가 이상하게 어긋나」
 //     · 소리 시계(getOutputTimestamp)는 칸 단위로 들쭉날쭉하다 — 화면 시계(performance.now)에 붙여 두고 천천히만 따라가게 (떨림 · 판정 흔들림을 없앤다)
 //     · mp3 앞 공백 — 브라우저마다 앞 25 ms 를 자르기도 · 안 자르기도 한다. 채보의 앞머리 지문(head)과 받은 곡을 대 보고 그만큼 민다 (AU.lag)
-function rawMs() {
+// 지금 스피커로 나가고 있는 소리의 소리 시계 (초) — 소리 장치의 지금 시각에서 출력 지연만큼 뒤
+function outT() {
     const c = AU.ctx; if (!c) return 0;
     const lat = c.outputLatency || c.baseLatency || 0;
     let t = c.currentTime - lat;
@@ -482,7 +483,11 @@ function rawMs() {
             }
         }
     } catch (e) { }
-    return (t - AU.startAt) * 1000 - (AU.lagNow || 0);
+    return t;
+}
+function rawMs() {
+    if (!AU.ctx) return 0;
+    return (outT() - AU.startAt) * 1000 - (AU.lagNow || 0);
 }
 const CK = { base: null };
 function clockReset() { CK.base = null; }
@@ -1790,6 +1795,15 @@ function draw(now) {
 //     친 것은 0.18 초마다 묶어 보내고, 작은 화면은 0.65 초 늦춰 그린다 — 소식이 닿기 전에 노트가 지나가 버리지 않게.
 //   · 점수 — 저마다 제 파트의 정확도. 끝나면 둘을 나란히 보여 주고 높은 쪽이 WIN.
 //   · 멈춤이 없다 (둘의 곡이 어긋난다) — 왼쪽 위 ✕ 는 「나가기」. 한쪽이 나가면 듀얼이 끝난다.
+//   · ★ 두 사람의 곡을 같은 때에 맞춘다 (2026-11-13 사용자 「듀얼로 할 때에 초대된 사람이 좀 채보가 밀려서 그것좀 봐 줘」)
+//     예전엔 저마다 「서버 시각」(파이어베이스가 접속할 때 한 번 알려 준 차이)으로 시작했다. 그 차이는 접속하던 순간의 통신 지연만큼
+//     틀려 있고(기기마다 다르다 · 오래 켜 둔 화면은 기기 시계가 흘러 더 벌어진다), 소리가 스피커로 나오기까지의 지연(기기 · 블루투스)과
+//     mp3 앞 공백(브라우저마다 다르다)도 셈하지 않아, 받는 쪽 곡 · 채보가 신청한 쪽보다 늦게 가곤 했다.
+//       1. 받는 쪽이 곡을 받는 동안 신청한 쪽과 핑을 여섯 번쯤 주고받아(ck/q → ck/a) 가장 빨리 돌아온 것으로 **신청한 쪽 시계와의 차이**를 잰다 (duelSync).
+//          시작 시각(startAt)은 신청한 쪽 시계 — 받는 쪽은 잰 차이로 제 시계에 옮긴다 (duelNow). 못 쟀으면 예전처럼 서버 시각.
+//       2. 곡은 「들리는 소리」가 그 시각에 오게 튼다 — 출력 지연 · mp3 앞 공백만큼 일찍 (duelAudio).
+//       3. 곡이 나오기 1 초쯤 전에 한 번 더 대 보고 어긋났으면 다시 건다 (소리 장치가 막 깨어난 때엔 지연을 0 으로 알려 주기도 한다 · 아직 소리가 없어 안 들린다).
+//       4. 오른쪽 위 작은 화면은 소식이 닿는 데 걸린 시간을 재어 그만큼 늦춰 그린다 (0.65 ~ 2 초) — 통신이 느려도 노트가 판정선을 지난 뒤에야 맞는 것처럼 보이지 않게.
 //     화면을 떠났다 오면(소리 장치가 쉬었다 오면) 서버 시각에 맞는 자리로 곡을 다시 맞춘다.
 //   · 랭킹 · 꿈결 · 이 기기 최고 기록 · 「한 번 플레이」 해금에는 들어가지 않는다 (곡의 반만 치는 판이라 · 사용자가 정한 것은 아니다).
 //   · 잠긴 곡은 둘 다 열어 둔 곡이라야 한다.
@@ -1797,6 +1811,7 @@ function draw(now) {
 //     rhythmDuel/<신청한 사번>/m  = { id, host, hn, guest, gn, song, diff, at, st: inv|acc|no|busy|lock|cancel|go,
 //                                     rdy: { 사번: 1 }, startAt (곡의 0 초가 오는 서버 시각), res: { 사번: { s, c, n, m, mc, t } }, quit: 나간 사번 }
 //     rhythmDuel/<신청한 사번>/ev/<사번>/e<차례> = '노트,판정;노트,판정…'   (판정 c · n · m · 길게 누르기 꼬리 C · M,뗀 때)
+//     rhythmDuel/<신청한 사번>/ck/q = { id, n, t }  받는 쪽의 핑 · ck/a = { id, n, h: 신청한 쪽 시각 }  그 답     (시계 맞추기)
 //     rhythmDuelInv/<받는 사번>   = { id, host, hn, song, diff, at }     신청 — 받는 쪽 화면이 듣는다 (리듬 게임을 열어 두지 않아도)
 function users() { try { return (typeof db !== 'undefined' && db && db.users) ? db.users : {}; } catch (e) { return {}; } }
 function online() { try { return (typeof onlineUsersMap !== 'undefined' && onlineUsersMap) ? onlineUsersMap : {}; } catch (e) { return {}; } }
@@ -1805,6 +1820,42 @@ function inDark() {
     try { if (typeof darkRun !== 'undefined' && darkRun) return true; } catch (e) { }
     try { const o = document.getElementById('dark-run-overlay'); if (o && o.getClientRects().length) return true; } catch (e) { }
     return false;
+}
+// ── 두 사람의 시계
+//   lnow — 이 화면이 열린 뒤로 거꾸로 가지 않는 시계 (기기 시계가 중간에 맞춰져도 뛰지 않는다)
+//   duelNow — 신청한 쪽의 시각. 신청한 쪽은 듀얼을 만들 때의 서버 시각에 붙여 두고, 받는 쪽은 핑으로 잰 차이(my.off)를 더한다
+function lnow() { try { const o = performance.timeOrigin; if (o > 1e12) return o + performance.now(); } catch (e) { } return Date.now(); }
+function duelNow() { const my = DUEL; return (my && my.off != null) ? lnow() + my.off : srv(); }
+// 받는 쪽 — 신청한 쪽과 핑을 주고받아 시계 차이를 잰다. 가장 빨리 돌아온 것이 가장 정확하다 (오가는 길이 같다고 보고 가운데 때로 셈한다)
+function duelSync(my) {
+    return new Promise(function (done) {
+        let n = 0, t0 = 0, got = 0, best = null, fin = false, to = null, ref = null;
+        const end = function () {
+            if (fin) return; fin = true;
+            clearTimeout(to);
+            try { if (ref) ref.off('value', onA); } catch (e) { }
+            if (best && DUEL === my) { my.off = best.off; my.rtt = Math.round(best.rtt); my.ckGot = got; }
+            done(!!best);
+        };
+        const ping = function () {
+            if (fin || DUEL !== my) { end(); return; }
+            n++; t0 = lnow();
+            try { my.ref.child('ck/q').set({ id: my.id, n: n, t: Math.round(t0) }); } catch (e) { }
+            clearTimeout(to);
+            to = setTimeout(function () { if (n >= DC.CK_MAX) end(); else ping(); }, DC.CK_WAIT);      // 답이 늦으면 다음 핑
+        };
+        const onA = function (snap) {
+            const v = snap && snap.val();
+            if (fin || !v || v.id !== my.id || v.n !== n || !(Number(v.h) > 1e12)) return;
+            const t1 = lnow(), rtt = t1 - t0;
+            got++;
+            if (!best || rtt < best.rtt) best = { off: Number(v.h) - (t0 + t1) / 2, rtt: rtt };
+            if (got >= DC.CK_N || n >= DC.CK_MAX) end(); else ping();
+        };
+        try { ref = my.ref.child('ck/a'); ref.on('value', onA); } catch (e) { end(); return; }
+        ping();
+        setTimeout(end, DC.CK_MS);
+    });
 }
 // 받을 수 없는 때 — 다른 판을 치는 중 · 다른 듀얼 중 · 탐사 중
 function duelBusy() {
@@ -1866,7 +1917,9 @@ function duelAudio(buf) {
     const my = DUEL; if (!my || !buf) return;
     const cx = ctx();
     try { if (AU.src) { AU.src.onended = null; AU.src.stop(); } } catch (e) { }
-    const lead = (my.startAt - srv()) / 1000;
+    // 「들리는 소리 · 채보의 0 초」가 startAt 에 오게 — 스피커로 나오기까지의 지연(lat)과 mp3 앞 공백(lagNow)만큼 일찍 튼다
+    const lat = Math.max(0, Math.min(0.35, cx.currentTime - outT()));
+    const lead = (my.startAt - duelNow()) / 1000 - lat - (AU.lagNow || 0) / 1000;
     const src = cx.createBufferSource(); src.buffer = buf; src.connect(AU.gain);
     const t = cx.currentTime;
     if (lead > 0.08) { AU.startAt = t + lead; src.start(AU.startAt); }
@@ -1877,7 +1930,7 @@ function duelAudio(buf) {
     }
     src.onended = function () { if (P && MODE === 'play' && AU.src === src) P.audioEnd = true; };
     AU.src = src;
-    my.syncAt = performance.now();
+    my.syncAt = performance.now(); my.lat = Math.round(lat * 1000); my.syncN = (my.syncN | 0) + 1;
     clockReset();
 }
 // ── 내가 친 것 보내기 — 판정이 난 노트를 훑어 묶어 둔다
@@ -1902,13 +1955,18 @@ function duelTick() {
     const tnow = performance.now();
     duelScan(P.lastNow);
     if (my.out.length && tnow - my.flushAt >= DC.FLUSH_MS) duelFlush();
-    // 곡이 서버 시각에서 벗어났으면 (화면을 떠났다 옴 · 소리 장치가 쉬었다 옴) 그 자리로 다시 맞춘다
+    const c = AU.ctx, want = duelNow() - my.startAt;              // 지금 곡의 몇 ms 여야 하나
+    // 곡이 나오기 직전에 한 번 더 대 본다 — 소리 장치가 막 깨어난 때에는 출력 지연을 0 으로 알려 주거나 시계가 잠깐 서 있어
+    //   처음 건 자리가 어긋나 있기도 하다. 아직 소리가 안 나온 때라 다시 걸어도 들리지 않는다
+    if (!my.pre && want > -1400 && want < -300 && c && c.state === 'running') {
+        my.pre = true;
+        if (Math.abs(rawMs() - want) > 10) duelAudio(P.buf);
+    }
+    // 곡이 그 시각에서 벗어났으면 (화면을 떠났다 옴 · 소리 장치가 쉬었다 옴) 그 자리로 다시 맞춘다
     if (tnow - my.checkAt > 1000) {
         my.checkAt = tnow;
-        const c = AU.ctx;
         if (c && c.state === 'running' && tnow - my.syncAt > 2500) {
-            const want = srv() - my.startAt, have = (c.currentTime - AU.startAt) * 1000;
-            if (Math.abs(want - have) > 300 && want < P.chart.dur) duelAudio(P.buf);
+            if (Math.abs(want - rawMs()) > 300 && want < P.chart.dur) duelAudio(P.buf);
         }
     }
 }
@@ -1920,6 +1978,7 @@ function duelListen() {
 }
 function duelRecv(str) {
     const my = DUEL, O = my && my.O; if (!O || typeof str !== 'string') return;
+    let late = -1e9;
     str.split(';').forEach(function (e) {
         const a = e.split(','), n = O.byI[Number(a[0])], c = a[1];
         if (!n || !c) return;
@@ -1928,7 +1987,10 @@ function duelRecv(str) {
         else if (c === 'C') at = n.t + n.len;
         else if (c === 'M') at = Number(a[2]) || (n.t + n.len);
         O.pend.push({ n: n, c: c, at: at });
+        if (P && P.lastNow - at > late) late = P.lastNow - at;
     });
+    // 소식이 닿는 데 걸린 시간 (묶어 보내기 + 통신 + 두 곡의 어긋남) — 작은 화면을 이만큼은 늦춰 그려야 노트가 지나가기 전에 닿는다
+    if (late > -1e8) my.need = Math.max((my.need || 0) * 0.97, Math.min(DC.DELAY_MAX, late));
 }
 function duelDo(O, e) {
     const n = e.n, t = performance.now();
@@ -2022,7 +2084,10 @@ function duelMini(g, now, tnow) {
     const my = DUEL, O = my.O; if (!O || !L) return;
     const sc = DC.MINI, w = Math.round(VW * sc), h = Math.round(VH * sc);
     const x0 = Math.round(VW - w - 12 - SAFE.r), y0 = Math.round(10 + SAFE.t);
-    const mnow = now - DC.DELAY;
+    const wantD = Math.max(DC.DELAY, Math.min(DC.DELAY_MAX, (my.need || 0) + 150));
+    if (my.dly == null) my.dly = DC.DELAY;
+    my.dly += (wantD - my.dly) * 0.03;                             // 천천히만 — 작은 화면의 노트가 뛰지 않게
+    const mnow = now - my.dly;
     duelApply(O, mnow);
     const mpt = duelPartAt(my.cuts, mnow);
     const their = mnow > 0 && (mpt >= my.finK || (mpt % 2) !== my.mine);      // 상대가 치는 동안 (합주도) 밝게
@@ -2136,6 +2201,17 @@ function duelWaitUI() {
 // ── 방 듣기
 function duelWatch() {
     const my = DUEL;
+    if (my.off == null) my.off = srv() - lnow();              // 못 재면 예전처럼 서버 시각 (받는 쪽은 duelSync 가 신청한 쪽 시계로 바꿔 적는다)
+    if (my.me === my.host) {
+        // 받는 쪽의 핑에 바로 답한다 — 내 시각을 실어서
+        my.ckRef = my.ref.child('ck/q');
+        my.ckRef.on('value', function (snap) {
+            const v = snap && snap.val();
+            if (DUEL !== my || !v || v.id !== my.id || v.n === my.ckN) return;
+            my.ckN = v.n;
+            try { my.ref.child('ck/a').set({ id: my.id, n: v.n, h: Math.round(duelNow() * 10) / 10 }); } catch (e) { }
+        });
+    }
     my.mref.on('value', function (snap) { if (DUEL === my) duelOnMeta(snap && snap.val()); });
     try { my.mref.child('quit').onDisconnect().set(my.me); } catch (e) { }       // 접속이 끊기면 나간 것으로
 }
@@ -2185,8 +2261,9 @@ function duelDrop() {
     clearTimeout(my.to); clearTimeout(my.to2); clearTimeout(my.to3);
     try { my.mref.off(); } catch (e) { }
     try { if (my.evRef) my.evRef.off(); } catch (e) { }
+    try { if (my.ckRef) my.ckRef.off(); } catch (e) { }
     try { my.mref.child('quit').onDisconnect().cancel(); } catch (e) { }
-    try { if (my.st === 'result' && my.me === my.host) my.ref.child('ev').remove(); } catch (e) { }      // 다 본 흔적은 치운다
+    try { if (my.st === 'result' && my.me === my.host) { my.ref.child('ev').remove(); my.ref.child('ck').remove(); } } catch (e) { }      // 다 본 흔적은 치운다
     if (UI) Array.prototype.forEach.call(UI.querySelectorAll('.rg-duelwait,.rg-duelquit'), function (e) { e.remove(); });
 }
 // ── 곡 받기 → 둘 다 준비되면 같은 때에 시작
@@ -2200,7 +2277,7 @@ function duelLoad() {
         + '<button class="rg-btn rg-x" data-k="dq">✕</button>';
     UI.querySelector('[data-k="dq"]').onclick = function () { duelLeave(); menu(); };
     my.to2 = setTimeout(function () { if (DUEL === my && my.st === 'load') { duelLeave(); menu(); duelNote('상대가 준비되지 않아 듀얼을 접었습니다'); } }, DC.LOAD_MS);
-    Promise.all([loadSong(s), loadChart(s)]).then(function (r) {
+    Promise.all([loadSong(s), loadChart(s), my.me === my.guest ? duelSync(my) : null]).then(function (r) {
         if (DUEL !== my || !OV || my.st !== 'load') return;
         my.buf = r[0]; my.chart = r[1]; my.loaded = true;
         const el = UI.querySelector('[data-v="dl"]'); if (el) el.textContent = '상대를 기다리는 중…';
@@ -2220,7 +2297,7 @@ function duelGo() {
     if (!m.startAt) {
         if (my.me === my.host && !my.sentGo && m.rdy && m.rdy[my.host] && m.rdy[my.guest]) {
             my.sentGo = true;
-            try { my.mref.update({ startAt: srv() + DC.START_MS, st: 'go' }); } catch (e) { }
+            try { my.mref.update({ startAt: Math.round(duelNow() + DC.START_MS), st: 'go' }); } catch (e) { }
         }
         return;
     }
@@ -2430,6 +2507,6 @@ window.rhythmState = function () {
     console.log({ 모드: MODE, 곡: SET.song, 난이도: SET.diff, 속도: SET.speed, 판정싱크: SET.offset, 화면싱크: SET.vis, 점수: P && Math.round(P.score), 콤보: P && P.combo, 판정: P && P.cnt, 소리: AU.ctx && AU.ctx.state });
 };
 window.rhythmDebug = { P: function () { return P; }, now: function () { return songMs(); }, mode: function () { return MODE; }, L: function () { return L; }, lag: function () { return AU.lag; }, headLag: headLag, vis: function () { return visMs(); }, clock: function () { return clockMs(); }, cal: function () { return C; }, set: SET, rankOf: rankOf, previewChunk: previewChunk, previewAt: previewAt, drawOnce: function () { if (P && L) draw(P.lastVis || 0); },
-    duel: function () { return DUEL; }, DC: DC, duelCuts: duelCuts, duelFinK: duelFinK, duelCreate: duelCreate, duelLeave: duelLeave, safe: function () { return SAFE; } };   // 시험 · 콘솔
+    duel: function () { return DUEL; }, DC: DC, duelCuts: duelCuts, duelFinK: duelFinK, duelNow: duelNow, lnow: lnow, rawMs: rawMs, duelRecv: duelRecv, duelCreate: duelCreate, duelLeave: duelLeave, safe: function () { return SAFE; } };   // 시험 · 콘솔
 console.log('[🎵 리듬] rhythmOpen() — 상담사 전용');
 })();
