@@ -123,8 +123,10 @@ function db_() { return (typeof database !== 'undefined') ? database : null; }
 function users() { return (typeof db !== 'undefined' && db && db.users) ? db.users : {}; }
 function now() { return Date.now(); }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-function nameOf(u) { if (!u) return '?'; return (u.badge && u.badge.nickname) || u.name || u.code || '?'; }
-function nameIn(code) { return nameOf(users()[code]) || code; }
+// ★ 이름이 없다고 인가 코드(로그인에 쓰는 코드)를 대신 보여 주지 않는다 — 화면에 보이는 것은 이름 · 사번(no)뿐 (2026-11-13)
+function nameOf(u) { if (!u) return '?'; return (u.badge && u.badge.nickname) || u.name || '?'; }
+function nameIn(code) { return nameOf(users()[code]); }
+function noIn(code) { const x = users()[code]; return (x && x.no) ? String(x.no) : ''; }      // 사번 (보여 주는 번호)
 function won(n) { return Number(n || 0).toLocaleString() + ' P'; }
 function roomieOf(code) {
     const u = users()[code];
@@ -175,8 +177,12 @@ const Y0 = 395, X1 = 468, X2 = 564;          // 거실 아래끝 · 왼쪽 날�
 const REGS = ['L', 'R', 'C'];
 function regionAt(x, y) { if (y < Y0) return 'C'; if (x < X1) return 'L'; if (x >= X2) return 'R'; return 'C'; }
 function mateOf(c) { c = String(c || ''); const r = roomieOf(c); return (r && roomieOf(r) === c) ? r : null; }   // 서로 가리키는 짝만
-function hkOf(c) { c = String(c || ''); if (c.indexOf('_') >= 0) return c; const m = mateOf(c); return m ? [c, m].sort().join('_') : c; }
-function membersOf(hk) { return String(hk || '').split('_').filter(Boolean); }
+// ★ 그 사원이 사는 집의 사람들 — 혼자면 [코드] · 서로 가리키는 룸메이트가 있으면 둘 (줄 세워서)
+//   집 열쇠(hk)는 이것을 「_」로 이은 글자일 뿐이다. **열쇠를 「_」로 다시 쪼개 사람을 찾지 않는다** (2026-11-13) —
+//   인가 코드는 사원이 정한 글자라 「_」가 들어 있을 수 있고, 예전엔 그런 사원이 제 사택에도 못 들어갔다
+//   (코드가 둘로 쪼개져 「사는 사원이 아님 · D 등급」으로 보였다).
+function memOf(c) { c = String(c || ''); if (!c) return []; const m = mateOf(c); return m ? [c, m].sort() : [c]; }
+function hkOf(c) { return memOf(c).join('_'); }
 // 좌우 뒤집기 — 그림이 차지하는 칸을 가운데(1031) 를 두고 뒤집고 옆모습은 반대쪽 옆모습으로
 function mirrorV(v) {
     const d2 = v.d === 1 ? 3 : (v.d === 3 ? 1 : v.d);
@@ -286,9 +292,9 @@ function regLabel(reg) {
 }
 // 그 집 등급 — A 이상만 들어간다 (2026-11-12)
 const GR = ['D', 'C', 'B', 'A', 'S', 'L'];
-function gradeOf(hk) {
+function gradeOf(mem) {               // mem — 그 집에 사는 사람들 (memOf)
     let best = -1;
-    membersOf(hk).forEach(function (c) {
+    (mem || []).forEach(function (c) {
         const x = users()[c] || ((u_() && String(u_().code) === c) ? u_() : null);
         let g = null;
         try { if (x && typeof houseGrade === 'function') g = houseGrade(x); } catch (e) { }
@@ -297,7 +303,7 @@ function gradeOf(hk) {
     });
     return GR[Math.max(0, best)];
 }
-function gradeOk(hk) { return GR.indexOf(gradeOf(hk)) >= GR.indexOf('A'); }
+function gradeOk(mem) { return GR.indexOf(gradeOf(mem)) >= GR.indexOf('A'); }
 // 그 자리를 가구가 막나 — (fx, fy) 는 지금 선 자리: 이미 그 가구 안에 서 있으면(놓을 때 겹쳤거나 그 자리에 내려졌다) 그 가구만은
 //   지나갈 수 있어야 걸어 나온다. 예전엔 어느 가구든 안에 있기만 하면 옆의 다른 가구까지 다 지나갔다
 function blockedAt(x, y, fx, fy) {
@@ -343,10 +349,9 @@ function invListen() {
     });
 }
 setInterval(function () { try { invListen(); } catch (e) { } }, 2000);
-function canEnter(hk) {
+function canEnter(mem) {
     const u = u_();
-    if (!u || !hk) return false;
-    const mem = membersOf(hk);
+    if (!u || !mem || !mem.length) return false;
     if (mem.indexOf(String(u.code)) >= 0) return true;
     return mem.some(function (c) { return !!INV[c]; });         // 둘 중 누구에게든 초대받았다
 }
@@ -884,15 +889,15 @@ function rpsPaint() {
 function enter(host) {
     const u = u_(), d = db_();
     if (!u) return;
-    const hk = hkOf(host || u.code);                       // 사번을 받아도 그 사람이 사는 집(룸메이트와 같이)으로
-    if (!canEnter(hk)) { try { showCustomAlert('🏠 그 사택에는 들어갈 수 없습니다.\n(사는 사원 · 초대받은 사원만)'); } catch (e) { } return; }
-    if (!gradeOk(hk)) { try { showCustomAlert('🏠 사택 안은 A 등급 이상 사택부터 들어갈 수 있습니다.\n(지금 ' + gradeOf(hk) + ' 등급)'); } catch (e) { } return; }
+    const mem = memOf(host || u.code), hk = mem.join('_');   // 그 사원이 사는 집(룸메이트와 같이)으로
+    if (!canEnter(mem)) { try { showCustomAlert('🏠 그 사택에는 들어갈 수 없습니다.\n(사는 사원 · 초대받은 사원만)'); } catch (e) { } return; }
+    if (!gradeOk(mem)) { try { showCustomAlert('🏠 사택 안은 A 등급 이상 사택부터 들어갈 수 있습니다.\n(지금 ' + gradeOf(mem) + ' 등급)'); } catch (e) { } return; }
     if (typeof window.dotActor !== 'function') { try { showCustomAlert('🏠 사람 그림을 아직 못 불렀습니다. 잠시 뒤에 다시 해 주십시오.'); } catch (e) { } return; }
     if (S) leave();
     css();
     const ov = document.createElement('div');
     ov.id = 'hr-ov';
-    const mem = membersOf(hk), mine = mem.indexOf(String(u.code)) >= 0;
+    const mine = mem.indexOf(String(u.code)) >= 0;
     ov.innerHTML = '<div id="hr-view"><div id="hr-world">'
         + '<div class="hr-l rg-L" id="hr-floor-L"></div><div class="hr-l rg-R" id="hr-floor-R"></div><div class="hr-l rg-C" id="hr-floor-C"></div>'
         + '<div class="hr-l rg-L" id="hr-wall-L"></div><div class="hr-l rg-R" id="hr-wall-R"></div><div class="hr-l rg-C" id="hr-wall-C"></div>'
@@ -1739,16 +1744,16 @@ function inviteModal() {
     function paint() {
         const nowEl = m.querySelector('[data-u="now"]'), allEl = m.querySelector('[data-u="all"]');
         const inv = Object.keys(cur);
-        nowEl.innerHTML = inv.length ? inv.map(function (c) { return '<div class="li"><span>' + esc(nameIn(c)) + ' <small style="color:#888;">' + esc(c) + '</small></span><button class="hr-b" data-del="' + esc(c) + '">거두기</button></div>'; }).join('') : '<small style="color:#777;">아직 없습니다</small>';
+        nowEl.innerHTML = inv.length ? inv.map(function (c) { return '<div class="li"><span>' + esc(nameIn(c)) + ' <small style="color:#888;">' + esc(noIn(c)) + '</small></span><button class="hr-b" data-del="' + esc(c) + '">거두기</button></div>'; }).join('') : '<small style="color:#777;">아직 없습니다</small>';
         const key = q.value.trim().toLowerCase();
         const U = users();
         const rows = Object.keys(U).filter(function (c) {
             if (c === u.code || cur[c]) return false;
             const x = U[c] || {}; if (!x.name) return false;
             if (!key) return false;
-            return String(nameOf(x)).toLowerCase().indexOf(key) >= 0 || String(x.name).toLowerCase().indexOf(key) >= 0 || String(x.no || '').indexOf(key) >= 0 || c.toLowerCase().indexOf(key) >= 0;
+            return String(nameOf(x)).toLowerCase().indexOf(key) >= 0 || String(x.name).toLowerCase().indexOf(key) >= 0 || String(x.no || '').indexOf(key) >= 0;      // 이름 · 사번으로만 (인가 코드로는 찾지 않는다)
         }).slice(0, 30);
-        allEl.innerHTML = key ? (rows.length ? rows.map(function (c) { const x = U[c]; return '<div class="li"><span>' + esc(nameOf(x)) + ' <small style="color:#888;">' + esc(x.no || c) + '</small></span><button class="hr-b on" data-add="' + esc(c) + '">초대</button></div>'; }).join('') : '<small style="color:#777;">찾는 사원이 없습니다</small>') : '';
+        allEl.innerHTML = key ? (rows.length ? rows.map(function (c) { const x = U[c]; return '<div class="li"><span>' + esc(nameOf(x)) + ' <small style="color:#888;">' + esc(x.no || '') + '</small></span><button class="hr-b on" data-add="' + esc(c) + '">초대</button></div>'; }).join('') : '<small style="color:#777;">찾는 사원이 없습니다</small>') : '';
         nowEl.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = function () { uninvite(b.getAttribute('data-del')); }; });
         allEl.querySelectorAll('[data-add]').forEach(function (b) { b.onclick = function () { invite(b.getAttribute('data-add')); q.value = ''; paint(); }; });
     }
@@ -1787,10 +1792,10 @@ function boxPaint() {
     }
     // ★ 2026-11-12 같이 쓰는 사택 — 룸메이트와 한 집이라 「룸메이트 사택」 칸은 없다 · A 등급 이상 사택만 들어간다
     const mate = mateOf(u.code);
-    const hk = hkOf(u.code), ok = gradeOk(hk);
+    const myMem = memOf(u.code), ok = gradeOk(myMem);
     const invs = Object.keys(INV || {}).filter(function (h) { return h !== String(u.code) && h !== mate; });
     let h = '<button class="hr-b on go" data-hr="' + esc(u.code) + '"' + (ok ? '' : ' disabled') + '>🏠 사택 안으로 들어가기' + (mate ? ' (' + esc(nameIn(mate)) + ' 사원과 함께)' : '') + '</button>';
-    if (!ok) h += '<div class="note">사택 안은 A 등급 이상 사택부터 들어갈 수 있습니다 (지금 ' + esc(gradeOf(hk)) + ' 등급)</div>';
+    if (!ok) h += '<div class="note">사택 안은 A 등급 이상 사택부터 들어갈 수 있습니다 (지금 ' + esc(gradeOf(myMem)) + ' 등급)</div>';
     if (invs.length) {
         h += '<div class="sub"><div class="cap">초대받은 사택</div>' + invs.map(function (c) { return '<button class="hr-b" data-hr="' + esc(c) + '">💌 ' + esc((INV[c] && INV[c].n) || nameIn(c)) + ' 사원의 사택</button>'; }).join('') + '</div>';
     }
@@ -1829,5 +1834,5 @@ window.houseRoomState = function () {
                  carry: S.carry, on: S.on, sm: S.sm }
              : { open: false, invited: Object.keys(INV) };
 };
-window.houseRoomDebug = { FURN: FURN, FB: FB, FD: FD, BODY: BODY, footOf: footOf, blockedAt: blockedAt, pos: function () { return S ? { x: S.x, y: S.y } : null; }, cellAt: cellAt, loadMask: loadMask, mirrorV: mirrorV, regionAt: regionAt, hkOf: hkOf, gradeOf: gradeOf, setPos: function (x, y) { if (S) { S.x = x; S.y = y; } }, keys: function (k) { if (S) S.keys = k || {}; } };
+window.houseRoomDebug = { FURN: FURN, FB: FB, FD: FD, BODY: BODY, footOf: footOf, blockedAt: blockedAt, pos: function () { return S ? { x: S.x, y: S.y } : null; }, cellAt: cellAt, loadMask: loadMask, mirrorV: mirrorV, regionAt: regionAt, hkOf: hkOf, gradeOf: function (c) { return gradeOf(memOf(c)); }, memOf: memOf, setPos: function (x, y) { if (S) { S.x = x; S.y = y; } }, keys: function (k) { if (S) S.keys = k || {}; } };
 })();
