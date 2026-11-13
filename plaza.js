@@ -458,9 +458,11 @@ R.event = { n: '🎉 이벤트 · 풀 파티', pn: '풀 파티', img: 'event-poo
 //   full — 파인애플(작아진 사람)이 이 방에서는 보통 크기 (단상 뒤에 서면 안 보인다 · 이벤트 맵과 같은 길).
 //   걸어 다니지 않는다 — 들어오면 제 자리(plazaPin)에 붙박인다. 그래서 나가는 길(spots)도 없다 (quizshow.js 의 [나가기]).
 //   pud — 🌧 여우비 웅덩이가 놓일 바닥 (단상 앞 무대 바닥 · plazaFloor). floor 는 서는 줄일 뿐 걷는 바닥이 아니다.
-R.quiz = { n: '📺 화요 퀴즈쇼', pn: '화요 퀴즈쇼', img: 'quiz-show.webp', w: 1880, h: 2448, top: 215, cut: 660, k: 1, pix: 1, max: 1,
-           gate: 'quizShowGate', full: 1, fit: [40, 1700], camX: 870, padTop: 96, bg: 'linear-gradient(180deg,#0a0916 0,#0a0916 22%,#22091c 62%)',
-           floor: [1196, 1200], pud: [1430, 1500], spots: [] };
+//   ★ 2026-11-13 사용자 「배경 전부 수정」 — 배경 · 단상을 새 그림으로 (단상이 위로 올라가고 · 6인용 단상은 가운데 앞). 양옆에 걷힌 커튼(끝 프레임)이 늘 남으므로
+//     화면 가운데(camX)를 그림 한가운데로 옮겨 두 커튼이 같은 폭으로 보이게 했다.
+R.quiz = { n: '📺 화요 퀴즈쇼', pn: '화요 퀴즈쇼', img: 'quiz-show2.webp', w: 1880, h: 2448, top: 150, cut: 648, k: 1, pix: 1, max: 1,
+           gate: 'quizShowGate', full: 1, fit: [110, 1770], camX: 940, padTop: 96, bg: 'linear-gradient(180deg,#0a0916 0,#0a0916 22%,#1d0913 62%)',
+           floor: [1119, 1123], pud: [1500, 1570], spots: [] };
 
 // ★ 돌아오는 길을 저절로 만든다 — 한쪽만 적어도 양쪽이 통한다
 (function link() {

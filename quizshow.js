@@ -28,10 +28,13 @@
 //   들어갈 때 (쇼마다 처음 한 번 · 다시 들어갈 때는 커튼만) —
 //   붉은 글씨 여섯 장이 빠르게 지나가고 (지지직거리며 서고 → 종이처럼 찢겨 나가면 그 아래 다음 글씨 · 2026-11-13 사용자 「흐려지는 게 아니라
 //   사진처럼 찢어지거나 지지직 · 빨랐으면」) → 「나는」 이 선 화면을 찢고 나오고 → 브라운관이 꺼지듯
-//   (화면 압축 → 수평선 → 빛의 점 → 암전) → 같은 붉은색의 커튼이 걷히며 무대가 열린다.
+//   (화면 압축 → 수평선 → 빛의 점 → 암전) → 닫힌 커튼이 걷히며 무대가 열린다.
+//   커튼은 주신 그림 여섯 장 (프레임 1 닫힘 → 2 → 3 → 4 → 5 → 종료) — 2026-11-13 사용자 「이걸로 하자 · 마지막 프레임을 유지」.
+//   방 그림과 같은 자리 · 같은 크기라 방 안에 겹쳐 깔고 위에서부터 걷는다. 끝 프레임은 무대 양옆에 걷힌 커튼으로 늘 남는다.
+//   (처음에는 그림 없이 붉은색으로 그린 커튼이었다 — 「걷히는 커튼은 같은 붉은색 코드로」 → 그림으로 바뀜)
 //
 // ■ 광장 쪽 (plaza.js)
-//   R.quiz (gate · fit · camX · padTop · full · pud) · goRoom 의 문지기 · plazaPin / plazaPinned · plazaOnPaint · plazaOnMySay · plazaOnPeerSay
+//   R.quiz (그림 quiz-show2 · gate · fit · camX · padTop · full · pud) · goRoom 의 문지기 · plazaPin / plazaPinned · plazaOnPaint · plazaOnMySay · plazaOnPeerSay
 //
 // ■ 적히는 자리
 //   quizShow/<사회자 사번> = { id, host, name, at, inst, inv: { 사번: { at, st: p|y|n } }, seat: { s1..s6: { c, nick, at } },
@@ -50,6 +53,10 @@ const ROOM = 'quiz';
 const START = 'plaza';
 const PATH = 'quizShow', WIN = 'quizWin', DAY = 'quizDay';
 const DIR = 'plaza/';
+// 그림 — 2026-11-13 사용자 「배경 전부 수정」 묶음 (배경은 plaza.js 의 R.quiz.img). 주신 그림(도트 한 칸 5픽셀)을 한 칸 한 점으로 줄여 둔 것.
+const T1_IMG = 'quiz2-t1.webp', T2_IMG = 'quiz2-t2.webp';                 // 단상 (기본 · 인원 추가)
+const CUR = ['quiz-cur1.webp', 'quiz-cur2.webp', 'quiz-cur3.webp', 'quiz-cur4.webp', 'quiz-cur5.webp'];   // 커튼 프레임 1 (닫힘) ~ 5
+const CUR_END = 'quiz-cur6.webp';                                          // 커튼 프레임 종료(유지) — 다 열린 뒤에도 남는다
 const ADMIN = 'kario0987';
 
 const Q = {
@@ -62,23 +69,28 @@ const Q = {
     NICK_MAX: 6,
     PLATE_MIN: 7.5,                // 명패 글씨가 화면에서 적어도 이만큼(px)은 되게
     POP_MS: 2600,                  // 머리 위 O · X 가 크게 떠 있는 동안
-    POP: 112, HEAD: 196,           // O · X 의 크기 · 발끝에서 머리 위까지 (방 그림 좌표 · 사람 1배일 때)
+    POP: 112, HEAD: 246,           // O · X 의 크기 · 발끝에서 머리 위까지 (사람 1배일 때의 키 — 사람 칸 384 가운데 머리끝 ~ 발끝이 240 쯤)
     HAIR_BACK: 84, HAIR_FRONT: 56, // 사람 머리가 가리는 폭 — 뒤통수 쪽(긴 머리) · 얼굴 쪽. 앞줄 사람이 뒷줄 명패를 이만큼 가린다
     // 서는 자리 (방 그림 좌표 · 발끝) — f 는 보는 쪽 (1 왼쪽 · -1 오른쪽)
-    //   뒷줄은 의자 앞(마이크 왼쪽). 앞줄은 뒷줄 사람 바로 앞 — 뒷줄 명패 사이의 틈에 서야 명패의 닉네임을 안 가린다 (단체 사진처럼 뒷줄은 머리가 위로 보인다)
-    HOST: { x: 1470, y: 1204, f: 1 },
+    //   ★ 2026-11-13 사용자 「배경 전부 수정」 — 새 그림에서 다시 쟀다 (단상이 112 올라갔고, 6인용 단상은 가운데 앞에 놓인다).
+    //   뒷줄은 의자 앞(마이크 왼쪽). 앞줄(6인용 단상)은 뒷줄 사람 바로 앞 — 뒷줄 명패 사이의 틈에 서야 명패의 닉네임을 덜 가린다
+    //   (단체 사진처럼 뒷줄은 머리가 위로 보인다). 앞줄 오른쪽 끝(s6)은 뒷단상을 벗어나 있어 아무것도 안 가린다 — 그래서 앞줄은 오른쪽부터 채운다.
+    //   발끝은 단상 윗면(뒷단상 1028 · 앞단상 1100 ~ 1128)보다 90 쯤 아래 — 사람(키 240 쯤)의 다리가 단상에 가려 **허리 위만** 보인다.
+    HOST: { x: 1470, y: 1123, f: 1 },
     SEAT: {
-        s1: { x: 292, y: 1200, f: -1 }, s2: { x: 492, y: 1200, f: -1 }, s3: { x: 706, y: 1200, f: -1 },
-        s4: { x: 296, y: 1300, f: -1 }, s5: { x: 505, y: 1300, f: -1 }, s6: { x: 700, y: 1300, f: -1 }
+        s1: { x: 300, y: 1123, f: -1 }, s2: { x: 492, y: 1123, f: -1 }, s3: { x: 706, y: 1123, f: -1 },
+        s4: { x: 508, y: 1215, f: -1 }, s5: { x: 706, y: 1215, f: -1 }, s6: { x: 967, y: 1215, f: -1 }      // s4 — 앞단상 몸통(x 484 부터) 안쪽에 서야 다리가 상판 밑으로 안 삐져나온다
     },
+    FILL3: ['s1', 's2', 's3'], FILL6: ['s1', 's2', 's3', 's6', 's5', 's4'],
     // 명패 (방 그림 좌표 — 그림에서 쟀다)
     PLATE: {
-        s1: [348, 1122, 120, 40], s2: [528, 1122, 120, 40], s3: [714, 1122, 120, 40],
-        s4: [202, 1202, 116, 40], s5: [376, 1202, 120, 40], s6: [564, 1202, 116, 40],
-        host: [1328, 1118, 136, 40]
+        s1: [350, 1010, 114, 40], s2: [530, 1010, 114, 40], s3: [716, 1010, 114, 40],
+        s4: [606, 1106, 114, 40], s5: [786, 1106, 114, 40], s6: [972, 1106, 116, 40],
+        host: [1328, 1002, 132, 40]
     },
-    // 층 — 사람은 100 + 발끝 y. 뒷줄 사람 < 뒷단상 < 앞줄 사람 < 앞단상
-    Z1: 1312, Z2: 1412, ZTOP: 4200
+    // 층 — 사람은 100 + 발끝 y. 걷힌 커튼(위쪽) < 뒷줄 사람 < 뒷단상 < 앞줄 사람 < 앞단상 < 걷힌 커튼(아래 자락) < O · X
+    //   걷힌 커튼(끝 프레임)은 두 겹으로 깐다 — 위쪽은 사람 뒤(말풍선이 커튼에 안 가리게), CUR_SPLIT 아래 자락은 단상 앞(그림대로 단상 끝을 덮는다).
+    Z1: 1240, Z2: 1332, ZCUR_LOW: 60, ZCUR: 3000, CUR_SPLIT: 1000, ZTOP: 4200
 };
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
@@ -103,7 +115,7 @@ function live(s) { return !!(s && s.host && s.at && !s.end && now() - Number(s.a
 function invOf(s) { return (s && s.inv && typeof s.inv === 'object') ? s.inv : {}; }
 function seatsOf(s) { return (s && s.seat && typeof s.seat === 'object') ? s.seat : {}; }
 function wide(s) { return Object.keys(invOf(s)).length > 3; }                       // 앞줄 단상까지 (6인용)
-function seatKeys(s) { return wide(s) ? ['s1', 's2', 's3', 's4', 's5', 's6'] : ['s1', 's2', 's3']; }
+function seatKeys(s) { return wide(s) ? Q.FILL6 : Q.FILL3; }                        // 앉히는 차례 (앞에서부터 빈 명패)
 function seatOf(s, code) {
     const st = seatsOf(s);
     for (const k in st) if (st[k] && st[k].c === code && Q.SEAT[k]) return k;
@@ -733,7 +745,7 @@ let popKey = '';                             // 마지막으로 띄운 O · X (�
 function lastKey(s) { const l = s && s.last; return l ? [s.id, l.c, l.k, l.v, l.at].join('|') : ''; }
 function stage() { try { return (typeof window.plazaStage === 'function') ? window.plazaStage() : null; } catch (e) { return null; } }
 function clearStage() {
-    Array.prototype.forEach.call(document.querySelectorAll('.qz-layer, .qz-plate, .qz-pips, .qz-pop, #qz-ctl'), function (e) { e.remove(); });
+    Array.prototype.forEach.call(document.querySelectorAll('.qz-layer, .qz-plate, .qz-pips, .qz-pop, #qz-ctl'), function (e) { e.remove(); });     // 커튼 층(#qz-curplay)도 .qz-layer 다
     const ov = document.getElementById('plaza-ov'); if (ov) ov.classList.remove('qz-on');
 }
 function px(v, z) { return Math.round(v * z) + 'px'; }
@@ -742,19 +754,23 @@ function paintStage() {
     if (!sg || sg.room !== ROOM) { if (document.querySelector('.qz-layer, #qz-ctl')) clearStage(); return; }
     const s = curShow();
     const el = sg.el, z = sg.z;
-    // ── 단상 그림
-    const need = function (id, src, zi, on) {
+    // ── 단상 · 커튼 그림
+    const need = function (id, src, zi, on, clip) {
         let im = el.querySelector('#' + id);
         if (!on) { if (im) im.remove(); return; }
         if (!im) {
             im = document.createElement('img');
             im.id = id; im.className = 'qz-layer'; im.alt = ''; im.src = DIR + src;
+            if (clip) im.style.clipPath = im.style.webkitClipPath = clip;
             el.appendChild(im);
         }
         im.style.zIndex = String(zi);
     };
-    need('qz-t1', 'quiz-t1.webp', Q.Z1, true);
-    need('qz-t2', 'quiz-t2.webp', Q.Z2, !!(s && wide(s)));
+    need('qz-t1', T1_IMG, Q.Z1, true);
+    need('qz-t2', T2_IMG, Q.Z2, !!(s && wide(s)));
+    // 걷힌 커튼 — 끝 프레임은 늘 남는다 (2026-11-13 사용자 「마지막 프레임을 유지」)
+    need('qz-cur', CUR_END, Q.ZCUR_LOW, true);
+    need('qz-cur-f', CUR_END, Q.ZCUR, true, 'inset(' + (Q.CUR_SPLIT / sg.h * 100).toFixed(3) + '% 0 0 0)');
     // ── 명패
     const st = seatsOf(s);
     // 앞줄에 선 사람 — 뒷줄 명패의 양 끝이 그 머리에 가린다 (앞단상은 뒷단상에 겹쳐 놓여 있다). 그 명패는 **보이는 틈**에만 적는다.
@@ -842,6 +858,45 @@ function paintMarks() {
         p.style.zIndex = String((k > 's3' ? Q.Z2 : Q.Z1) + 1);
         p.innerHTML = ml.map(function (m) { return '<i class="' + (m === 1 ? 'o' : (m === 2 ? 'x' : '')) + '" style="width:' + d + 'px;height:' + d + 'px"></i>'; }).join('');
     });
+}
+// ── 커튼 (들어갈 때) — 프레임 1 ~ 5 를 방 안에 겹쳐 깐다. 더 닫힌 장이 위 (1 이 맨 위).
+//   위에서부터 한 장씩 흐려 없애면 그 아래 장이 드러난다 — 두 장에 다 있는 커튼 자리는 내내 불투명해서 겹쳐 넘기는 동안 무대가 비쳐 보이지 않는다.
+//   다 걷히면 방의 층으로 깔려 있는 끝 프레임(qz-cur)만 남는다.
+function curtainShut() {
+    const sg = stage();
+    if (!sg || sg.room !== ROOM) return null;
+    const old = sg.el.querySelector('#qz-curplay'); if (old) old.remove();
+    const box = document.createElement('div');
+    box.id = 'qz-curplay'; box.className = 'qz-layer';
+    box.style.zIndex = String(Q.ZTOP - 10);
+    CUR.forEach(function (f, i) {
+        const im = document.createElement('img');
+        im.className = 'qz-layer'; im.alt = ''; im.src = DIR + f;
+        im.style.zIndex = String(CUR.length - i);
+        box.appendChild(im);
+    });
+    sg.el.appendChild(box);
+    return box;
+}
+function curtainReady(box) {
+    if (!box) return Promise.resolve();
+    return Promise.all(Array.prototype.map.call(box.querySelectorAll('img'), function (im) {
+        if (im.complete && im.naturalWidth) return Promise.resolve();
+        return new Promise(function (res) { im.onload = im.onerror = function () { res(); }; });
+    }));
+}
+function curtainOpen(box) {
+    if (!box || !box.isConnected) return Promise.resolve();
+    const ims = Array.prototype.slice.call(box.querySelectorAll('img'));
+    let p = Promise.resolve();
+    ims.forEach(function (im, i) {
+        p = p.then(function () {
+            im.style.transition = 'opacity ' + IN.CURTAIN + 'ms ease-in-out';
+            im.style.opacity = '0';
+            return wait(i === ims.length - 1 ? IN.CURTAIN + 60 : Math.round(IN.CURTAIN * 0.7));
+        });
+    });
+    return p.then(function () { box.remove(); });
 }
 // 머리 위에 크게 — O (초록) · X (빨강)
 function pop(last) {
@@ -966,7 +1021,7 @@ setInterval(function () {
 // ==========================================
 //   글씨 여섯 장 · 찢고 나오는 여섯 장은 주신 그림(3배율)을 한 칸 한 점으로 줄여 둔 것 (한 칸 420 x 420 · 가로 셋 세로 둘).
 //   글씨 사이의 찢김(뜯긴 금 · 흰 속살)과 지지직(잡음 · 긁힌 줄)은 그림 없이 그린다.
-//   커튼은 그림 없이 글씨와 같은 붉은색으로 그린다 (사용자 「걷히는 커튼은 같은 붉은색 코드로」).
+//   커튼은 주신 그림 여섯 장 (CUR · CUR_END) — 방 안에 깐다 (curtainShut · curtainOpen).
 const IN = {
     CELL: 420,
     // 글씨 — 칸 · 다 드러난 뒤 머무는 때(ms). 앞 장이 찢기는 동안(TEAR) 이미 그 아래로 보이기 시작한다.
@@ -982,7 +1037,9 @@ const IN = {
     TEAR: 210,                                 // 한 장이 찢겨 나가는 때
     GL: 150,                                   // 글씨가 지지직거리며 서는 때
     BURST: [150, 150, 170, 190, 210, 620],     // 찢고 나오는 여섯 장 — 장마다 머무는 때
-    CRT: 1050, DARK: 380, CURTAIN: 1900
+    CRT: 1050, DARK: 380,
+    SHUT: 600,                                 // 닫힌 막을 보여 주는 때
+    CURTAIN: 380                               // 커튼 한 장이 걷히는 때 (다섯 장이 조금씩 겹쳐 이어진다)
 };
 (function introCss() {
     const st = document.createElement('style');
@@ -1019,18 +1076,8 @@ const IN = {
         '@keyframes qiCrt{0%{width:100vw;height:100vh;border-radius:0;opacity:1}8%{width:100vw;height:100vh;border-radius:0}36%{width:96vw;height:22vh;border-radius:10px}',
         '  56%{width:88vw;height:5px;border-radius:5px;box-shadow:0 0 22px 5px rgba(210,228,228,.75)}76%{width:16px;height:6px;border-radius:50%;box-shadow:0 0 0 7px rgba(120,140,140,.6),0 0 26px 10px rgba(210,228,228,.6)}',
         '  90%{width:8px;height:5px;border-radius:50%;box-shadow:0 0 0 4px rgba(120,140,140,.5);opacity:1}100%{width:0;height:0;border-radius:50%;box-shadow:none;opacity:0}}',
-        // 커튼 — 글씨와 같은 붉은색. 주름은 세로 줄무늬로.
-        '#qz-intro .qi-cur{position:absolute;top:-2%;bottom:-2%;width:52%;z-index:6;will-change:transform;',
-        '  background:repeating-linear-gradient(90deg,#3a0000 0,#800000 5%,#a30d0d 8%,#800000 11%,#4a0000 16%,#2c0000 18%);box-shadow:0 0 40px rgba(0,0,0,.8);}',
-        '#qz-intro .qi-cur.l{left:0;transform-origin:0 0;}',
-        '#qz-intro .qi-cur.r{right:0;transform-origin:100% 0;}',
-        '#qz-intro .qi-cur:after{content:"";position:absolute;left:0;right:0;bottom:0;height:3.2%;background:repeating-linear-gradient(90deg,#c79a5b 0 6px,#6a4a22 6px 12px);box-shadow:0 -2px 0 #2a1b0e;}',
-        '#qz-intro .qi-cur:before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.55) 0,rgba(0,0,0,0) 22%,rgba(0,0,0,0) 70%,rgba(0,0,0,.45) 100%);}',
-        '@keyframes qiCurL{0%{transform:translateX(0) scaleX(1)}100%{transform:translateX(-4%) scaleX(.02)}}',
-        '@keyframes qiCurR{0%{transform:translateX(0) scaleX(1)}100%{transform:translateX(4%) scaleX(.02)}}',
-        '#qz-intro .qi-val{position:absolute;left:-2%;right:-2%;top:0;height:11%;z-index:7;background:repeating-linear-gradient(90deg,#2c0000 0,#6a0000 4%,#8f0a0a 6%,#6a0000 8%,#2c0000 12%);',
-        '  border-bottom:4px solid #c79a5b;box-shadow:0 6px 18px rgba(0,0,0,.7);border-radius:0 0 50% 50%/0 0 30% 30%;}',
-        '@keyframes qiValUp{0%{transform:translateY(0)}100%{transform:translateY(-115%)}}'
+        // 커튼 — 주신 그림 여섯 장을 방 안에 겹쳐 깔고 위에서부터 걷는다 (curtainShut · curtainOpen). 여기서는 화면을 덮은 검은 막만 걷는다.
+        '#qz-intro .qi-none{display:none;}'
     ].join('\n');
     document.head.appendChild(st);
 })();
@@ -1057,7 +1104,7 @@ function noise() {
 // 그림을 미리 받아 둔다 — 연출 도중에 빈 칸이 뜨지 않게
 const pre = {};
 function preload() {
-    [WORDS_IMG, 'quiz-burst.webp', 'quiz-show.webp', 'quiz-t1.webp', 'quiz-t2.webp'].forEach(function (f) {
+    [WORDS_IMG, 'quiz-burst.webp', 'quiz-show2.webp', T1_IMG, T2_IMG, CUR_END].concat(CUR).forEach(function (f) {
         if (pre[f]) return;
         const im = new Image();
         pre[f] = new Promise(function (res) { im.onload = im.onerror = function () { res(); }; });
@@ -1225,28 +1272,26 @@ function intro(full, behind) {
         ov.appendChild(c);
         return wait(IN.CRT).then(function () { c.remove(); return wait(IN.DARK); });
     };
+    // 커튼 — 검은 막 뒤에서 방을 옮기고, 방 안에 닫힌 커튼(프레임 1)을 친 뒤 검은 막을 걷는다. 그다음 커튼이 한 장씩 걷힌다.
+    //   커튼 그림은 방 그림과 같은 자리 · 같은 크기라 화면이 아니라 **방 안에** 깐다 (어느 화면에서든 무대와 딱 맞는다). 끝 프레임은 방의 층으로 남는다.
     const curtain = function () {
-        film.innerHTML = '';
+        film.innerHTML = ''; film.style.background = '';
         const gr = ov.querySelector('.qi-grain'); if (gr) gr.remove();
-        const l = document.createElement('div'), r = document.createElement('div'), v = document.createElement('div');
-        l.className = 'qi-cur l'; r.className = 'qi-cur r'; v.className = 'qi-val';
-        l.style.opacity = r.style.opacity = v.style.opacity = '0';
-        l.style.transition = r.style.transition = v.style.transition = 'opacity .45s ease';
-        ov.appendChild(l); ov.appendChild(r); ov.appendChild(v);
-        void l.offsetWidth;
-        l.style.opacity = r.style.opacity = v.style.opacity = '1';
-        return wait(520).then(function () {
-            // 막이 다 가렸다 — 그 뒤에서 방을 옮긴다
+        let p = Promise.resolve();
+        if (!full) {                                               // 커튼만 도는 때 — 먼저 화면을 까맣게 덮는다
+            ov.style.opacity = '0'; void ov.offsetWidth;
+            ov.style.transition = 'opacity .28s ease'; ov.style.opacity = '1';
+            p = wait(300);
+        }
+        return p.then(function () {
             let ok = true;
             try { ok = behind() !== false; } catch (e) { ok = false; }
             if (!ok) { fin(); return; }
-            return wait(480).then(function () {
-                ov.style.background = 'transparent';
-                l.style.animation = 'qiCurL ' + IN.CURTAIN + 'ms cubic-bezier(.6,0,.3,1) forwards';
-                r.style.animation = 'qiCurR ' + IN.CURTAIN + 'ms cubic-bezier(.6,0,.3,1) forwards';
-                v.style.animation = 'qiValUp ' + Math.round(IN.CURTAIN * 0.8) + 'ms cubic-bezier(.6,0,.3,1) ' + Math.round(IN.CURTAIN * 0.35) + 'ms forwards';
-                return wait(IN.CURTAIN + 120).then(fin);
-            });
+            const box = curtainShut();
+            return Promise.race([curtainReady(box), wait(4000)]).then(function () { return wait(120); }).then(function () {
+                ov.style.transition = 'opacity .45s ease'; ov.style.opacity = '0';       // 검은 막이 걷히면 — 닫힌 커튼
+                return wait(450 + IN.SHUT);
+            }).then(function () { return curtainOpen(box); }).then(fin);
         });
     };
     const safety = setTimeout(function () { if (introOn && ov.isConnected) { try { behind(); } catch (e) { } fin(); } }, 22000);
