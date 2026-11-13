@@ -626,6 +626,34 @@ function css() {
         '.rg-rank{font-size:84px;font-weight:900;line-height:1;text-shadow:0 0 24px currentColor;}',
         '.rg-tbl{font-size:13px;line-height:1.75;}',
         '.rg-tbl b{display:inline-block;min-width:104px;}',
+        // 결과 연출 — A 이상 (2026-11-13 · 아래 「결과 연출」 마당)
+        '.rg-fx{position:relative;}',
+        '.rg-fx [data-rv]{opacity:0;transform:translateY(5px);transition:opacity .2s ease,transform .2s ease;}',
+        '.rg-fx [data-rv].on{opacity:1;transform:none;}',
+        '.rg-fx .rg-tbl{position:relative;z-index:1;}',
+        '.rg-rkwrap{position:relative;z-index:0;display:flex;align-items:center;justify-content:center;min-width:118px;height:84px;}',
+        '.rg-rkwrap .rg-rank{position:relative;}',
+        '.rg-rk.wait{opacity:0;}',
+        '.rg-rk.tick{opacity:.6;animation:rgTick .16s ease-out;}',
+        '.rg-rk.land{animation:rgLand .62s cubic-bezier(.2,1.5,.4,1) both;}',
+        '.rg-rays,.rg-glow{position:absolute;left:50%;top:50%;border-radius:50%;pointer-events:none;opacity:0;z-index:-1;}',
+        '.rg-rays{width:300px;height:300px;margin:-150px 0 0 -150px;-webkit-mask:radial-gradient(circle,#000 8%,rgba(0,0,0,.5) 34%,transparent 66%);mask:radial-gradient(circle,#000 8%,rgba(0,0,0,.5) 34%,transparent 66%);}',
+        '.rg-rays i{position:absolute;inset:0;border-radius:50%;background:repeating-conic-gradient(from 0deg,var(--r) 0deg 5deg,transparent 5deg 18deg);animation:rgSpin 16s linear infinite;}',
+        '.rg-glow{width:170px;height:170px;margin:-85px 0 0 -85px;background:radial-gradient(circle,var(--r) 0%,transparent 68%);}',
+        '.rg-flash{position:absolute;inset:0;border-radius:16px;pointer-events:none;opacity:0;background:radial-gradient(circle at 28% 50%,#fff 0%,var(--r) 38%,transparent 76%);}',
+        '.rg-spk{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:#fff;box-shadow:0 0 8px var(--r),0 0 14px var(--r);opacity:0;pointer-events:none;}',
+        '.rg-lit .rg-rays{animation:rgRays 2.8s ease-out forwards;}',
+        '.rg-lit .rg-glow{animation:rgGlow 2.2s ease-out forwards;}',
+        '.rg-lit .rg-flash{animation:rgFlash .7s ease-out forwards;}',
+        '.rg-lit .rg-spk{animation:rgSpk 1s ease-out forwards;animation-delay:var(--d);}',
+        '.rg-lit0 .rg-rays,.rg-lit0 .rg-glow{opacity:.2;}',
+        '@keyframes rgTick{0%{transform:scale(1.25);}100%{transform:scale(1);}}',
+        '@keyframes rgLand{0%{opacity:0;transform:scale(2.6);filter:brightness(3);}45%{opacity:1;transform:scale(.9);filter:brightness(1.8);}100%{opacity:1;transform:scale(1);filter:none;}}',
+        '@keyframes rgRays{0%{opacity:0;transform:scale(.25);}14%{opacity:.8;transform:scale(1.1);}50%{opacity:.42;transform:scale(1);}100%{opacity:.2;transform:scale(1);}}',
+        '@keyframes rgGlow{0%{opacity:0;transform:scale(.4);}12%{opacity:.75;transform:scale(1.25);}100%{opacity:.18;transform:scale(1);}}',
+        '@keyframes rgFlash{0%{opacity:0;}10%{opacity:.5;}100%{opacity:0;}}',
+        '@keyframes rgSpk{0%{opacity:0;transform:translate(0,0) scale(.4);}15%{opacity:1;}100%{opacity:0;transform:translate(var(--x),var(--y)) scale(1);}}',
+        '@keyframes rgSpin{to{transform:rotate(360deg);}}',
         '.rg-rot{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:11px;color:#889;}',
         // 랭크 글자 · 싱크 맞추기 · 랭킹
         '.rg-rk{font-style:normal;font-weight:900;color:var(--r);text-shadow:0 0 8px var(--r);}',
@@ -724,6 +752,7 @@ function open() {
 }
 function close() {
     if (DUEL) duelLeave();                      // 듀얼 중에 닫으면 나간 것으로
+    rfxStop();
     previewStop(true);
     calStop(); C = null;
     stopPlay();
@@ -2432,6 +2461,142 @@ setInterval(function () {
 }, 2000);
 
 // ==========================================
+// 결과 연출 — A 이상 (2026-11-13 사용자)
+//   「리듬게임 끝나고 점수 나올 때, 했던 곡 하이라이트 부분 리마인드 식으로 작게 나오면서
+//    알파벳 띵 띵 띠딩 띵. 챤. 하는 효과랑 빛도 같이 나오게 하자. A 이상부터.」
+//   · 곡     방금 친 곡의 하이라이트(채보의 fin — 듀얼에서 같이 치는 그 자리 · 없으면 미리 듣기 자리)를 작게 깔아 준다.
+//            RFX.VOL 크기 · RFX.LEN 초 · 앞뒤를 부드럽게. 풀어 둔 곡을 그대로 쓴다 (새로 받지 않는다).
+//            미리 듣기와 같은 자리(PV.cur)에 걸어 둔다 — 다시 · 닫기 · 화면을 떠나면 같이 멎는다.
+//   · 알파벳  랭크 글자가 아래 등급부터 띵 · 띵 · 띠딩 · 띵 하고 다섯 번 올라와, 챤 에 제 랭크가 찍힌다.
+//            같은 박자에 CHARMING · NORMAL · MISS · MAX COMBO · 정확도가 한 줄씩 뜬다.
+//   · 빛     챤 에 랭크 색의 빛살(천천히 돈다) · 번쩍임 · 반짝이.
+//   B 이하는 전처럼 바로 다 보인다 (곡 · 소리 · 빛 없음). 👥 듀얼 결과는 그대로다.
+//   상자를 누르면(단추 말고) 연출을 건너뛴다 — 단추는 처음부터 눌린다.
+// ==========================================
+const RFX = { FROM: 'A', VOL: 0.3, LEN: 14, LEAD: 0.55, BEAT: 0.36, T: [0, 1, 2, 2.5, 3], CHAN: 5,
+              HZ: [1318.5, 1568, 1760, 2093, 2349.3], cur: null };
+function rfxOn(rk) { return rankIdx(rk[0]) <= rankIdx(RFX.FROM); }
+// 띵 — 유리 종 (배음 셋이 빨리 사그라든다)
+function rfxBell(c, out, t, f, v, dur) {
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(v, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    g.connect(out);
+    [[1, 1], [2.76, 0.28], [5.4, 0.1]].forEach(function (p) {
+        if (f * p[0] > 15000) return;
+        const o = c.createOscillator(), og = c.createGain();
+        o.type = 'sine'; o.frequency.value = f * p[0]; og.gain.value = p[1];
+        o.connect(og); og.connect(g); o.start(t); o.stop(t + dur + 0.05);
+    });
+}
+// 챤 — 심벌 같은 잔향 + 종 화음 + 밑을 받치는 짧은 울림
+function rfxChan(c, out, t, v) {
+    const sr = c.sampleRate, n = Math.floor(sr * 1.7), b = c.createBuffer(1, n, sr), d = b.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    const s = c.createBufferSource(); s.buffer = b;
+    const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 5600;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(v * 0.55, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
+    s.connect(hp); hp.connect(g); g.connect(out); s.start(t); s.stop(t + 1.7);
+    [1046.5, 1318.5, 1568, 2093, 2637].forEach(function (f, i) { rfxBell(c, out, t + i * 0.014, f, v * (i === 3 ? 0.5 : 0.36), 1.5); });
+    const o = c.createOscillator(), og = c.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(196, t); o.frequency.exponentialRampToValueAtTime(98, t + 0.2);
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(v * 0.6, t + 0.008);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.32);
+    o.connect(og); og.connect(out); o.start(t); o.stop(t + 0.36);
+}
+function rfxMute(my) {
+    const c = AU.ctx;
+    if (!c || !my || !my.g) return;
+    try { const t = c.currentTime; my.g.gain.cancelScheduledValues(t); my.g.gain.setValueAtTime(my.g.gain.value, t); my.g.gain.linearRampToValueAtTime(0, t + 0.06); } catch (e) { }
+}
+function rfxStop() {
+    const my = RFX.cur; RFX.cur = null;
+    if (!my) return;
+    my.timers.forEach(clearTimeout);
+    rfxMute(my);
+}
+// 하이라이트를 작게 — 풀어 둔 곡에서 그 자리부터
+function remindPlay(s, chart, buf) {
+    previewStop(true);
+    const c = AU.ctx;
+    if (!c || !buf || !chart || c.state === 'closed') return null;
+    const at = Number(chart.fin) > 0 ? Number(chart.fin) : previewAt(chart);
+    const off = Math.max(0, (at + (AU.lagNow || 0)) / 1000 - 0.12);
+    const len = Math.min(RFX.LEN, buf.duration - off - 0.05);
+    if (!(len > 4)) return null;
+    const my = { key: s.key, at: at, armed: true, remind: true, t: 0, g: null, node: null, t0: 0, skip: off };
+    try {
+        const src = c.createBufferSource(); src.buffer = buf;
+        const g = c.createGain(); g.gain.value = 0;
+        src.connect(g); g.connect(c.destination);
+        const t = c.currentTime + 0.05;
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(RFX.VOL, t + 1.2);
+        g.gain.setValueAtTime(RFX.VOL, t + len - 3);
+        g.gain.linearRampToValueAtTime(0, t + len);
+        src.start(t, off, len + 0.05);
+        my.node = src; my.g = g; my.t0 = t;
+    } catch (e) { return null; }
+    PV.cur = my;
+    my.t = setTimeout(function () { if (PV.cur === my) previewStop(); }, len * 1000 + 150);
+    return my;
+}
+function rfxRun(rk) {
+    rfxStop();
+    const box = UI && UI.querySelector('.rg-box');
+    const rkEl = box && box.querySelector('[data-v="rk"]');
+    if (!box || !rkEl) return;
+    const my = { timers: [], g: null, done: false };
+    RFX.cur = my;
+    const i0 = rankIdx(rk[0]), N = RFX.T.length;
+    const climb = RFX.T.map(function (_, k) { return RANKS[Math.min(RANKS.length - 1, i0 + N - k)]; });      // 아래 등급부터 다섯 — 마지막이 제 랭크 바로 밑
+    const show = function (n) { Array.prototype.forEach.call(box.querySelectorAll('[data-rv="' + n + '"]'), function (e) { e.classList.add('on'); }); };
+    const tick = function (k) {
+        if (RFX.cur !== my || my.done || !rkEl.isConnected) return;
+        show(k + 1);
+        rkEl.textContent = climb[k][0]; rkEl.style.setProperty('--r', climb[k][2]);
+        rkEl.classList.remove('wait', 'tick'); void rkEl.offsetWidth; rkEl.classList.add('tick');
+    };
+    const land = function (quiet) {
+        if (my.done) return;
+        my.done = true;
+        if (!rkEl.isConnected) return;
+        for (let n = 1; n <= 7; n++) show(n);
+        rkEl.textContent = rk[0]; rkEl.style.setProperty('--r', rk[2]);
+        rkEl.classList.remove('wait', 'tick');
+        if (!quiet) { void rkEl.offsetWidth; rkEl.classList.add('land'); }
+        box.classList.add(quiet ? 'rg-lit0' : 'rg-lit');
+    };
+    my.land = land;
+    const c = AU.ctx;
+    let lat = 0;
+    if (c && c.state !== 'closed') {
+        try {
+            my.g = c.createGain(); my.g.gain.value = 1; my.g.connect(c.destination);
+            const t0 = c.currentTime + RFX.LEAD;
+            RFX.T.forEach(function (b, k) { rfxBell(c, my.g, t0 + b * RFX.BEAT, RFX.HZ[k], 0.2, 0.5); });
+            rfxChan(c, my.g, t0 + RFX.CHAN * RFX.BEAT, 0.3);
+            lat = Math.max(0, Math.min(0.25, c.outputLatency || c.baseLatency || 0));           // 소리가 실제로 나가는 때에 화면을 맞춘다
+        } catch (e) { }
+    }
+    RFX.T.forEach(function (b, k) { my.timers.push(setTimeout(function () { tick(k); }, (RFX.LEAD + lat + b * RFX.BEAT) * 1000)); });
+    my.timers.push(setTimeout(function () { if (RFX.cur === my) land(false); }, (RFX.LEAD + lat + RFX.CHAN * RFX.BEAT) * 1000));
+    // 상자를 누르면 건너뛴다 (단추는 그대로 눌린다)
+    box.addEventListener('pointerdown', function (e) {
+        if (e.target && e.target.closest && e.target.closest('button')) return;
+        if (RFX.cur !== my || my.done) return;
+        my.timers.forEach(clearTimeout);
+        rfxMute(my);
+        land(true);
+    });
+}
+
+// ==========================================
 // 끝
 // ==========================================
 function result() {
@@ -2457,26 +2622,40 @@ function result() {
     const lv = P.chart.charts[P.d].level;
     const pay = P.paid ? 0 : dreamPay(dk, rk[0], lv);
     P.paid = true;
+    // ✨ A 이상 — 하이라이트를 작게 깔고 · 알파벳이 띵 띵 띠딩 띵 · 챤 · 빛 (위 「결과 연출」 마당 · data-rv 는 뜨는 차례)
+    const fx = rfxOn(rk);
+    let spk = '';
+    if (fx) for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2 + Math.random() * 0.4, r = 70 + Math.random() * 60;
+        spk += '<i class="rg-spk" style="--x:' + Math.round(Math.cos(a) * r) + 'px;--y:' + Math.round(Math.sin(a) * r) + 'px;--d:' + (Math.random() * 0.18).toFixed(2) + 's;"></i>';
+    }
     UI.innerHTML = '<div class="rg-bg"></div>'
-        + '<div class="rg-modal" style="background:transparent"><div class="rg-box" style="padding:16px 28px;">'
+        + '<div class="rg-modal" style="background:transparent"><div class="rg-box' + (fx ? ' rg-fx' : '') + '" style="padding:16px 28px;--r:' + rk[2] + ';">'
+        + (fx ? '<i class="rg-flash"></i>' : '')
         + '<div style="font-size:13px;color:#aab;">' + esc(P.s.title) + ' · <b style="color:' + D[3] + '">' + D[1] + ' ' + P.chart.charts[P.d].level + '</b></div>'
         + '<div class="rg-res"><div style="text-align:center;">'
-        + '<div class="rg-rank rg-rk" style="--r:' + rk[2] + ';font-family:Georgia,serif;font-size:' + (rk[0].length > 2 ? 58 : 72) + 'px;">' + rk[0] + '</div>'
-        + '<div style="font-family:Georgia,serif;font-weight:300;font-size:30px;color:#fff;">' + pct + '<small style="font-size:16px;">%</small></div>'
-        + (ac ? '<div style="color:#ffc1e3;font-weight:bold;letter-spacing:3px;">ALL CHARMING</div>' : fc ? '<div style="color:#ffe066;font-weight:bold;letter-spacing:3px;">ALL COMBO</div>' : '')       // MISS 없이 끝까지 (2026-11-11 사용자 「FULL COMBO → ALL COMBO」)
-        + (newBest ? '<div style="font-size:12px;color:#ffe066;">NEW BEST</div>' : '') + '</div>'
-        + '<div class="rg-tbl"><div><b style="color:#ff9ccf">CHARMING</b>' + P.cnt.c + '</div><div><b style="color:#7ec8ff">NORMAL</b>' + P.cnt.n + '</div>'
-        + '<div><b style="color:#a3a3b3">MISS</b>' + P.cnt.m + '</div><div><b>MAX COMBO</b>' + P.maxCombo + '</div>'
-        + (avg != null ? '<div style="font-size:12px;color:#ccd;">평균 ' + sgn(avg) + 'ms · ' + (Math.abs(avg) <= 12 ? '딱 맞음' : avg > 0 ? '늦게 누름' : '빠르게 누름') + '</div>' : '')
-        + '<div data-v="place" style="font-size:12px;color:#ffe9a8;">🏆 랭킹 올리는 중…</div>'
-        + (pay ? '<div data-v="dream" style="font-size:12px;color:#c9a8ff;">💤 꿈결 +' + pay.toLocaleString() + ' D …</div>' : '')
+        + (fx ? '<div class="rg-rkwrap" style="--r:' + rk[2] + ';"><i class="rg-rays"><i></i></i><i class="rg-glow"></i>' : '')
+        + '<div class="rg-rank rg-rk' + (fx ? ' wait' : '') + '" data-v="rk" style="--r:' + rk[2] + ';font-family:Georgia,serif;font-size:' + (rk[0].length > 2 ? 58 : 72) + 'px;">' + rk[0] + '</div>'
+        + (fx ? spk + '</div>' : '')
+        + '<div data-rv="5" style="font-family:Georgia,serif;font-weight:300;font-size:30px;color:#fff;">' + pct + '<small style="font-size:16px;">%</small></div>'
+        + (ac ? '<div data-rv="6" style="color:#ffc1e3;font-weight:bold;letter-spacing:3px;">ALL CHARMING</div>' : fc ? '<div data-rv="6" style="color:#ffe066;font-weight:bold;letter-spacing:3px;">ALL COMBO</div>' : '')       // MISS 없이 끝까지 (2026-11-11 사용자 「FULL COMBO → ALL COMBO」)
+        + (newBest ? '<div data-rv="6" style="font-size:12px;color:#ffe066;">NEW BEST</div>' : '') + '</div>'
+        + '<div class="rg-tbl"><div data-rv="1"><b style="color:#ff9ccf">CHARMING</b>' + P.cnt.c + '</div><div data-rv="2"><b style="color:#7ec8ff">NORMAL</b>' + P.cnt.n + '</div>'
+        + '<div data-rv="3"><b style="color:#a3a3b3">MISS</b>' + P.cnt.m + '</div><div data-rv="4"><b>MAX COMBO</b>' + P.maxCombo + '</div>'
+        + (avg != null ? '<div data-rv="7" style="font-size:12px;color:#ccd;">평균 ' + sgn(avg) + 'ms · ' + (Math.abs(avg) <= 12 ? '딱 맞음' : avg > 0 ? '늦게 누름' : '빠르게 누름') + '</div>' : '')
+        + '<div data-v="place" data-rv="7" style="font-size:12px;color:#ffe9a8;">🏆 랭킹 올리는 중…</div>'
+        + (pay ? '<div data-v="dream" data-rv="7" style="font-size:12px;color:#c9a8ff;">💤 꿈결 +' + pay.toLocaleString() + ' D …</div>' : '')
         + '</div></div>'
         + '<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;"><button class="rg-btn" data-k="re">다시</button><button class="rg-btn" data-k="q">곡 고르기</button><button class="rg-btn" data-k="rank">🏆 랭킹</button>'
         + (avg != null && Math.abs(avg) > 12 ? '<button class="rg-btn" data-k="sync">판정 싱크에 반영 (' + sgn(Math.max(-300, Math.min(300, SET.offset + avg))) + 'ms)</button>' : '')
         + '</div></div></div>';
-    UI.querySelector('[data-k="re"]').onclick = function () { start(); };
-    UI.querySelector('[data-k="q"]').onclick = function () { menu(); };
+    UI.querySelector('[data-k="re"]').onclick = function () { rfxStop(); start(); };
+    UI.querySelector('[data-k="q"]').onclick = function () { rfxStop(); previewStop(); menu(); };
     UI.querySelector('[data-k="rank"]').onclick = function () { rankModal(dk); };
+    if (fx) {
+        try { remindPlay(P.s, P.chart, P.buf || AU.bufs[P.s.key]); } catch (e) { console.warn('[🎵] 하이라이트', e && e.message); }
+        try { rfxRun(rk); } catch (e) { console.warn('[🎵] 결과 연출', e && e.message); const b0 = UI.querySelector('.rg-box'); if (b0) b0.classList.remove('rg-fx'); const r0 = UI.querySelector('[data-v="rk"]'); if (r0) { r0.classList.remove('wait'); r0.textContent = rk[0]; } }
+    }
     const sy = UI.querySelector('[data-k="sync"]');
     if (sy) sy.onclick = function () { SET.offset = Math.max(-300, Math.min(300, SET.offset + avg)); saveSet(); sy.textContent = '판정 싱크 ' + sgn(SET.offset) + 'ms 로 맞췄습니다'; sy.disabled = true; };
     // 꿈결 — 하드 · D 이상
@@ -2506,7 +2685,7 @@ function result() {
 window.rhythmState = function () {
     console.log({ 모드: MODE, 곡: SET.song, 난이도: SET.diff, 속도: SET.speed, 판정싱크: SET.offset, 화면싱크: SET.vis, 점수: P && Math.round(P.score), 콤보: P && P.combo, 판정: P && P.cnt, 소리: AU.ctx && AU.ctx.state });
 };
-window.rhythmDebug = { P: function () { return P; }, now: function () { return songMs(); }, mode: function () { return MODE; }, L: function () { return L; }, lag: function () { return AU.lag; }, headLag: headLag, vis: function () { return visMs(); }, clock: function () { return clockMs(); }, cal: function () { return C; }, set: SET, rankOf: rankOf, previewChunk: previewChunk, previewAt: previewAt, drawOnce: function () { if (P && L) draw(P.lastVis || 0); },
+window.rhythmDebug = { P: function () { return P; }, now: function () { return songMs(); }, mode: function () { return MODE; }, L: function () { return L; }, lag: function () { return AU.lag; }, headLag: headLag, vis: function () { return visMs(); }, clock: function () { return clockMs(); }, cal: function () { return C; }, set: SET, rankOf: rankOf, previewChunk: previewChunk, previewAt: previewAt, RFX: RFX, rfx: function () { return RFX.cur; }, drawOnce: function () { if (P && L) draw(P.lastVis || 0); },
     duel: function () { return DUEL; }, DC: DC, duelCuts: duelCuts, duelFinK: duelFinK, duelNow: duelNow, lnow: lnow, rawMs: rawMs, duelRecv: duelRecv, duelCreate: duelCreate, duelLeave: duelLeave, safe: function () { return SAFE; } };   // 시험 · 콘솔
 console.log('[🎵 리듬] rhythmOpen() — 상담사 전용');
 })();
