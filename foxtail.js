@@ -112,6 +112,7 @@ function ownsFox(u) {
 }
 function wearsFox(u) {
     if (!u || !Array.isArray(u.equippedWeapons)) return false;
+    try { if (typeof window.calamSealed === 'function' && window.calamSealed(u)) return false; } catch (e) { }   // ☄ 재앙의 장비 봉인 (calam-seal.js · 2026-11-13)
     return u.equippedWeapons.some(function (w) {
         const b = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w;
         return b === FOX || FOX_OLDS.indexOf(b) >= 0;

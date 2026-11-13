@@ -807,6 +807,16 @@ function afterMain() {
     const u = me();
     const goOn = function () { if (!prof(u).job) cardPick(); else afterJob(); };
     attrGate(function () {
+        // ☄ 재앙의 군주 — 아직 내리지 않은 첫번째 재앙을 들어설 때마다 묻는다 (2026-11-13 · 13. 재앙)
+        try {
+            if (calamAskDue()) {
+                const k0 = prof(u);
+                if (!k0.calam || typeof k0.calam !== 'object') k0.calam = {};
+                if (!k0.calam.asked1) { k0.calam.asked1 = now(); saveProf(); }
+                calamLordPopup(goOn);
+                return;
+            }
+        } catch (e) { }
         // 🔥 재난의 길 — 상담사가 지정했으면 붉은 카드 (2026-10-30). 들어서면 문(속성)을 다시 묻는다 — 바로 새 속성을 열 수 있게
         if (pathOffered()) { pathPopup(function (went) { if (went) attrGate(goOn); else goOn(); }); return; }
         // 🌀 교란자의 길 — 상담사가 지정했으면 파란 카드 (2026-11-10)
@@ -4870,6 +4880,346 @@ function jamGearOff() {
     }, 500);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
+
+// ==========================================
+// 13. ☄ 재앙 — 재난의 길을 끝까지 걸은 사원이 히든 직업에게 내린다 (2026-11-13 사용자)
+// ==========================================
+//   「히든 달성자들한테, 『 재앙이 업을 달성하였습니다. 제한 시간 내에 해치우지 않으면 방은 사라집니다. 』 문구를 띄워줘.
+//    재앙의 길을 달성한 사람이 10개 속성을 100개로 만들었을 경우에는 팝업으로 『 재앙의 군주 : 첫번째 재앙을 내리겠습니까? 』 를
+//    띄우고 내린다 / 보류한다 선택하게. 내린다. 라고 하면 히든 직업 중 무작위로 한 명에게 팝업으로 『 첫번째 재앙이 내려졌습니다. 』
+//    라고 띄워줘. 재앙을 맞은 사람이 L 을 찍었을 경우에는 다이스를 굴려서 확률적으로 쳐낼 수 있고 그게 아니면 가지고 있는 장비들을
+//    3 시간동안 아예 사용 못 하게.」
+//
+//   kroomCalam/lord/<사번>          = { code, name, no, at, cast1: { at, to } }   업을 달성한 재앙 (🔥 재난의 길 · 열 속성 모두 Lv 100)
+//   kroomCalam/hit/<사번>/<재앙>_1   = { n: 1, from, at, state, roll, until, doneAt }
+//       state  new      내려졌다 — 맞은 사원이 아직 안 봤다
+//              sealed   장비 봉인 (L 이 아니거나, 주사위로 못 쳐냈다)      blocked  L 이 주사위로 쳐냈다
+//   users/<사번>/calamSeal          = { until, at, n }    장비 봉인 — 무엇이 막히는지는 calam-seal.js
+//   kroom.calam = { at, asked1, hold1, cast1 }  (재앙 본인)      kroom.calamSeen = { <재앙 사번>: at }  (히든 직업 — 문구를 본 것)
+//
+//   ■ 업 — 🔥 재난의 길을 걷는 사원이 열 속성을 모두 Lv 100 으로 만들면 lord 에 한 번 적힌다.
+//   ■ 문구 — 히든 직업을 받은 사원(전직 · L)에게 한 번씩. 접속해 있지 않았으면 다음에 들어올 때.
+//            ※ 문구만 띄운다 — 「제한 시간」 · 「방이 사라진다」는 아직 정해진 것이 없어 아무 일도 하지 않는다.
+//   ■ 묻기 — 업을 이룬 뒤 한 번 바로 묻고, 보류하면 K 의 방에 들어설 때마다 다시 묻는다. 내리면 끝 (첫번째 재앙은 한 번).
+//   ■ 맞는 사람 — 히든 직업을 받은 사원(전직 · L) 가운데 무작위 한 명 (지워진 사원 · 재앙 본인은 빼고).
+//            누가 맞았는지는 재앙에게도, 누가 내렸는지는 맞은 사원에게도 보이지 않는다.
+//   ■ 쳐내기 — 히든 직업이 L 에 닿은 사원만. d30 을 굴려 16 이상이면 쳐낸다 (K 의 방 판정 기준과 같다 · 보정 없음).
+//            L 이 아니거나 못 쳐내면 그때부터 3 시간 장비 봉인.
+const C_NODE = 'kroomCalam';
+const C_SEAL_MS = 3 * 3600000;
+const C_DIE = 30, C_DC = 16;
+const C_TXT = {
+    notice: '재앙이 업을 달성하였습니다. 제한 시간 내에 해치우지 않으면 방은 사라집니다.',
+    ask: '재앙의 군주 : 첫번째 재앙을 내리겠습니까?',
+    hit: '첫번째 재앙이 내려졌습니다.'
+};
+let cLord = {}, cLordOn = false, cHit = {}, cHitRef = null, cHitCode = '', cBusy = false, cMade = '', cMadeAt = 0;
+function cNow() { try { if (typeof window.serverNow === 'function') return window.serverNow(); } catch (e) { } return now(); }
+function calamFull(k, u) {
+    if (!k || typeof k !== 'object' || stale(k) || !onPath(k)) return false;
+    return Object.keys(ATTR).every(function (a) { const p = profOf(k, u, a); return !!p && (p.lv || 1) >= LV_MAX; });
+}
+function calamHolder(k) { return hadHidden(k) || !!(hMine && (hMine.state === 'accepted' || hMine.state === 'L')); }
+function calamIsL(k) {
+    if (hMine && hMine.state === 'L') return true;
+    if (!k || typeof k !== 'object') return false;
+    if (isHiddenJob(k.job) && k.grade === 'L') return true;
+    const alt = k.alt || {};
+    return Object.keys(alt).some(function (a) { const p = alt[a]; return !!(p && isHiddenJob(p.job) && p.grade === 'L'); });
+}
+function calamCast(k, u) { return !!((k && k.calam && k.calam.cast1) || (u && cLord[u.code] && cLord[u.code].cast1)); }
+setInterval(function () {
+    const u = me(), d = db_();
+    if (!u || !d) return;
+    if (!cLordOn) { cLordOn = true; d.ref(C_NODE + '/lord').on('value', function (s) { cLord = s.val() || {}; }); }
+    if (cHitCode === u.code) return;
+    try { if (cHitRef) cHitRef.off(); } catch (e) { }
+    cHitCode = u.code; cHit = {};
+    cHitRef = d.ref(C_NODE + '/hit/' + u.code);
+    cHitRef.on('value', function (s) { cHit = s.val() || {}; });
+}, 1500);
+
+function calamCss() {
+    if (document.getElementById('kcal-css')) return;
+    const st = document.createElement('style');
+    st.id = 'kcal-css';
+    st.textContent = [
+        '#kcal-ov{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;',
+        '  padding:24px;overflow:hidden;background:radial-gradient(ellipse at 50% 40%,rgba(52,6,10,.95) 0%,rgba(14,3,6,.98) 48%,rgba(2,0,2,.99) 82%);',
+        '  animation:kcalFade 1.1s ease both;}',
+        '#kcal-ov .kcal-ash{position:absolute;top:-10px;width:2px;height:2px;border-radius:50%;background:#ff9a86;',
+        '  box-shadow:0 0 5px #ff4a36,0 0 10px rgba(255,60,40,.5);opacity:0;animation:kcalFall linear infinite;pointer-events:none;}',
+        '#kcal-ov .kcal-tag{font-size:9px;letter-spacing:8px;color:#b8564a;animation:kcalFade 1.2s ease .2s both;}',
+        '#kcal-ov .kcal-sig{margin-top:14px;font-size:54px;line-height:1;color:#ffd9d0;text-shadow:0 0 16px #ff3a2a,0 0 44px rgba(255,40,30,.7);',
+        '  animation:kcalIn 1.5s cubic-bezier(.2,.8,.2,1) both,kcalPulse 2.6s ease-in-out 1.5s infinite;}',
+        '#kcal-ov .kcal-q{margin-top:26px;max-width:420px;font-size:17px;letter-spacing:2px;color:#ffd6cc;text-align:center;line-height:1.9;',
+        '  word-break:keep-all;text-shadow:0 0 12px rgba(255,60,40,.8);font-family:"Nanum Myeongjo","Noto Serif KR",serif;animation:kcalFade 1.3s ease .9s both;}',
+        '#kcal-ov .kcal-note{margin-top:12px;max-width:400px;min-height:18px;font-size:11px;color:#b89088;text-align:center;line-height:1.8;',
+        '  word-break:keep-all;animation:kcalFade 1.3s ease 1.4s both;}',
+        '#kcal-ov .kcal-die{margin-top:16px;width:74px;height:74px;border-radius:14px;display:none;align-items:center;justify-content:center;',
+        '  font-size:30px;font-weight:bold;color:#ffe9e2;background:linear-gradient(150deg,#4a0c0e,#1a0406);border:2px solid #ff6a56;',
+        '  box-shadow:0 0 18px rgba(255,70,50,.7),inset 0 0 18px rgba(255,120,100,.25);font-variant-numeric:tabular-nums;}',
+        '#kcal-ov .kcal-die.on{display:flex;}',
+        '#kcal-ov .kcal-die.ok{border-color:#ffe08a;color:#fff3cf;box-shadow:0 0 22px rgba(255,215,110,.85),inset 0 0 18px rgba(255,225,150,.3);}',
+        '#kcal-ov .kcal-die.no{border-color:#7a2a26;color:#d9a79e;box-shadow:0 0 12px rgba(120,30,26,.7);}',
+        '#kcal-ov .kcal-btns{display:flex;gap:10px;margin-top:24px;animation:kcalFade 1.3s ease 1.8s both;}',
+        '#kcal-ov .kcal-btns button{padding:11px 24px;border-radius:999px;font-size:13px;cursor:pointer;font-family:inherit;}',
+        '#kcal-ov .kcal-yes{background:linear-gradient(145deg,#d8402e,#70120c);color:#fff1ec;font-weight:bold;border:1px solid #ff8a6a;',
+        '  box-shadow:0 0 16px rgba(255,70,45,.6);}',
+        '#kcal-ov .kcal-no{background:rgba(0,0,0,.3);color:#b08a80;border:1px solid #5a2a22;}',
+        '#kcal-ov .kcal-btns button:disabled{opacity:.5;cursor:default;}',
+        '@keyframes kcalFade{from{opacity:0}to{opacity:1}}',
+        '@keyframes kcalIn{0%{transform:translateY(-46px) scale(.5);opacity:0;filter:brightness(3)}60%{opacity:1}100%{transform:none;opacity:1;filter:none}}',
+        '@keyframes kcalPulse{0%,100%{text-shadow:0 0 16px #ff3a2a,0 0 44px rgba(255,40,30,.7)}50%{text-shadow:0 0 26px #ff6a56,0 0 80px rgba(255,50,30,.9)}}',
+        '@keyframes kcalFall{0%{transform:translateY(0) translateX(0);opacity:0}12%{opacity:.9}100%{transform:translateY(112vh) translateX(18px);opacity:0}}'
+    ].join('\n');
+    document.head.appendChild(st);
+}
+// 화면 — 문구 한 줄(『 』) · 작은 글 · 단추들. btns = [{ t, cls, fn(ov, btn) }]
+function calamOv(kind, q, note, btns) {
+    calamCss();
+    const old = document.getElementById('kcal-ov'); if (old) old.remove();
+    const ov = document.createElement('div');
+    ov.id = 'kcal-ov';
+    ov.dataset.kind = kind;
+    let ash = '';
+    for (let i = 0; i < 30; i++) {
+        ash += '<i class="kcal-ash" style="left:' + (Math.random() * 100).toFixed(1) + '%;animation-duration:'
+            + (5 + Math.random() * 7).toFixed(1) + 's;animation-delay:' + (Math.random() * 7).toFixed(1) + 's;"></i>';
+    }
+    ov.innerHTML = ash + '<div class="kcal-tag">CALAMITY</div><div class="kcal-sig">☄</div>'
+        + '<div class="kcal-q">『 ' + esc(q).replace(/\. /g, '.<br>') + ' 』</div>'
+        + '<div class="kcal-note">' + (note || '') + '</div>'
+        + '<div class="kcal-die"></div><div class="kcal-btns"></div>';
+    document.body.appendChild(ov);
+    calamBtns(ov, btns);
+    return ov;
+}
+function calamBtns(ov, btns) {
+    const box = ov.querySelector('.kcal-btns');
+    box.innerHTML = '';
+    (btns || []).forEach(function (b) {
+        const el = document.createElement('button');
+        el.className = b.cls || 'kcal-yes';
+        el.textContent = b.t;
+        el.onclick = function () { try { b.fn(ov, el); } catch (e) { console.warn('[재앙]', e); } };
+        box.appendChild(el);
+    });
+}
+function calamNote(ov, html) { const n = ov.querySelector('.kcal-note'); if (n) n.innerHTML = html; }
+function calamEnd(ov, cont, wait) {
+    setTimeout(function () {
+        try { ov.remove(); } catch (e) { }
+        cBusy = false;
+        if (typeof cont === 'function') { try { cont(); } catch (e) { console.warn('[재앙]', e); } }
+    }, wait == null ? 1700 : wait);
+}
+function calamLeft(ms) {
+    const m = Math.max(1, Math.ceil(ms / 60000));
+    return (m >= 60 ? Math.floor(m / 60) + '시간' + (m % 60 ? ' ' : '') : '') + (m % 60 ? (m % 60) + '분' : '');
+}
+
+// ── 업 — 열 속성이 모두 Lv 100 이 되면 한 번 적는다
+function calamLordMake(u, k) {
+    const d = db_();
+    if (!d || cMade === u.code || now() - cMadeAt < 60000) return;      // 못 적었으면 1 분 뒤에 다시
+    cMade = u.code; cMadeAt = now();
+    const entry = { code: u.code, name: u.name || '', no: String(u.no || ''), at: cNow() };
+    d.ref(C_NODE + '/lord/' + u.code).transaction(function (cur) { return (cur && cur.at) ? undefined : entry; })
+        .then(function (res) {
+            if (!res || !res.committed) return;
+            if (!k.calam || typeof k.calam !== 'object') k.calam = {};
+            if (!k.calam.at) { k.calam.at = entry.at; saveProf(); }
+            addHistoryLog(u, '[K 의 방] ☄ 열 갈래를 모두 끝까지 걸었다. 업이 찼다.');
+            try { saveFields({ history: 1 }); } catch (e) { }
+        }).catch(function () { cMade = ''; });
+}
+// ── 재앙의 군주 — 『 첫번째 재앙을 내리겠습니까? 』
+function calamAskDue() {
+    const u = me(); if (!u || u.code === ADMIN) return false;
+    const k = prof(u);
+    return calamFull(k, u) && !calamCast(k, u);
+}
+function calamPick(all, mine) {
+    return Object.keys(all || {}).filter(function (c) {
+        const v = all[c] || {};
+        return c !== mine && c !== ADMIN && (v.state === 'accepted' || v.state === 'L') && !userGone(c);
+    });
+}
+function calamLordPopup(cont, preview) {
+    const u = me(), k = prof(u), d = db_();
+    cBusy = true;
+    const ov = calamOv('ask', C_TXT.ask, '내리면 히든 직업을 받은 사원 가운데 한 명에게 떨어집니다.<br>보류하면 K 의 방에 들어설 때 다시 묻습니다.', [
+        { t: '보류한다', cls: 'kcal-no', fn: function () {
+            if (preview) { calamEnd(ov, cont, 0); return; }
+            if (!k.calam || typeof k.calam !== 'object') k.calam = {};
+            k.calam.hold1 = now();
+            saveProf();
+            ov.querySelector('.kcal-btns').innerHTML = '';
+            calamNote(ov, '재앙을 거둬 둔다.');
+            calamEnd(ov, cont);
+        } },
+        { t: '내린다', cls: 'kcal-yes', fn: function () {
+            if (preview) { calamEnd(ov, cont, 0); return; }
+            Array.prototype.forEach.call(ov.querySelectorAll('.kcal-btns button'), function (b) { b.disabled = true; });
+            const fail = function (msg) { ov.querySelector('.kcal-btns').innerHTML = ''; calamNote(ov, msg); calamEnd(ov, cont, 2600); };
+            if (!d) { fail('지금은 내릴 수 없습니다.'); return; }
+            d.ref(H_NODE).once('value').then(function (s) {
+                const list = calamPick(s.val() || {}, u.code);
+                if (!list.length) { fail('재앙이 내릴 곳이 없다 — 히든 직업을 받은 사원이 아직 없습니다.<br>K 의 방에 들어설 때 다시 묻습니다.'); return null; }
+                const to = pick(list), at = cNow();
+                return d.ref(C_NODE + '/lord/' + u.code).transaction(function (cur) {
+                    if (cur && cur.cast1) return;                      // 다른 기기에서 이미 내렸다
+                    const o = (cur && typeof cur === 'object') ? cur : { code: u.code, name: u.name || '', no: String(u.no || ''), at: at };
+                    o.cast1 = { at: at, to: to };
+                    return o;
+                }).then(function (res) {
+                    if (!res || !res.committed) {
+                        if (!k.calam || typeof k.calam !== 'object') k.calam = {};
+                        k.calam.cast1 = k.calam.cast1 || now(); saveProf();
+                        fail('첫번째 재앙은 이미 내려졌습니다.');
+                        return null;
+                    }
+                    return d.ref(C_NODE + '/hit/' + to + '/' + u.code + '_1').set({ n: 1, from: u.code, at: at, state: 'new' }).then(function () {
+                        if (!k.calam || typeof k.calam !== 'object') k.calam = {};
+                        k.calam.cast1 = at;
+                        saveProf();
+                        addHistoryLog(u, '[K 의 방] ☄ 첫번째 재앙을 내렸다.');
+                        try { saveFields({ kroom: 1, history: 1 }); } catch (e) { }
+                        ov.querySelector('.kcal-btns').innerHTML = '';
+                        ov.querySelector('.kcal-q').innerHTML = '☄ 첫번째 재앙 ☄';
+                        calamNote(ov, '재앙이 내려갔다. 어디에 떨어졌는지는 보이지 않는다.');
+                        calamEnd(ov, cont, 2400);
+                    }, function () {
+                        // 떨어뜨리지 못했다 — 내린 것을 되돌린다
+                        try { d.ref(C_NODE + '/lord/' + u.code + '/cast1').remove(); } catch (e) { }
+                        fail('재앙을 내리지 못했습니다. K 의 방에 들어설 때 다시 묻습니다.');
+                    });
+                });
+            }).catch(function () { fail('재앙을 내리지 못했습니다. K 의 방에 들어설 때 다시 묻습니다.'); });
+        } }
+    ]);
+}
+// ── 히든 직업에게 — 『 재앙이 업을 달성하였습니다. … 』
+function calamNoticePopup(code, entry, preview) {
+    const u = me(), k = prof(u);
+    cBusy = true;
+    if (!preview) {
+        if (!k.calamSeen || typeof k.calamSeen !== 'object') k.calamSeen = {};
+        k.calamSeen[code] = Number(entry.at) || now();
+        saveProf();
+    }
+    const ov = calamOv('notice', C_TXT.notice, '', [{ t: '확인', cls: 'kcal-yes', fn: function () { calamEnd(ov, null, 0); } }]);
+}
+// ── 맞은 사원 — 『 첫번째 재앙이 내려졌습니다. 』
+function calamSeal(u, n) {
+    const t = cNow();
+    const was = (u.calamSeal && Number(u.calamSeal.until)) || 0;
+    u.calamSeal = { until: Math.max(was, t + C_SEAL_MS), at: t, n: n || 1 };
+    addHistoryLog(u, '[K 의 방] ☄ 재앙을 맞았다 — 가진 장비가 3 시간 동안 봉인된다.');
+    try { saveFields({ calamSeal: 1, history: 1 }); } catch (e) { }
+    try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+    return u.calamSeal.until;
+}
+function calamHitPopup(id, hit, preview) {
+    const u = me(), k = prof(u), d = db_();
+    const ref = (d && !preview) ? d.ref(C_NODE + '/hit/' + u.code + '/' + id) : null;
+    const isL = preview ? preview === 'dice' : calamIsL(k);
+    cBusy = true;
+    const sealNote = function (until) {
+        return '가진 장비가 <b style="color:#ffb8a4;">3 시간</b> 동안 봉인됩니다 — 전용 장비 · 커스텀 장비 · 장착한 장비.<br>'
+            + '<span style="font-size:10px;">남은 시간 ' + calamLeft(until - cNow()) + '</span>';
+    };
+    const okBtn = function (ov) { return [{ t: '확인', cls: 'kcal-yes', fn: function () { calamEnd(ov, null, 0); } }]; };
+    if (!isL) {
+        // 쳐낼 수 없다 — 띄우기 전에 먼저 봉인한다 (창을 닫아 피하지 못하게)
+        const until = preview ? cNow() + C_SEAL_MS : calamSeal(u, hit.n);
+        if (ref) { hit.state = 'sealed'; ref.update({ state: 'sealed', until: until, doneAt: cNow() }).catch(function () { }); }
+        const ov = calamOv('hit', C_TXT.hit, sealNote(until), null);
+        calamBtns(ov, okBtn(ov));
+        return;
+    }
+    const ov = calamOv('hit', C_TXT.hit, 'L 에 닿은 자는 재앙을 쳐낼 수 있다.<br>🎲 d' + C_DIE + ' — <b style="color:#ffe08a;">' + C_DC + ' 이상</b>이면 쳐낸다.', [
+        { t: '주사위를 굴린다', cls: 'kcal-yes', fn: function (o, btn) {
+            btn.disabled = true;
+            // 다른 기기에서 이미 굴렸다 — 여기서 또 굴리지 않는다
+            if (!preview && cHit[id] && cHit[id].state && cHit[id].state !== 'new') { calamEnd(ov, null, 0); return; }
+            const r = Math.floor(Math.random() * C_DIE) + 1, ok = r >= C_DC;
+            // 굴린 값을 먼저 적는다 — 새로 고쳐 다시 굴리지 못하게
+            let until = 0;
+            if (!preview) {
+                hit.state = ok ? 'blocked' : 'sealed';
+                if (!ok) until = calamSeal(u, hit.n);
+                else { addHistoryLog(u, '[K 의 방] ☄ 재앙이 내려졌다 — 🎲 ' + r + ' · 쳐냈다.'); try { saveFields({ history: 1 }); } catch (e) { } }
+                if (ref) ref.update({ state: hit.state, roll: r, until: until || null, doneAt: cNow() }).catch(function () { });
+            } else if (!ok) until = cNow() + C_SEAL_MS;
+            const die = ov.querySelector('.kcal-die');
+            die.classList.add('on');
+            ov.querySelector('.kcal-btns').innerHTML = '';
+            let n = 0;
+            const iv = setInterval(function () {
+                n++;
+                if (n < 14) { die.textContent = String(Math.floor(Math.random() * C_DIE) + 1); return; }
+                clearInterval(iv);
+                die.textContent = String(r);
+                die.classList.add(ok ? 'ok' : 'no');
+                calamNote(ov, ok ? '🎲 ' + r + ' — 재앙을 쳐냈다. 장비는 그대로다.' : '🎲 ' + r + ' — 쳐내지 못했다.<br>' + sealNote(until));
+                calamBtns(ov, okBtn(ov));
+            }, 80);
+        } }
+    ]);
+}
+
+function calamFree() {
+    if (cBusy || kr) return false;
+    try { if (typeof darkRun !== 'undefined' && darkRun) return false; } catch (e) { }
+    return !['kcal-ov', 'kpath-ov', 'kjam-ov', 'khid-ov', 'rg-ov'].some(function (id) { return !!document.getElementById(id); });
+}
+function calamTick() {
+    const u = me();
+    if (!u || u.code === ADMIN || !db_() || cHitCode !== u.code) return;
+    const k = prof(u);
+    if (!k || stale(k)) return;
+    // 업 — 어디에 있든 적는다 (묻는 것은 화면이 빌 때)
+    const full = calamFull(k, u);
+    if (full && !cLord[u.code]) calamLordMake(u, k);
+    if (!calamFree()) return;
+    // ① 내게 내려진 재앙
+    const id = Object.keys(cHit).filter(function (x) { return cHit[x] && cHit[x].state === 'new'; })
+        .sort(function (a, b) { return (cHit[a].at || 0) - (cHit[b].at || 0); })[0];
+    if (id) { calamHitPopup(id, cHit[id]); return; }
+    // ② 재앙의 군주 — 처음 한 번은 바로 묻는다 (그 뒤로는 K 의 방에 들어설 때)
+    if (full && cLord[u.code] && !calamCast(k, u) && !(k.calam && (k.calam.asked1 || k.calam.hold1))) {
+        if (!k.calam || typeof k.calam !== 'object') k.calam = {};
+        k.calam.asked1 = now();
+        saveProf();
+        calamLordPopup(null);
+        return;
+    }
+    // ③ 히든 직업 — 업을 이룬 재앙마다 한 번
+    if (calamHolder(k)) {
+        const seen = (k.calamSeen && typeof k.calamSeen === 'object') ? k.calamSeen : {};
+        const c = Object.keys(cLord).filter(function (x) { const v = cLord[x]; return x !== u.code && v && v.at && seen[x] !== v.at; })[0];
+        if (c) calamNoticePopup(c, cLord[c]);
+    }
+}
+setInterval(function () { try { calamTick(); } catch (e) { console.warn('[재앙]', e); } }, 4000);
+// 상담사 — 화면 모양 보기 (아무것도 안 바뀐다): 'notice' 문구 · 'ask' 군주 · 'hit' 맞음(봉인) · 'dice' 맞음(L · 주사위)
+window.kroomCalamPreview = function (kind) {
+    const u = me(); if (!u) return;
+    if (kind === 'ask') calamLordPopup(null, true);
+    else if (kind === 'hit' || kind === 'dice') calamHitPopup('preview', { n: 1 }, kind);
+    else calamNoticePopup('preview', { at: now() }, true);
+};
+window.kroomCalamState = function () {
+    const u = me(), k = prof(u); if (!k) return;
+    console.log('%c===== ☄ 재앙 =====', 'color:#ff8a76; font-size:13px');
+    console.log('  🔥 재난의 길 ' + (onPath(k) ? '걷는 중' : '아니오') + ' · 열 속성 Lv ' + LV_MAX + ' — ' + Object.keys(ATTR).filter(function (a) { const p = profOf(k, u, a); return p && (p.lv || 1) >= LV_MAX; }).length + ' / ' + Object.keys(ATTR).length
+        + ' · 업 ' + (calamFull(k, u) ? '달성' : '아직') + ' · 첫번째 재앙 ' + (calamCast(k, u) ? '내림' : (k.calam && k.calam.hold1 ? '보류' : '—')));
+    console.log('  히든 직업 ' + (calamHolder(k) ? '받음' + (calamIsL(k) ? ' (L — 주사위로 쳐낼 수 있다)' : '') : '없음')
+        + ' · 내게 내려진 재앙 ' + JSON.stringify(cHit) + ' · 장비 봉인 ' + ((typeof window.calamSealLeft === 'function' && window.calamSealLeft(u) > 0) ? calamLeft(window.calamSealLeft(u)) + ' 남음' : '없음'));
+    if (u.code === ADMIN) console.table(Object.keys(cLord).map(function (c) { const v = cLord[c] || {}; return { 재앙: v.name, 사번: v.no, 업: new Date(v.at).toLocaleString(), 첫번째: v.cast1 ? new Date(v.cast1.at).toLocaleString() : '—', 맞은사원: v.cast1 ? ((((typeof db !== 'undefined' && db.users) || {})[v.cast1.to] || {}).name || '?') : '' }; }));
+};
 
 window.kroomState = function () {
     const k = prof(); if (!k) return;

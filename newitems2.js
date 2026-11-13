@@ -263,6 +263,13 @@ function hasEquipped(u, name) {
     });
 }
 
+// ☄ 재앙의 장비 봉인(calam-seal.js · 2026-11-13) 중에는 찬 것의 힘이 먹히지 않는다.
+//   힘을 읽는 자리에서만 쓴다 — 차고 벗는 자리는 hasEquipped 그대로 (봉인 중에도 장착칸은 그대로 있다)
+function eqOn(u, name) {
+    try { if (typeof window.calamSealed === 'function' && window.calamSealed(u)) return false; } catch (e) { }
+    return hasEquipped(u, name);
+}
+
 function hasAny(u, name) {
     if (!u) return false;
     return hasEquipped(u, name) || (u.inventory || []).indexOf(name) >= 0;
@@ -425,13 +432,13 @@ function payDarkPt() {
     let v = u.darkPtPend || 0;
 
     // 보유만으로 붙는 것들
-    if (hasEquipped(u, '꿈결 수집기')) { v += 5000; (u.darkPtWhy = u.darkPtWhy || []).push('꿈결 수집기 +5,000P'); }
+    if (eqOn(u, '꿈결 수집기')) { v += 5000; (u.darkPtWhy = u.darkPtWhy || []).push('꿈결 수집기 +5,000P'); }
     if (hasSilverHeart(u) && (u.heartSaves || 0) >= 30) {
         v += 5000; (u.darkPtWhy = u.darkPtWhy || []).push('은심장 +5,000P');
     }
     const cage = u.cageSaved || 0;
     if (cage > 0) {
-        if (hasEquipped(u, '％＄＠＆ 이동장')) {
+        if (eqOn(u, '％＄＠＆ 이동장')) {
             const got = Math.min(9000, cage * 1500);
             v += got; (u.darkPtWhy = u.darkPtWhy || []).push('％＄＠＆ 이동장 +' + got.toLocaleString() + 'P');
         }
@@ -510,12 +517,12 @@ function rescueGuarantee() {
     const u = currentUser;
     if (hasSilverHeart(u) && (u.heartSaves || 0) >= 10) return '은심장';
     // 이동장 — 탐사마다 한 번 (전에는 「구역 + 날짜」로 세어, 같은 날 같은 구역에 두 번째로 들면 안 걸렸다)
-    if (hasEquipped(u, '％＄＠＆ 이동장') && darkRun && !darkRun._cageUsed) return '％＄＠＆ 이동장';
+    if (eqOn(u, '％＄＠＆ 이동장') && darkRun && !darkRun._cageUsed) return '％＄＠＆ 이동장';
     if ((u.paperBoat | 0) > 0) return '종이배';
     if (hasAny(u, '전용 자전거') && dayLeft(u, '전용 자전거', 2) > 0) return '전용 자전거';
-    if (hasEquipped(u, '노스텔지어 끈')) return '노스텔지어 끈';      // 다섯 번 — daydream-items.js 가 센다
-    if (hasEquipped(u, '포승줄')) return '포승줄';
-    if (hasEquipped(u, '통신 단추') && (u.buttonUses | 0) > 0) return '통신 단추';
+    if (eqOn(u, '노스텔지어 끈')) return '노스텔지어 끈';      // 다섯 번 — daydream-items.js 가 센다
+    if (eqOn(u, '포승줄')) return '포승줄';
+    if (eqOn(u, '통신 단추') && (u.buttonUses | 0) > 0) return '통신 단추';
     return null;
 }
 
@@ -631,7 +638,7 @@ function withLucky(fn, ctx, args) {
 // 이동장 — 「살린 만큼 최대 9,000P」. 찬 채로 **살려 낸** 수를 센다 (확정이든 아니든 · 실패는 안 센다)
 //   전에는 확정권을 쓴 번만, 그것도 구출이 실패해도 셌다.
 function cageCount(u, won0) {
-    if (!u || !darkRun || !hasEquipped(u, '％＄＠＆ 이동장')) return;
+    if (!u || !darkRun || !eqOn(u, '％＄＠＆ 이동장')) return;
     if ((darkRun.success || 0) <= won0) return;
     u.cageSaved = (u.cageSaved || 0) + 1;
     saveFields({ cageSaved: 1 });
@@ -700,7 +707,7 @@ function cageCount(u, won0) {
 
             window.__epicSureRoll = true;
             setTimeout(function () { window.__epicSureRoll = false; }, 8000);   // 안전장치
-            if (darkRun && hasEquipped(u, '％＄＠＆ 이동장')) {           // 확정이라 살린다 — 이동장 몫
+            if (darkRun && eqOn(u, '％＄＠＆ 이동장')) {           // 확정이라 살린다 — 이동장 몫
                 u.cageSaved = (u.cageSaved || 0) + 1;
                 saveFields({ cageSaved: 1 });
             }
@@ -766,7 +773,7 @@ function scaleRisk(u) {
             if (b0) b0.remove();
             return;
         }
-        const on = hasEquipped(currentUser, '은색 저울')
+        const on = eqOn(currentUser, '은색 저울')
                 || (currentUser.borrowedGear || []).some(function (w) {
                        return String(w).indexOf('은색 저울') === 0;
                    });
@@ -805,7 +812,7 @@ function scaleRisk(u) {
         const _a = attemptRescue;
         attemptRescue = function () {
             const risk = currentUser._scaleRisk || 0;
-            if (hasEquipped(currentUser, '은색 저울') && risk > 50) {
+            if (eqOn(currentUser, '은색 저울') && risk > 50) {
                 addDarkPt(currentUser, 5000, '저울');
             }
             currentUser._scaleRisk = 0;
@@ -916,7 +923,7 @@ function onDarkEnter() {
     const pid = darkRun && darkRun.partyId;
 
     // 부적이 깃든 등 — 팀원에게 무작위 버프
-    if (hasEquipped(u, '부적이 깃든 등') && pid) {
+    if (eqOn(u, '부적이 깃든 등') && pid) {
         database.ref('darkParties/' + pid + '/alive').once('value').then(function (s) {
             const alive = Object.keys(s.val() || {});
             const lines = [];
@@ -937,7 +944,7 @@ function onDarkEnter() {
     }
 
     // 공기 누름돌 — 파티 전체 보호막
-    if (hasEquipped(u, '공기 누름돌') && dayLeft(u, '공기 누름돌', 5) > 0 && pid) {
+    if (eqOn(u, '공기 누름돌') && dayLeft(u, '공기 누름돌', 5) > 0 && pid) {
         daySpend(u, '공기 누름돌');
         database.ref('darkParties/' + pid + '/alive').once('value').then(function (s) {
             Object.keys(s.val() || {}).forEach(function (c) {

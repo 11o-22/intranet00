@@ -143,6 +143,7 @@ function baseOf(w) {
 }
 function wears(u) {
     if (!u || !Array.isArray(u.equippedWeapons)) return false;
+    try { if (typeof window.calamSealed === 'function' && window.calamSealed(u)) return false; } catch (e) { }   // ☄ 재앙의 장비 봉인 (calam-seal.js · 2026-11-13)
     return u.equippedWeapons.some(function (w) { const b = baseOf(w); return b === NAME || b === OLD; });
 }
 window.jisanWears = wears;

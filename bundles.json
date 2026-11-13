@@ -490,7 +490,8 @@
       "rhythm.js",
       "playlist.js",
       "house-room.js",
-      "purge-wuniform.js"
+      "purge-wuniform.js",
+      "calam-seal.js"
     ]
   ]
 }

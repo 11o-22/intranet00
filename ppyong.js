@@ -58,6 +58,7 @@ function isOwner(u) {
     });
 }
 function wearing(u) {
+    try { if (typeof window.calamSealed === 'function' && window.calamSealed(u)) return false; } catch (e) { }   // ☄ 재앙의 장비 봉인 (calam-seal.js · 2026-11-13)
     return !!u && (u.equippedWeapons || []).some(function (w) { return getEquipBaseName(w) === NAME; });
 }
 function usedToday(u) { return (u && u.ppyongDay === today()) ? (Number(u.ppyongN) || 0) : 0; }
