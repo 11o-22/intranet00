@@ -600,7 +600,10 @@ function css() {
         '.rg-x{position:absolute;top:10px;right:12px;width:36px;height:36px;font-size:18px;z-index:5;}',
         '.rg-best{font-size:12px;color:#ffe9a8;}',
         '.rg-load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);font-size:15px;letter-spacing:2px;}',
-        '.rg-pause{position:absolute;top:8px;left:10px;width:40px;height:34px;border-radius:9px;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.35);color:#fff;font-size:15px;z-index:4;}',
+        // ★ 일시정지 — 손전화의 상단바(시계 · 배터리) 밑에 깔리지 않게 그만큼 안쪽으로 (2026-11-13 사용자 「아이폰 상단바에 일시정지 버튼이 겹쳐져서 안 눌려」).
+        //   세워 든 손전화에서는 무대를 90도 돌려 그린다 (fit) — 무대의 왼쪽 끝이 화면의 **위**(상단바), 무대의 위가 화면의 오른쪽이다. 그래서 돌린 무대(.rg-r)에서는 왼쪽에 위쪽 여백을 더한다.
+        '.rg-pause{position:absolute;top:calc(8px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));width:40px;height:34px;border-radius:9px;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.35);color:#fff;font-size:15px;z-index:4;}',
+        '#rg-st.rg-r .rg-pause{top:calc(8px + env(safe-area-inset-right,0px));left:calc(10px + env(safe-area-inset-top,0px));}',
         '.rg-modal{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.66);z-index:6;}',
         // 계속 — 3 · 2 · 1 (2026-11-12)
         '.rg-cd{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:6;pointer-events:none;font-size:96px;font-weight:900;color:#fff;text-shadow:0 0 24px rgba(160,190,255,.75),0 4px 18px #000;font-variant-numeric:tabular-nums;}',
@@ -638,6 +641,7 @@ function fit() {
     VW = rot ? h : w; VH = rot ? w : h;
     ST.style.width = VW + 'px'; ST.style.height = VH + 'px';
     ST.style.transform = rot ? ('translateX(' + w + 'px) rotate(90deg)') : 'none';
+    ST.classList.toggle('rg-r', rot);                 // 돌린 무대 — 상단바 여백을 어느 쪽에 줄지 (.rg-pause)
     // ★ 2.5 → 2 — 휴대폰(3배 화면)에서 칠할 점이 3분의 1 넘게 준다 · 눈으로는 거의 같다 (2026-11-11 발열)
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     CV.width = Math.round(VW * dpr); CV.height = Math.round(VH * dpr);
