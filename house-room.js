@@ -77,18 +77,18 @@ const SEND_MS = 150, BEAT_MS = 10000, STALE_MS = 40000;
 const SPAWN = { x: 516, y: 662 };    // 가운데 복도 아래끝 (현관)
 const WALL_P = 10000, FLOOR_P = 10000, WALLS = 6, FLOORS = 7;
 const HEAD_TOP = 116;                // 사람 칸에서 머리 꼭대기 (옷장 그림 규격 · plaza.js 와 같다)
-// 가구 — 차례는 그림의 줄 · 칸 (한 줄에 두 가지). p 값 · r 바닥에 닿는 몫 (그림 아래쪽에서 이만큼이 막히는 자리)
+// 가구 — 차례는 그림의 줄 · 칸 (한 줄에 두 가지). p 값
 const FURN = [
-    { n: '책장', p: 15000, r: 0.3 },      { n: '옷장', p: 20000, r: 0.3 },
-    { n: '서랍장', p: 8000, r: 0.45 },    { n: '소파', p: 25000, r: 0.55 },
-    { n: '1인 소파', p: 12000, r: 0.55 }, { n: '침대', p: 30000, r: 0.75 },
-    { n: '식탁', p: 15000, r: 0.55 },     { n: '의자', p: 5000, r: 0.45 },
-    { n: '스툴', p: 3000, r: 0.5 },       { n: 'TV', p: 30000, r: 0.35 },
-    { n: '화장대', p: 18000, r: 0.35 },   { n: '낮은 탁자', p: 8000, r: 0.6 },
-    { n: '스탠드 조명', p: 5000, r: 0.25 }, { n: '화분', p: 5000, r: 0.3 },
-    { n: '냉장고', p: 25000, r: 0.3 },    { n: '싱크대', p: 20000, r: 0.45 },
-    { n: '가스레인지', p: 15000, r: 0.45 }, { n: '욕조', p: 25000, r: 0.6 },
-    { n: '세탁기', p: 20000, r: 0.4 },    { n: '변기', p: 10000, r: 0.5 }
+    { n: '책장', p: 15000 },      { n: '옷장', p: 20000 },
+    { n: '서랍장', p: 8000 },     { n: '소파', p: 25000 },
+    { n: '1인 소파', p: 12000 },  { n: '침대', p: 30000 },
+    { n: '식탁', p: 15000 },      { n: '의자', p: 5000 },
+    { n: '스툴', p: 3000 },       { n: 'TV', p: 30000 },
+    { n: '화장대', p: 18000 },    { n: '낮은 탁자', p: 8000 },
+    { n: '스탠드 조명', p: 5000 }, { n: '화분', p: 5000 },
+    { n: '냉장고', p: 25000 },    { n: '싱크대', p: 20000 },
+    { n: '가스레인지', p: 15000 }, { n: '욕조', p: 25000 },
+    { n: '세탁기', p: 20000 },    { n: '변기', p: 10000 }
 ];
 // 가구 칸(120) 안에서 그림이 차지하는 자리 [x0, y0, x1, y1] — FB[가구][방향] (furn.webp 에서 잰 값)
 const FB = [[[4,25,69,120],[0,4,24,120],[2,25,69,120],[0,4,24,120]],[[7,25,66,120],[0,8,24,120],[6,25,65,120],[0,8,24,120]],
@@ -101,6 +101,15 @@ const FB = [[[4,25,69,120],[0,4,24,120],[2,25,69,120],[0,4,24,120]],[[7,25,66,12
     [[5,39,42,120],[6,39,43,120],[5,39,42,120],[6,39,43,120]],[[0,72,72,120],[0,44,24,120],[0,77,72,120],[0,44,24,120]],
     [[0,77,24,120],[0,74,22,120],[0,77,24,120],[2,74,24,120]],[[2,72,70,120],[4,58,44,120],[2,73,70,120],[4,45,44,120]],
     [[6,62,43,120],[0,52,34,120],[5,62,42,120],[14,52,48,120]],[[2,74,22,120],[0,74,28,120],[2,79,22,120],[20,74,48,120]]];
+// ★ 바닥에 닿는 깊이 (도트 · 그림 아래끝에서 위로) — FD[가구][방향] (2026-11-13 사용자 「가구들에 캐릭터가 통과하는 게 있어서」)
+//   예전엔 가구마다 몫(r) 하나를 그림 높이에 곱했다. 옆으로 돌리면 긴 쪽이 깊이가 되어 윗면(상판)이 훨씬 길어지는데도 같은 몫이라,
+//   옆으로 놓은 식탁 · TV · 화장대 · 싱크대 · 낮은 탁자 · 욕조 · 소파는 윗면 절반쯤이 뚫려 있었다 (식탁 21 · TV 29 도트).
+//   그래서 방향마다 윗면이 끝나는 줄(= 맨 뒤 바닥선)을 furn.webp 에서 따로 쟀다. 예전 값보다 얕게 한 것은 없다.
+const FD = [[29,39,29,39],[29,37,29,37],[22,24,22,24],[25,52,24,52],[25,26,24,26],[50,49,45,49],[42,72,42,72],[21,21,16,21],
+    [14,14,14,14],[25,63,25,63],[28,43,25,43],[21,46,21,46],[6,6,6,6],[14,14,14,14],[24,24,24,24],[24,46,24,46],
+    [19,21,19,21],[29,44,28,45],[23,28,23,28],[23,23,21,23]];
+// 사람 몸 반쪽 (도트) — 발 한 점으로만 재면 가구 옆을 지날 때 몸 절반이 가구 뒤로 파묻힌다. 좌우로 이만큼 더 막는다 (몸은 22 도트쯤)
+const BODY = 8, BODY_TINY = 2;
 const DIRS = ['앞', '옆', '뒤', '옆'];
 // 화면 배 (화면 점 / 도트) — 사람이 도트 한 칸에 고르게 찍히는 자리만 (광장의 K_STEP × 4)
 const Z_STEP = [1, 4 / 3, 2, 8 / 3, 3, 4];
@@ -243,10 +252,10 @@ function placedOf(t) {
 }
 function bbOf(v) { return FB[v.t][v.d]; }
 function baseOf(v) { return v.y + bbOf(v)[3]; }                    // 발밑 (앞뒤 차례)
-function footOf(v) {
-    const b = bbOf(v), r = FURN[v.t].r;
-    const h = Math.max(4, Math.round((b[3] - b[1]) * r));
-    return { x0: v.x + b[0] + 2, x1: v.x + b[2] - 2, y0: v.y + b[3] - h, y1: v.y + b[3] - 1 };
+function footOf(v, pad) {
+    const b = bbOf(v), h = FD[v.t][v.d];
+    pad = pad || 0;
+    return { x0: v.x + b[0] - pad, x1: v.x + b[2] - 1 + pad, y0: v.y + b[3] - h, y1: v.y + b[3] - 1 };
 }
 function anchorOf(v) { const b = bbOf(v); return { x: v.x + (b[0] + b[2]) / 2, y: v.y + b[3] - 1 }; }
 function placeOk(v) { const a = anchorOf(v); return cellAt(a.x, a.y) >= 128; }
@@ -289,14 +298,16 @@ function gradeOf(hk) {
     return GR[Math.max(0, best)];
 }
 function gradeOk(hk) { return GR.indexOf(gradeOf(hk)) >= GR.indexOf('A'); }
-function blockedAt(x, y, skipId) {
+// 그 자리를 가구가 막나 — (fx, fy) 는 지금 선 자리: 이미 그 가구 안에 서 있으면(놓을 때 겹쳤거나 그 자리에 내려졌다) 그 가구만은
+//   지나갈 수 있어야 걸어 나온다. 예전엔 어느 가구든 안에 있기만 하면 옆의 다른 가구까지 다 지나갔다
+function blockedAt(x, y, fx, fy) {
     if (!S) return false;
-    const L = S.flist || [];
+    const L = S.flist || [], pad = S.sm ? BODY_TINY : BODY, has = fx != null;
     for (let i = 0; i < L.length; i++) {
-        const v = L[i];
-        if (v.id === skipId) continue;
-        const f = footOf(v);
-        if (x >= f.x0 && x <= f.x1 && y >= f.y0 && y <= f.y1) return true;
+        const f = footOf(L[i], pad);
+        if (x < f.x0 || x > f.x1 || y < f.y0 || y > f.y1) continue;
+        if (has && fx >= f.x0 && fx <= f.x1 && fy >= f.y0 && fy <= f.y1) continue;
+        return true;
     }
     return false;
 }
@@ -1176,7 +1187,7 @@ function loop() {
     if (len > 0.08) {
         const v = SPEED * dt * mag / len;
         const nx = S.x + dx * v, ny = S.y + dy * v;
-        const ok = function (x, y) { return cellAt(x, y) === 255 && !(blockedAt(x, y) && !blockedAt(S.x, S.y)); };
+        const ok = function (x, y) { return cellAt(x, y) === 255 && !blockedAt(x, y, S.x, S.y); };
         if (ok(nx, ny)) { S.x = nx; S.y = ny; moving = true; }
         else if (Math.abs(dx) > 0.01 && ok(nx, S.y)) { S.x = nx; moving = true; }
         else if (Math.abs(dy) > 0.01 && ok(S.x, ny)) { S.y = ny; moving = true; }
@@ -1818,5 +1829,5 @@ window.houseRoomState = function () {
                  carry: S.carry, on: S.on, sm: S.sm }
              : { open: false, invited: Object.keys(INV) };
 };
-window.houseRoomDebug = { FURN: FURN, FB: FB, cellAt: cellAt, loadMask: loadMask, mirrorV: mirrorV, regionAt: regionAt, hkOf: hkOf, gradeOf: gradeOf, setPos: function (x, y) { if (S) { S.x = x; S.y = y; } }, keys: function (k) { if (S) S.keys = k || {}; } };
+window.houseRoomDebug = { FURN: FURN, FB: FB, FD: FD, BODY: BODY, footOf: footOf, blockedAt: blockedAt, pos: function () { return S ? { x: S.x, y: S.y } : null; }, cellAt: cellAt, loadMask: loadMask, mirrorV: mirrorV, regionAt: regionAt, hkOf: hkOf, gradeOf: gradeOf, setPos: function (x, y) { if (S) { S.x = x; S.y = y; } }, keys: function (k) { if (S) S.keys = k || {}; } };
 })();
