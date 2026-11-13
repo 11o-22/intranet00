@@ -449,6 +449,19 @@ R.event = { n: '🎉 이벤트 · 풀 파티', pn: '풀 파티', img: 'event-poo
             spots: [ { x: 940, y: 1215, get n() { return evFixed() ? '고정 중' : '고정'; }, i: '📍', fn: 'plazaEventFix', stay: true },
                      { x: 1790, n: '광장으로', ic: 'out', go: P.START } ] };
 
+// 📺 화요 퀴즈쇼 (2026-11-13 사용자) — 「📺 브라운의 심야 토크 쇼」를 찬 사회자가 초대한 사람만 드는 방 (quizshow.js)
+//   주신 그림(2350x3060 · 도트 한 칸 5픽셀)을 이벤트 맵처럼 한 칸 한 점(470x612)으로 두고 네 배(1880x2448)로 그린다.
+//   단상(탁자) 그림은 사람 앞에 따로 깐다 — 그 층과 명패 · O X 는 quizshow.js 가 맡는다 (plazaOnPaint).
+//   gate — 들어가도 되는지 · 몇 번 방인지 quizshow.js 에 묻는다 (쇼마다 방 번호가 다르다 · 0 이면 못 든다).
+//   fit — 단상 두 개(손님 · 사회자)가 **한 화면에 다 들도록** 줄인다 (세로 손전화). camX — 화면 가운데에 둘 자리 (내가 어디 섰든 고정).
+//   padTop — 그렇게 줄여 그림이 창보다 짧아지면 이만큼(px) 내려 앉힌다 (위 띠 · 포인트 칸이 간판을 안 가리게). bg — 그림 위아래로 남는 자리의 빛깔.
+//   full — 파인애플(작아진 사람)이 이 방에서는 보통 크기 (단상 뒤에 서면 안 보인다 · 이벤트 맵과 같은 길).
+//   걸어 다니지 않는다 — 들어오면 제 자리(plazaPin)에 붙박인다. 그래서 나가는 길(spots)도 없다 (quizshow.js 의 [나가기]).
+//   pud — 🌧 여우비 웅덩이가 놓일 바닥 (단상 앞 무대 바닥 · plazaFloor). floor 는 서는 줄일 뿐 걷는 바닥이 아니다.
+R.quiz = { n: '📺 화요 퀴즈쇼', pn: '화요 퀴즈쇼', img: 'quiz-show.webp', w: 1880, h: 2448, top: 215, cut: 660, k: 1, pix: 1, max: 1,
+           gate: 'quizShowGate', full: 1, fit: [40, 1700], camX: 870, padTop: 96, bg: 'linear-gradient(180deg,#0a0916 0,#0a0916 22%,#22091c 62%)',
+           floor: [1196, 1200], pud: [1430, 1500], spots: [] };
+
 // ★ 돌아오는 길을 저절로 만든다 — 한쪽만 적어도 양쪽이 통한다
 (function link() {
     Object.keys(R).forEach(function (a) {
@@ -528,6 +541,7 @@ function hsNote(t) { if (!t) return; if (now() - hsSaidAt < 2500) return; hsSaid
 function hidPeer(code) {
     if (HS()) return !!hsCall('hidePeer', code);   // 🫣 놀이 방에는 참여자만 있다 — 상담사도 함께 보인다 · 🕵️ 산 사람에게는 유령이 안 보인다
     if (!code || code !== P.ADMIN) return false;
+    if (run && run.room && R[run.room] && R[run.room].gate) return false;   // 📺 화요 퀴즈쇼 — 초대받아 든 방에서는 상담사도 보인다 (사회자일 수 있다)
     const u = u_();
     if (!u || u.code === P.ADMIN) return false;
     return SEE_ADMIN.indexOf(noOf(u)) < 0;
@@ -1148,6 +1162,7 @@ function spec() {
 //   크기가 바뀌면 나는 refreshTags(3초)가, 남은 onSeat 가 그 사람을 다시 만든다.
 const TINY = 1 / 5;
 const TINY_FX = '파인애플맛 물약';
+function fullRoom() { return !!(run && run.room && (run.room === 'event' || (R[run.room] && R[run.room].full))); }
 function tinyOf(u) {
     if (!u) return false;
     if (u.tiny != null) return !!u.tiny;                 // 남 — 실려 온 표시
@@ -1156,7 +1171,7 @@ function tinyOf(u) {
     if (hsT != null) return !!hsT;
     // 🎉 이벤트 맵 안에서는 파인애플이 잠시 풀린다 — 보통 크기로 선다 (2026-11-09 사용자 「이벤트 맵 들어갈 때에는 파인애플이 일시적으로 풀리게」)
     //   물약(timedEffects)은 그대로 두므로 나오면 도로 작아진다. 내 자리 기록의 sm 도 이 값으로 나가 남의 화면에서도 보통 크기다.
-    if (run && run.room === EV.ROOM) return false;
+    if (fullRoom()) return false;                        // 📺 화요 퀴즈쇼도 같은 길 (R.quiz.full)
     const t = now();
     return (Array.isArray(u.timedEffects) ? u.timedEffects : []).some(function (e) {
         return e && e.name === TINY_FX && (e.fixed || !e.expireAt || e.expireAt > t);
@@ -4234,7 +4249,7 @@ function potMine() {
     if (!u) return null;
     const v = potOf(u.code);
     if (!v) return null;
-    if (run && run.room === EV.ROOM) return v;           // 이벤트 맵에서는 파인애플이 잠시 풀린다 — 그래도 냄비는 그대로
+    if (fullRoom()) return v;                            // 이벤트 맵 · 퀴즈쇼에서는 파인애플이 잠시 풀린다 — 그래도 냄비는 그대로
     return tinyOf(u) ? v : null;
 }
 // 이 방(이 번호) 냄비에 든 사람들
@@ -4294,7 +4309,7 @@ function heldRoom() { const pm = potMine(); return cageMine() || (pm ? pm.r : ''
     // 파인애플이 풀렸으면 — 저절로 나온다 (내 것만 · 상담사는 남의 것도 걷지 않는다)
     setInterval(function () {
         const u = u_(), d = db_();
-        if (!u || !d || !POTS[u.code] || !run || run.room === EV.ROOM) return;
+        if (!u || !d || !POTS[u.code] || !run || fullRoom()) return;
         if (tinyOf(u)) return;
         try { d.ref(POT.PATH + '/' + u.code).remove(); } catch (e) { }
         delete POTS[u.code];
@@ -4792,6 +4807,13 @@ function zoomOf(r) {
     const top = r.top || 0;                                      // 🎉 위쪽도 잘라 낸다 (이벤트 맵 — 하늘을 덜 보이고 무대를 키운다 · 2026-11-09)
     const zH = vh / Math.max(200, r.h - cut - top);
     if (run) { run._cy = top * zH; run._wide = false; }
+    // 📺 fit — 그 폭(무대의 단상 둘)이 창에 다 들도록. 좁은 창(세로 손전화)에서는 그만큼 줄이고, 줄인 만큼 위를 덜 자른다 (2026-11-13 화요 퀴즈쇼)
+    if (r.fit) {
+        const zW = vw ? vw / Math.max(200, r.fit[1] - r.fit[0]) : zH;
+        if (zW >= zH) return zH;
+        if (run) run._cy = (r.h * zW < vh) ? -Math.min(vh - r.h * zW, r.padTop || 0) : Math.max(0, Math.min(top * zW, r.h * zW - vh));
+        return zW;
+    }
     // 넓은 터치 화면 — 방이 창보다 좁을 때만 (위 WIDE 설명)
     const W = P.WIDE;
     if (!W || !run || cut <= 0 || !vw || r.w * zH >= vw || !touchy()) return zH;
@@ -4827,6 +4849,7 @@ function paintRoom() {
     run.el.style.imageRendering = (r.pix || run.z >= 1) ? 'pixelated' : 'auto';
     run.el.style.backgroundImage = 'url("' + P.DIR + r.img + '")';
     run.el.style.backgroundSize = w + 'px ' + h + 'px';
+    if (run.view) run.view.style.background = r.bg || '';         // 📺 그림 아래로 남는 자리의 빛깔 (화요 퀴즈쇼 — 그림 아래끝과 같은 색)
     // 넓은 터치 화면 — 채팅 내역을 지하 바닥 왼쪽 끝 바깥으로만 (걷는 사람을 안 덮게)
     const feed = document.getElementById('plaza-feed');
     if (feed) {
@@ -4853,6 +4876,8 @@ function paintRoom() {
     paintCage();                    // 🔒 가두리 (그 방에 있으면)
     paintPot();                     // 🍲 냄비 (구석)
     paintHalloween();               // 🎃 핼러윈 — 호박 셋 · 우중충한 막
+    // 📺 방을 다 그렸다 — 제 층을 얹는 쪽에 알린다 (quizshow.js · 단상 · 명패)
+    try { if (typeof window.plazaOnPaint === 'function') window.plazaOnPaint(run.room); } catch (e) { }
 }
 
 // 🎃 핼러윈 (2026-10-31 사용자) — P.PK 의 자리에 호박을 세우고 방 그림 위에 막을 한 장 깐다
@@ -5196,6 +5221,17 @@ function goRoom(key, way, lv) {
         key = P.START; way = null; lv = 0;
     }
     if (R[key].invite) run.forceInst = 1;                   // 몇 명이든 한 방 (위에서 광장으로 바뀌었으면 invite 가 없어 안 든다)
+    // 📺 화요 퀴즈쇼 — 사회자와 초대장을 받아 자리에 앉은 손님만. 방 번호는 쇼마다 다르다 (quizshow.js 가 준다 · 0 이면 못 든다)
+    if (R[key].gate) {
+        let gi = 0;
+        try { gi = Math.floor(Number(typeof window[R[key].gate] === 'function' ? window[R[key].gate]() : 0)) || 0; } catch (e) { gi = 0; }
+        if (gi > 0) run.forceInst = gi;
+        else {
+            sysLine(R[key].n + ' — 사회자의 초대장이 있어야 들어갈 수 있습니다.');
+            if (run.room && run.me) return;
+            key = P.START; way = null; lv = 0;
+        }
+    }
     run.evFix = null; try { evOffUi(false); } catch (e) { }   // 무대 고정은 방을 나가면 풀린다
     // 🔒 갇혔으면 가두리 방 밖으로는 못 간다 — 이미 거기 있으면 그대로, 밖이면 그리로 데려간다
     const cg = cageMine();
@@ -5550,7 +5586,7 @@ function camera(snap) {
     const vh = vb.h || rh;
     // 방이 창보다 좁으면 **가운데로** 둔다 (왼쪽에 붙이면 한쪽만 검다)
     let cx = -(vw - rw) / 2;
-    if (rw > vw) cx = Math.max(0, Math.min(rw - vw, run.x * z - vw / 2));
+    if (rw > vw) cx = Math.max(0, Math.min(rw - vw, (r.camX != null ? r.camX : run.x) * z - vw / 2));   // camX — 내가 어디 섰든 그 자리를 가운데에 (📺 화요 퀴즈쇼)
     if (snap) run.cx = cx;
     else      run.cx += (cx - run.cx) * 0.18;   // 조금 늦게 따라와 부드럽다
     run.camBusy = Math.abs(cx - run.cx) > 0.5;  // 아직 따라가는 중이면 쉬지 않는다
@@ -6188,6 +6224,14 @@ function onSeat(code, v, fresh) {
         // ★ 말풍선 빛깔은 **그 사람이 쓸 수 있는지 받는 쪽에서도 본다.**
         //   b 칸은 보내는 사람이 적는 값이라, 손으로 적어 보낼 수 있다.
         bubble(q.one, v.s || '', sbOkOf(code, v.b || '') ? (v.b || '') : '');
+    }
+    // 📺 같은 방 사람이 말했다 (quizshow.js — 사회자 화면이 「직전에 말한 참가자」를 적어 둔다)
+    //   ★ 말풍선과 달리 **기기 시계를 견주지 않는다** — 말한 때(st)는 보낸 기기의 시계라, 그 기기 시계가 몇 초만 늦어도 「묵은 말」로 보여 빠진다.
+    //     앞서 본 st 와 달라졌으면 새 말이다. 처음 본 사람의 st 는 지난 말이라 적어만 둔다.
+    if (isNew) q.sayH = v.st || 0;
+    else if (v.st && v.st !== q.sayH) {
+        q.sayH = v.st;
+        try { if (typeof window.plazaOnPeerSay === 'function') window.plazaOnPeerSay(code, v.s || '', v.st); } catch (e) { }
     }
     if (isNew) { showWho(); overSoon(); }
 }
@@ -6986,6 +7030,8 @@ function say(text) {
     run.say = t; run.sayAt = now();
     bubble(run.me, t, sbMine());
     send(false);                              // 말풍선을 바로 알린다
+    // 📺 내가 말했다 (quizshow.js — 사회자의 「정답.」 · 「땡」 · 「오답.」)
+    try { if (typeof window.plazaOnMySay === 'function') window.plazaOnMySay(t); } catch (e) { }
     const d = db_();
     if (d) {
         try {
@@ -8143,10 +8189,27 @@ window.plazaPeerPos = function (code) {
 // 🌧 지금 방의 길 띠 (방 그림 좌표 · 내가 선 층) — 여우비 웅덩이가 놓일 자리 (foxrain.js)
 window.plazaFloor = function () {
     if (!run || !run.el || !run.room || !R[run.room]) return null;
-    const r = roomOf(), b = bandOf(r, run.lv || 0);
+    const r = roomOf(), b = r.pud || bandOf(r, run.lv || 0);      // pud — 걷는 띠가 따로 없는 방(📺 화요 퀴즈쇼)은 보이는 바닥을 따로 적어 둔다
     if (!Array.isArray(b) || b.length < 2) return null;
     return { band: [Number(b[0]), Number(b[1])], w: r.w, h: r.h, z: zz() };
 };
+// 📺 자리 붙박이 (quizshow.js · 2026-11-13) — 그 자리에 세워 두고 걸음을 막는다. 이벤트 무대 「고정」과 같은 길(run.evFix)이되 [내려오기] 단추가 없다.
+//   p = { x, y, f } (방 그림 좌표 · f 는 보는 쪽 1 왼쪽 · -1 오른쪽) · null 이면 푼다. 방을 옮기면 저절로 풀린다 (goRoom).
+window.plazaPin = function (p) {
+    if (!run || !run.me || !run.room) return false;
+    if (!p) { if (run.evFix && run.evFix.pin) run.evFix = null; return true; }
+    const x = Number(p.x), y = Number(p.y);
+    if (!isFinite(x) || !isFinite(y)) return false;
+    run.evFix = { x: x, y: y, pin: 1 };
+    run.tx = null; run.ty = null; run.tseg = null; run.vx = run.vy = 0; run.ax = 0; run.ay = 0;
+    run.x = x; run.y = y;
+    try { run.me.actor.face(Number(p.f) < 0 ? -1 : 1); } catch (e) { }
+    putOne(run.me, run.x, run.y);
+    camera(true);
+    try { send(false); } catch (e) { }
+    return true;
+};
+window.plazaPinned = function () { return (run && run.evFix && run.evFix.pin) ? { x: run.evFix.x, y: run.evFix.y } : null; };
 window.plazaMeFace = function () { try { return (run && run.me && run.me.actor.facing()) || 1; } catch (e) { return 1; } };
 // ⚔ 펫 배틀 연출(pet-arena.js) — 그 사번의 사람 칸 (나 · 같은 방의 남). 없으면 null
 window.plazaOneOf = function (code) {
