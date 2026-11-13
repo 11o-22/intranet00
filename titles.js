@@ -88,7 +88,13 @@ const DEFS = [
 //   그림(ADMIN_ICON)도 안 붙이고, 보일 때 꺾쇠를 또 두르지도 않는다
 //   (tag 참고). 넷 다 상담사만 주고 뗀다.
 const ADMIN_TITLES = ['또류', '뉴비', '고인물', '전설', '이레귤러', '페르소나', '흔적',
-                      '[69]', '[세]', '[T]', '[아기]'];
+                      '[69]', '[세]', '[T]', '[아기]', '리디광공'];
+
+// 칭호마다 제 빛깔 — [글자, 테두리]. 적지 않으면 금빛 그대로다.
+//   리디광공 — 톤다운 녹색 (2026-11-13 사용자 「리디광공 칭호 넣자. 색은 녹색 톤다운으로 해서. 상담사가 주는 형식으로.」)
+//   사원 목록 · 파티챗 · 정보 열람 · 채팅방 · 광장 · 사원증 · 칭호 탭 — 보이는 곳 어디서나 이 빛깔이다
+const TITLE_COLOR = { '리디광공': ['#7fae8e', '#48664f'] };
+function tcol(n) { return TITLE_COLOR[n] || null; }
 
 // 상담사 칭호에 붙는 그림
 //
@@ -762,9 +768,10 @@ function paint() {
     }
     const w = worn(currentUser);
     const own = myList(currentUser).length;
+    const wc = tcol(w);
     box.innerHTML = '<div style="font-size:10px; color:#888; margin-bottom:5px;">칭호</div>'
         + (w
-            ? '<span style="font-size:11px; color:#d4af37; border:1px solid #6a5a2a;'
+            ? '<span style="font-size:11px; color:' + (wc ? wc[0] : '#d4af37') + '; border:1px solid ' + (wc ? wc[1] : '#6a5a2a') + ';'
               + ' border-radius:3px; padding:2px 7px;">' + tag(w) + '</span>'
             : '<div style="font-size:11px; color:#666;">'
               + (own ? '달고 있지 않습니다. 칭호 탭에서 하나 고르세요.' : '아직 없습니다.')
@@ -783,8 +790,9 @@ function tagHtml(u, size, color) {
     const n = worn(u);                     // 달고 있는 하나만 보인다
     if (!n) return '';
     const s = size || 9;
-    return '<span style="font-size:' + s + 'px; color:' + (color || '#d4af37')
-        + '; border:1px solid #6a5a2a;'
+    const tc = tcol(n);                    // 제 빛깔이 있는 칭호는 어디서나 그 빛깔
+    return '<span style="font-size:' + s + 'px; color:' + (tc ? tc[0] : (color || '#d4af37'))
+        + '; border:1px solid ' + (tc ? tc[1] : '#6a5a2a') + ';'
         + ' border-radius:3px; padding:0 4px; margin-right:3px; white-space:nowrap;">'
         + label(n) + '</span>';
 }
@@ -1017,11 +1025,12 @@ function renderTitleList() {
           + '<div style="font-size:10px; color:#888; margin-bottom:6px;">상담사가 붙여 준 칭호</div>'
           + adm.map(function (n) {
                 const on = currentUser.titleOn === n;
+                const tc = tcol(n);
                 return '<div style="display:flex; justify-content:space-between; align-items:center;'
-                    + ' gap:8px; border:1px solid ' + (on ? '#d4af37' : '#6a5a2a') + '; border-radius:6px;'
+                    + ' gap:8px; border:1px solid ' + (on ? (tc ? tc[0] : '#d4af37') : (tc ? tc[1] : '#6a5a2a')) + '; border-radius:6px;'
                     + ' padding:8px 11px; margin-bottom:6px; background:rgba(0,0,0,0.3);">'
                     + '<div style="min-width:0;">'
-                    + '<span style="font-size:12px; font-weight:bold; color:#d4af37;">' + tag(n) + '</span>'
+                    + '<span style="font-size:12px; font-weight:bold; color:' + (tc ? tc[0] : '#d4af37') + ';">' + tag(n) + '</span>'
                     + (ADMIN_DESC[n]
                         ? '<div style="font-size:10px; color:#7d7870; margin-top:3px; line-height:1.5;">'
                           + ADMIN_DESC[n] + '</div>'
@@ -1038,7 +1047,7 @@ function renderTitleList() {
     box.innerHTML = '<div style="font-size:10px; color:#888; margin-bottom:10px; line-height:1.7;">'
         + '얻은 칭호 ' + have.length + ' / ' + DEFS.length + '종. 줄을 누르면 얻는 방법이 보입니다.<br>'
         + '<span style="color:#d4af37;">달 수 있는 것은 한 번에 하나뿐입니다.</span> 지금: '
-        + (worn(currentUser) ? '<b style="color:#d4af37;">' + tag(worn(currentUser)) + '</b>' : '없음')
+        + (worn(currentUser) ? '<b style="color:' + ((tcol(worn(currentUser)) || ['#d4af37'])[0]) + ';">' + tag(worn(currentUser)) + '</b>' : '없음')
         + '</div>'
         + rows + admHtml;
 }
