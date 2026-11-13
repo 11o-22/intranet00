@@ -337,10 +337,12 @@ function invListen() {
         if (!invFirst) {
             Object.keys(INV).forEach(function (h) {
                 if (was[h]) return;
-                try { if (typeof showCustomAlert === 'function') showCustomAlert('🏠 ' + (INV[h].n || nameIn(h)) + ' 사원이 사택에 초대했습니다.\n\n사택 → 「초대받은 사택」에서 들어갈 수 있습니다.'); } catch (e) { }
+                try { inviteCard(h); } catch (e) { }
             });
         }
         invFirst = false;
+        // 거둬진 초대의 카드는 걷는다
+        try { const cd = document.getElementById('hr-invcard'); if (cd && !INV[cd.getAttribute('data-h')]) cd.remove(); } catch (e) { }
         // 들어가 있던 집에서 초대가 거둬졌다
         if (S && !S.member && !S.mem.some(function (c) { return !!INV[c]; })) {
             leave(); try { if (typeof showCustomAlert === 'function') showCustomAlert('🏠 초대가 거둬져 사택에서 나왔습니다.'); } catch (e) { }
@@ -349,6 +351,33 @@ function invListen() {
     });
 }
 setInterval(function () { try { invListen(); } catch (e) { } }, 2000);
+// ★ 초대가 닿았다 — 그 자리에서 바로 들어가는 「들어가기」 카드 (2026-11-13 사용자 「사택 초대했는데 안 들어가지는 · 들어가기 누르는데 그대로 그냥 광장 홀에 있어」)
+//   예전엔 「사택 → 초대받은 사택에서 들어갈 수 있습니다」 알림뿐이었고, 사택 칸에서 「들어가기」라고 적힌 단추는 **제 사택** 것 하나였다
+//   (초대받은 집 단추는 그 밑에 작게 「💌 ○○ 사원의 사택」). 제 사택이 A 등급 미만인 사원은 그 단추가 꺼져 있어, 눌러도 아무 일도 없었다.
+//   → 초대가 닿으면 [들어가기] 가 달린 카드를 띄우고, 사택 칸에서도 초대받은 집을 맨 위에 「들어가기」로 적는다.
+//   탐사 중(어둠 · K의 방)에는 카드 대신 알림만 — 탐사 화면을 덮고 사택으로 들어가 버리지 않게.
+function busyRun() { try { return (typeof darkRun !== 'undefined' && !!darkRun) || (typeof window.kroomOn === 'function' && !!window.kroomOn()); } catch (e) { return false; } }
+function inviteCard(h) {
+    const nm = (INV[h] && INV[h].n) || nameIn(h);
+    if (busyRun() || !document.body) {
+        if (typeof showCustomAlert === 'function') showCustomAlert('🏠 ' + nm + ' 사원이 사택에 초대했습니다.\n\n☰ → 사택 → 「💌 ' + nm + ' 사원의 사택 들어가기」로 들어갈 수 있습니다.');
+        return;
+    }
+    css();
+    const old = document.getElementById('hr-invcard'); if (old) old.remove();
+    const el = document.createElement('div');
+    el.id = 'hr-invcard';
+    el.setAttribute('data-h', h);
+    el.style.cssText = 'position:fixed;inset:0;z-index:99999900;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;color:#eee;';
+    el.innerHTML = '<div class="hr-box" style="text-align:center;align-items:center;"><b style="font-size:14px;">💌 사택 초대</b>'
+        + '<div>' + esc(nm) + ' 사원이 사택에 초대했습니다.</div>'
+        + '<div class="acts" style="width:100%;"><button class="hr-b" data-a="x" style="flex:1;padding:10px;">나중에</button><button class="hr-b on" data-a="go" style="flex:1.4;padding:10px;font-size:14px;font-weight:bold;">들어가기</button></div>'
+        + '<small style="color:#998;">나중에 들어가려면 ☰ → 사택 → 「초대받은 사택」</small></div>';
+    ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'click', 'wheel'].forEach(function (t) { el.addEventListener(t, function (e) { e.stopPropagation(); }, { passive: true }); });
+    document.body.appendChild(el);
+    el.querySelector('[data-a="x"]').onclick = function () { el.remove(); };
+    el.querySelector('[data-a="go"]').onclick = function () { el.remove(); enter(h); };
+}
 function canEnter(mem) {
     const u = u_();
     if (!u || !mem || !mem.length) return false;
@@ -451,6 +480,7 @@ function css() {
         '#hr-box{background:linear-gradient(145deg,#1e1a14,#141110);border:1px solid #5a4a2a;border-radius:8px;padding:12px;margin-bottom:14px;}',
         '#hr-box .go{width:100%;padding:10px;font-size:14px;font-weight:bold;}',
         '#hr-box .sub{display:flex;flex-direction:column;gap:6px;margin-top:8px;}',
+        '#hr-box .sub.inv{margin:0 0 10px 0;}',
         '#hr-box .cap{font-size:10px;color:#888;font-weight:bold;margin-top:4px;}'
     ].join('\n');
     document.head.appendChild(st);
@@ -886,6 +916,17 @@ function rpsPaint() {
 // ==========================================
 // 들어가기 · 나가기
 // ==========================================
+// 사택 화면은 광장 위에 떠야 한다 — 사원 쪽 광장은 바탕(z-index 1)이라 괜찮지만, 상담사의 광장 · 새로 만들어져 바탕 표가 떨어진 광장은
+//   덮개(999995)로 떠 있어 사택(999990)을 가린다. 그러면 「들어가기를 눌러도 그대로 광장」으로 보인다 → 그럴 때는 광장 바로 위로 올린다
+function overPlaza(ov) {
+    try {
+        if (!ov) return;
+        const pl = document.querySelector('#plaza-ov');
+        const pz = pl ? (parseInt(getComputedStyle(pl).zIndex, 10) || 0) : 0;
+        const want = pz >= 999990 ? String(pz + 1) : '';
+        if (ov.style.zIndex !== want) ov.style.zIndex = want;
+    } catch (e) { }
+}
 function enter(host) {
     const u = u_(), d = db_();
     if (!u) return;
@@ -913,6 +954,7 @@ function enter(host) {
         + (mine ? '<div id="hr-zoom"><button class="hr-b" data-z="-1">－</button><span></span><button class="hr-b" data-z="1">＋</button></div>' : '')
         + '<div id="hr-load">🏠 사택에 들어가는 중…</div>';
     document.body.appendChild(ov);
+    overPlaza(ov);
     S = {
         host: hk, hk: hk, mem: mem, member: mine, mine: mine, md: {}, sh: {}, migr: {}, region: 'C', ov: ov,
         carry: [], on: null, dn: {}, cv: 0, scv: 0, sm: false, wk: 0, cm: null, goto: null, menu: null, rps: {}, view: ov.querySelector('#hr-view'), world: ov.querySelector('#hr-world'),
@@ -1208,6 +1250,7 @@ function loop() {
     // 지금 서 있는 자리(내 방 · 거실 · 남의 방) — 벽지 · 바닥지 칸과 「룸메 꾸미기 허용」 단추가 이것을 따른다
     const reg = regionAt(S.x, S.y);
     if (reg !== S.region) { S.region = reg; if (S.editEl && editTab !== 'furn') editPaint(); allowPaint(); }
+    if (t - (S.ozAt || 0) > 1000) { S.ozAt = t; overPlaza(S.ov); }          // 광장이 다시 덮개로 올라왔으면 그 위로
     // 룸메이트가 바뀌었다 (월요일 재배정 등) — 집이 달라졌으니 나온다
     if (S.member && t - (S.hkAt || 0) > 3000) {
         S.hkAt = t;
@@ -1794,11 +1837,13 @@ function boxPaint() {
     const mate = mateOf(u.code);
     const myMem = memOf(u.code), ok = gradeOk(myMem);
     const invs = Object.keys(INV || {}).filter(function (h) { return h !== String(u.code) && h !== mate; });
-    let h = '<button class="hr-b on go" data-hr="' + esc(u.code) + '"' + (ok ? '' : ' disabled') + '>🏠 사택 안으로 들어가기' + (mate ? ' (' + esc(nameIn(mate)) + ' 사원과 함께)' : '') + '</button>';
-    if (!ok) h += '<div class="note">사택 안은 A 등급 이상 사택부터 들어갈 수 있습니다 (지금 ' + esc(gradeOf(myMem)) + ' 등급)</div>';
+    // ★ 초대받은 집을 맨 위에 · 단추마다 「들어가기」 (2026-11-13 — 「들어가기」라고 적힌 것이 제 사택 단추뿐이라 그것을 눌렀다)
+    let h = '';
     if (invs.length) {
-        h += '<div class="sub"><div class="cap">초대받은 사택</div>' + invs.map(function (c) { return '<button class="hr-b" data-hr="' + esc(c) + '">💌 ' + esc((INV[c] && INV[c].n) || nameIn(c)) + ' 사원의 사택</button>'; }).join('') + '</div>';
+        h += '<div class="sub inv"><div class="cap">💌 초대받은 사택</div>' + invs.map(function (c) { return '<button class="hr-b on go" data-hr="' + esc(c) + '">💌 ' + esc((INV[c] && INV[c].n) || nameIn(c)) + ' 사원의 사택 들어가기</button>'; }).join('') + '</div>';
     }
+    h += '<button class="hr-b' + (invs.length ? '' : ' on') + ' go" data-hr="' + esc(u.code) + '"' + (ok ? '' : ' disabled') + '>🏠 ' + (invs.length ? '내 ' : '') + '사택 안으로 들어가기' + (mate ? ' (' + esc(nameIn(mate)) + ' 사원과 함께)' : '') + '</button>';
+    if (!ok) h += '<div class="note">' + (invs.length ? '내 사택은 A 등급 미만이라 못 들어갑니다 (지금 ' : '사택 안은 A 등급 이상 사택부터 들어갈 수 있습니다 (지금 ') + esc(gradeOf(myMem)) + ' 등급)' + (invs.length ? ' — 초대받은 사택은 위 단추로 들어갑니다' : '') + '</div>';
     if (el._h !== h) {
         el._h = h;
         el.innerHTML = h;
