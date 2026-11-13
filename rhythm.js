@@ -37,6 +37,9 @@
 //   ■ 기록   곡 · 난이도마다 최고 정확도 — 이 기기에 (rgBest) · 랭킹은 서버에
 //   ■ 키보드 S D F J K L · 스페이스 = 멈춤 — PC(마우스가 있는 기기)에서는 판정선 밑에 키를 보여 준다 (2026-11-11)
 //     여섯 줄 키는 ⚙ 설정의 「키 배치」에서 줄마다 바꾼다 (같은 키를 고르면 두 줄이 서로 바뀐다 · 기본값으로 되돌리기)
+//   ★ 2026-11-13 사용자 「리듬게임 듀얼 모드 만들자. 파트별로 서로 번갈아 치는 형식으로 해서. 오른쪽 위에 치는 거 보이고」
+//     · 곡 고르기의 [DUEL] → 접속해 있는 사원에게 신청 → 수락하면 둘이 같은 때에 시작해 파트(마디 넷쯤)마다 번갈아 친다
+//     · 내 화면에는 내 파트의 노트만 · 상대가 치는 모습은 오른쪽 위 작은 화면에 · 끝나면 둘의 정확도를 나란히 (아래 「👥 듀얼」 마당)
 //
 //   콘솔   rhythmOpen()
 
@@ -223,6 +226,10 @@ const SET = Object.assign({ speed: 5, offset: 0, vis: 0, hit: true, song: 'airpl
 // 싱크가 둘로 나뉘면서 뜻이 바뀌었다 — 전 값은 버리고 0 에서 (2026-11-11)
 if (SET.sv !== 2) { SET.offset = 0; SET.vis = 0; SET.sv = 2; saveJ(SET_KEY, SET); }
 function saveSet() { saveJ(SET_KEY, SET); }
+// 👥 듀얼 — 지금 듀얼(없으면 null) · 값들 (아래 「듀얼」 마당)
+const DUEL_PATH = 'rhythmDuel', DUEL_INV = 'rhythmDuelInv';
+const DC = { INV_MS: 30000, LOAD_MS: 45000, START_MS: 4200, FLUSH_MS: 180, DELAY: 650, PART_MS: 8000, MINI: 0.27, RES_WAIT: 9000 };
+let DUEL = null;
 function sgn(v) { return (v > 0 ? '+' : '') + v; }
 
 // 랭크 — 정확도로 (ALL CHARMING 은 L)
@@ -566,7 +573,7 @@ function css() {
         '.rg-left{width:min(34%,240px);}',
         '.rg-set{align-self:flex-start;padding:7px 14px;font-size:12px;background:rgba(255,255,255,.08);}',
         '.rg-meta{font-size:12px;color:#99a;letter-spacing:.5px;}',
-        '.rg-acts{display:flex;gap:10px;align-items:center;margin-top:4px;}',
+        '.rg-acts{display:flex;gap:10px;align-items:center;margin-top:4px;flex-wrap:wrap;}',
         '.rg-ic{width:48px;height:48px;padding:0;font-size:20px;background:rgba(255,255,255,.08);}',
         '.rg-box.rg-setbox{min-width:250px;max-width:340px;align-items:stretch;gap:12px;}',
         '.rg-setbox .rg-row{justify-content:space-between;font-size:13px;}',
@@ -630,7 +637,17 @@ function css() {
         '.rg-rkrow .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
         '.rg-rkrow .rg-rk{width:34px;text-align:center;}',
         '.rg-rkrow .pc{width:62px;text-align:right;font-family:Georgia,serif;}',
-        '.rg-rkrow small{width:22px;font-size:10px;color:#ffe066;}'
+        '.rg-rkrow small{width:22px;font-size:10px;color:#ffe066;}',
+        // 👥 듀얼 (2026-11-13)
+        '.rg-duelbtn{padding:12px 14px;font-size:14px;font-weight:bold;letter-spacing:2px;background:transparent;border:2px solid rgba(181,140,255,.8);color:#e6dcff;}',
+        '.rg-drow{display:flex;align-items:center;gap:8px;padding:11px 8px;border-bottom:1px solid rgba(255,255,255,.07);cursor:pointer;}',
+        '.rg-drow .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+        '.rg-drow i{font-style:normal;font-size:11px;color:#8fe3a8;}',
+        '.rg-vs{display:flex;gap:14px;align-items:stretch;}',
+        '.rg-vcol{min-width:150px;text-align:center;padding:8px 12px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);}',
+        '.rg-vcol.win{border-color:#ffe066;box-shadow:0 0 16px -6px #ffe066;}',
+        '.rg-vcol .nm{font-size:13px;color:#ccd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px;margin:0 auto 2px;}',
+        '.rg-vcol .cnt{font-size:11px;color:#aab;line-height:1.7;}'
     ].join('\n');
     document.head.appendChild(s);
 }
@@ -642,6 +659,7 @@ function fit() {
     ST.style.width = VW + 'px'; ST.style.height = VH + 'px';
     ST.style.transform = rot ? ('translateX(' + w + 'px) rotate(90deg)') : 'none';
     ST.classList.toggle('rg-r', rot);                 // 돌린 무대 — 상단바 여백을 어느 쪽에 줄지 (.rg-pause)
+    safeRead();
     // ★ 2.5 → 2 — 휴대폰(3배 화면)에서 칠할 점이 3분의 1 넘게 준다 · 눈으로는 거의 같다 (2026-11-11 발열)
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     CV.width = Math.round(VW * dpr); CV.height = Math.round(VH * dpr);
@@ -649,6 +667,21 @@ function fit() {
     if (CB) { CB.width = CV.width; CB.height = CV.height; GB.setTransform(dpr, 0, 0, dpr, 0, 0); }
     STILL.key = null; STILL.clr = false; STILL.dirty = true;
     layout();
+}
+// 안전 여백(노치 · 상단바 · 홈 막대) — **무대 기준**으로 (돌린 무대면 무대의 왼쪽이 화면의 위). 캔버스에 그리는 것(듀얼의 오른쪽 위 화면)이 쓴다
+let SAFE = { t: 0, r: 0, b: 0, l: 0 };
+function safeRead() {
+    try {
+        let p = document.getElementById('rg-safe');
+        if (!p) {
+            p = document.createElement('div'); p.id = 'rg-safe';
+            p.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);';
+            OV.appendChild(p);
+        }
+        const cs = getComputedStyle(p), n = function (k) { return parseFloat(cs[k]) || 0; };
+        const a = { t: n('paddingTop'), r: n('paddingRight'), b: n('paddingBottom'), l: n('paddingLeft') };
+        SAFE = rot ? { l: a.t, t: a.r, r: a.b, b: a.l } : a;
+    } catch (e) { SAFE = { t: 0, r: 0, b: 0, l: 0 }; }
 }
 // 손가락 자리 → 무대 자리 (세워 두면 돌려서)
 function toStage(cx, cy) {
@@ -685,6 +718,7 @@ function open() {
     raf();
 }
 function close() {
+    if (DUEL) duelLeave();                      // 듀얼 중에 닫으면 나간 것으로
     previewStop(true);
     calStop(); C = null;
     stopPlay();
@@ -763,7 +797,7 @@ function menu() {
         + '<div class="rg-big"><div class="rg-jacket"' + coverCss(s) + '></div><div class="rg-info">'
         + '<div class="rg-title">' + esc(s.title) + '</div><div class="rg-meta">' + esc(s.artist) + (chart ? ' · BPM ' + bpm + ' · ' + len : '') + '</div>'
         + '<div class="rg-diffs">' + diffs + '</div>'
-        + '<div class="rg-acts">' + (owned(s) ? '<button class="rg-btn rg-go" data-k="go">START</button>' : s.price ? '<button class="rg-btn rg-go" data-k="buy">🔒 ' + s.price.toLocaleString() + 'P 해금</button>' : '<button class="rg-btn rg-go" data-k="buy">🔒 잠김</button>')
+        + '<div class="rg-acts">' + (owned(s) ? '<button class="rg-btn rg-go" data-k="go">START</button><button class="rg-btn rg-duelbtn" data-k="duel">DUEL</button>' : s.price ? '<button class="rg-btn rg-go" data-k="buy">🔒 ' + s.price.toLocaleString() + 'P 해금</button>' : '<button class="rg-btn rg-go" data-k="buy">🔒 잠김</button>')
         + '<button class="rg-btn rg-ic" data-k="rank" title="랭킹">🏆</button></div>'
         + '</div></div></div>';
     const sl = UI.querySelector('.rg-songs');
@@ -779,11 +813,13 @@ function menu() {
             const k = el.dataset.k;
             if (k === 'x') { close(); return; }
             if (k === 'go') { saveSet(); start(); return; }
+            if (k === 'duel') { saveSet(); duelPick(); return; }
             if (k === 'buy') { if (song().price) buyModal(song()); else needModal(song()); return; }
             if (k === 'set') { setModal(); return; }
             if (k === 'rank') { rankModal(SET.diff); return; }
         };
     });
+    if (DUEL && DUEL.st === 'inv') duelWaitUI();       // 곡 고르기를 다시 그려도 「답을 기다리는 중」 창은 그대로
 }
 // ⚙ 설정 — 속도 · 타격음 · 싱크 맞추기 (곡 고르기 화면을 다시 그리지 않고 그 자리에서 바뀐다)
 function setModal() {
@@ -886,19 +922,23 @@ function rankModal(d) {
 // 판
 // ==========================================
 let P = null;        // 지금 판
+// 전체 화면 · 가로 고정 (되는 기기만) — 손짓 안에서 부른다
+function goFull() {
+    try {
+        if (OV && !document.fullscreenElement && OV.requestFullscreen) {
+            OV.requestFullscreen({ navigationUI: 'hide' }).then(function () {
+                try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(function () { }); } catch (e) { }
+            }).catch(function () { });
+        }
+    } catch (e) { }
+}
 function start() {
     if (!owned(song())) { if (song().price) buyModal(song()); else needModal(song()); return; }
     previewStop(true);
     const s = song(), d = SET.diff;
     // 손짓 안에서 — 소리 · 전체 화면 · 가로 고정 (소리 종류를 먼저 — 도는 소리 장치 위에서 바꾸지 않게)
     sessionOn(); ctx(); keepAlive();
-    try {
-        if (!document.fullscreenElement && OV.requestFullscreen) {
-            OV.requestFullscreen({ navigationUI: 'hide' }).then(function () {
-                try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(function () { }); } catch (e) { }
-            }).catch(function () { });
-        }
-    } catch (e) { }
+    goFull();
     MODE = 'load';
     UI.innerHTML = '<div class="rg-bg"></div><div class="rg-load">불러오는 중…</div>';
     Promise.all([loadSong(s), loadChart(s)]).then(function (r) {
@@ -912,19 +952,21 @@ function start() {
 }
 function begin(s, d, buf, chart) {
     const c = chart.charts[d];
-    const notes = c.notes.map(function (n, i) {
+    let notes = c.notes.map(function (n, i) {
         const k = n[2] === 3 ? 2 : n[2];               // 지그재그(3)는 슬라이드처럼 판정 — 초록으로만 그린다
         return { i: i, t: n[0], lane: n[1], x: xOfLane(n[1]), w: NOTE_W[k] || 0.15, k: k, z: n[2] === 3, len: k === 1 ? n[3] : 0, ch: k === 2 ? n[3] : 0,
                  done: false, j: null, hold: null, tail: null };
     });
+    if (DUEL) notes = duelSplit(notes, chart);     // 👥 듀얼 — 내 파트의 노트만 (상대 몫은 오른쪽 위 작은 화면으로)
     // 슬라이드 줄 — 같은 번호끼리 차례대로 (희미한 줄로 잇는다)
     const chains = {};
     notes.forEach(function (n) { if (n.k === 2) (chains[n.ch] = chains[n.ch] || []).push(n); });
     const total = notes.reduce(function (a, n) { return a + (n.k === 1 ? 2 : 1); }, 0);
     P = { s: s, d: d, chart: chart, notes: notes, chains: chains, total: total, score: 0, combo: 0, maxCombo: 0,
-          cnt: { c: 0, n: 0, m: 0 }, offs: [], ptr: {}, judge: null, fx: [], parts: [], ended: false, head: 0 };
-    UI.innerHTML = '<button class="rg-pause" data-k="pause">❚❚</button>';
-    UI.querySelector('[data-k="pause"]').onclick = function (e) { e.stopPropagation(); pause(); };
+          cnt: { c: 0, n: 0, m: 0 }, offs: [], ptr: {}, judge: null, fx: [], parts: [], ended: false, head: 0, duel: !!DUEL };
+    // 듀얼에는 멈춤이 없다 — 같은 자리에 ✕ (나가기)
+    UI.innerHTML = DUEL ? '<button class="rg-pause" data-k="quit">✕</button>' : '<button class="rg-pause" data-k="pause">❚❚</button>';
+    UI.querySelector('.rg-pause').onclick = function (e) { e.stopPropagation(); if (DUEL) duelQuitAsk(); else pause(); };
     bindInput();
     bgFor(s);                                      // 바탕 표지를 미리 받아 둔다
     if (AU.lag[s.key] == null) AU.lag[s.key] = headLag(buf, chart.head);
@@ -932,10 +974,13 @@ function begin(s, d, buf, chart) {
     clockReset();
     const cx = ctx();
     keepAlive();
-    AU.src = cx.createBufferSource(); AU.src.buffer = buf; AU.src.connect(AU.gain);
-    AU.startAt = cx.currentTime + LEAD;
-    AU.src.start(AU.startAt);
-    AU.src.onended = function () { if (P && MODE === 'play') P.audioEnd = true; };
+    if (DUEL) { duelAudio(buf); duelListen(); }    // 둘이 같은 때(서버 시각)에 시작한다
+    else {
+        AU.src = cx.createBufferSource(); AU.src.buffer = buf; AU.src.connect(AU.gain);
+        AU.startAt = cx.currentTime + LEAD;
+        AU.src.start(AU.startAt);
+        AU.src.onended = function () { if (P && MODE === 'play') P.audioEnd = true; };
+    }
     P.buf = buf;
     wdReset();
     MODE = 'play';
@@ -958,7 +1003,7 @@ function wakeShow() {
     if (!UI || UI.querySelector('.rg-wake')) return;
     WD.on = true;
     const m = document.createElement('div'); m.className = 'rg-modal rg-wake';
-    m.innerHTML = '<div class="rg-box" style="align-items:center;text-align:center;gap:10px;"><div style="font-size:13px;color:#ccd;line-height:1.7;">소리가 멈춰 있습니다<br><small style="color:#99a;">눌러 주시면 이 곡을 처음부터 다시 시작합니다</small></div>'
+    m.innerHTML = '<div class="rg-box" style="align-items:center;text-align:center;gap:10px;"><div style="font-size:13px;color:#ccd;line-height:1.7;">소리가 멈춰 있습니다<br><small style="color:#99a;">' + (DUEL ? '눌러 주시면 지금 자리부터 이어집니다' : '눌러 주시면 이 곡을 처음부터 다시 시작합니다') + '</small></div>'
         + '<button class="rg-btn rg-go" data-k="wake">▶ 눌러서 시작</button></div>';
     UI.appendChild(m);
     m.querySelector('[data-k="wake"]').onclick = function (e) { e.stopPropagation(); wakeGo(); };
@@ -966,6 +1011,16 @@ function wakeShow() {
 function wakeHide() { WD.on = false; const m = UI && UI.querySelector('.rg-wake'); if (m) m.remove(); }
 function wakeGo() {
     if (!P) return;
+    if (DUEL && DUEL.st === 'play') {              // 듀얼 — 처음부터가 아니라 서버 시각에 맞는 자리부터
+        wakeHide();
+        const o = AU.ctx; AU.ctx = null;
+        try { if (o && o.state !== 'closed') o.close(); } catch (e) { }
+        AU.keep = null;
+        sessionOn(); ctx(); keepAlive();
+        duelAudio(P.buf);
+        wdReset();
+        return;
+    }
     const s = P.s, d = P.d, chart = P.chart, buf = P.buf || AU.bufs[s.key];
     wakeHide();
     stopPlay();
@@ -1005,7 +1060,7 @@ function stopPlay() {
     unbindInput();
 }
 function pause() {
-    if (MODE !== 'play') return;
+    if (MODE !== 'play' || DUEL) return;               // 듀얼에는 멈춤이 없다 (둘의 곡이 어긋난다)
     MODE = 'pause';
     STILL.pauseAt = performance.now();
     try { AU.ctx.suspend(); } catch (e) { }
@@ -1396,7 +1451,7 @@ function onKey(e) {
         if ((k === ' ' || keys().indexOf(k) >= 0) && !e.repeat) { e.preventDefault(); e.stopPropagation(); calTap(evAge(e), null); }
         return;
     }
-    if (k === 'escape') { if (MODE === 'play') pause(); e.preventDefault(); return; }
+    if (k === 'escape') { if (MODE === 'play') { if (DUEL) duelQuitAsk(); else pause(); } e.preventDefault(); return; }
     if (MODE !== 'play' || !P) return;
     if (k === ' ') { pause(); e.preventDefault(); return; }
     const lane = keys().indexOf(k);
@@ -1429,7 +1484,7 @@ function raf() {
     // 곡 고르기 · 결과 — 한 번만 지우고 쉰다 (전에는 틀마다 온 화면을 지웠다)
     if (MODE !== 'play' && MODE !== 'pause') { if (G2 && !STILL.clr) { G2.clearRect(0, 0, VW, VH); STILL.clr = true; } return; }
     STILL.clr = false;
-    if (MODE === 'play') { watchdog(); clockTick(); P.lastNow = songMs(); P.lastVis = visMs(); step(P.lastNow); }
+    if (MODE === 'play') { watchdog(); clockTick(); P.lastNow = songMs(); P.lastVis = visMs(); step(P.lastNow); if (DUEL) duelTick(); }
     // 멈춤 — 판정 글자가 사그라질 동안만 그리고 쉰다 (화면 크기가 바뀌면 한 번 더)
     else if (performance.now() - STILL.pauseAt > 700 && !STILL.dirty) return;
     STILL.dirty = false;
@@ -1564,25 +1619,13 @@ function stageLine(g) {
     g.fillStyle = 'rgba(235,242,255,0.9)';
     [L.lineL, L.lineL + L.lineW].forEach(function (x) { g.beginPath(); g.arc(x, L.yJ, 4, 0, Math.PI * 2); g.fill(); });
 }
-function draw(now) {
-    const g = G2; if (!g || !L) return;
-    const vis = 7000 / SET.speed;                     // 멀리서 판정선까지 걸리는 ms
-    const pOf = function (t) { return 1 - (t - now) / vis; };
-    const tnow = performance.now();
-    if (stillPaint(P.s)) { g.clearRect(0, 0, VW, VH); stageBars(g, pOf, P.chart.bars); }
-    else drawStage(g, pOf, P.chart.bars, bgFor(P.s));
-    // 손가락 자리 — 판정선 위 은은한 빛
-    Object.keys(P.ptr).forEach(function (id) {
-        const q = P.ptr[id]; if (!q || q.u == null) return;
-        const x = xAt(q.u, 1);
-        const rg = g.createRadialGradient(x, L.yJ, 0, x, L.yJ, L.lineW * 0.07);
-        rg.addColorStop(0, 'rgba(200,225,255,0.45)'); rg.addColorStop(1, 'rgba(200,225,255,0)');
-        g.fillStyle = rg; g.fillRect(x - L.lineW * 0.07, L.yJ - L.lineW * 0.07, L.lineW * 0.14, L.lineW * 0.14);
-    });
+// 슬라이드 줄 · 노트 — S 는 판(P) 또는 듀얼의 상대 몫(DUEL.O). mini — 오른쪽 위 작은 화면 (줄여 그리니 건반 · 줄을 도톰하게)
+function drawNotes(g, S, pOf, mini) {
+    const nh = L.nh * (mini ? 1.9 : 1);
     // 슬라이드 줄 — 희미하게
-    Object.keys(P.chains).forEach(function (c) {
-        const ch = P.chains[c]; if (ch.length < 2) return;
-        g.strokeStyle = ch[0].z ? 'rgba(110,240,150,0.45)' : 'rgba(255,214,90,0.38)'; g.lineWidth = 3; g.lineCap = 'round';     // 지그재그는 초록 줄
+    Object.keys(S.chains).forEach(function (c) {
+        const ch = S.chains[c]; if (ch.length < 2) return;
+        g.strokeStyle = ch[0].z ? 'rgba(110,240,150,0.45)' : 'rgba(255,214,90,0.38)'; g.lineWidth = mini ? 9 : 3; g.lineCap = 'round';     // 지그재그는 초록 줄
         g.beginPath(); let st = false;
         for (let i = 0; i < ch.length; i++) {
             const n = ch[i]; const p = pOf(n.t); if (p < 0) break; if (n.done && i < ch.length - 1 && ch[i + 1].done) continue;
@@ -1592,10 +1635,10 @@ function draw(now) {
         if (st) g.stroke();
     });
     // 노트 — 먼 것부터 (가까운 것이 위에)
-    let last = P.head;
-    while (last < P.notes.length && pOf(P.notes[last].t) >= 0) last++;
-    for (let i = last - 1; i >= P.head; i--) {
-        const n = P.notes[i];
+    let last = S.head;
+    while (last < S.notes.length && pOf(S.notes[last].t) >= 0) last++;
+    for (let i = last - 1; i >= S.head; i--) {
+        const n = S.notes[i];
         const p = pOf(n.t);
         if (n.k === 1) {
             if (n.tail) continue;
@@ -1615,18 +1658,20 @@ function draw(now) {
             bg2.addColorStop(0, holding ? 'rgba(210,230,255,0.25)' : 'rgba(200,215,245,0.15)');
             bg2.addColorStop(1, holding ? 'rgba(235,245,255,0.75)' : 'rgba(210,225,255,0.45)');
             g.fillStyle = bg2; g.fill();
-            g.strokeStyle = holding ? 'rgba(255,255,255,0.8)' : 'rgba(220,232,255,0.45)'; g.lineWidth = 1.2; g.stroke();
-            if (pe > 0) { const sc = scaleAt(pe); key(g, xAt(n.x, sc), yAt(sc), n.w * L.lineW * sc * 0.7, L.nh * sc * 0.5, 0, false); }
+            g.strokeStyle = holding ? 'rgba(255,255,255,0.8)' : 'rgba(220,232,255,0.45)'; g.lineWidth = mini ? 4 : 1.2; g.stroke();
+            if (pe > 0) { const sc = scaleAt(pe); key(g, xAt(n.x, sc), yAt(sc), n.w * L.lineW * sc * 0.7, nh * sc * 0.5, 0, false); }
             const sc = scaleAt(ph);
-            key(g, xAt(n.x, sc), yAt(sc), n.w * L.lineW * sc, L.nh * sc, 1, holding);
+            key(g, xAt(n.x, sc), yAt(sc), n.w * L.lineW * sc, nh * sc, 1, holding);
             continue;
         }
         if (n.done || p < 0 || p > 1.25) continue;
         const sc = scaleAt(p);
-        key(g, xAt(n.x, sc), yAt(sc), n.w * L.lineW * sc, L.nh * sc * (n.k === 2 ? 0.8 : 1), n.z ? 3 : n.k, false);
+        key(g, xAt(n.x, sc), yAt(sc), n.w * L.lineW * sc, nh * sc * (n.k === 2 ? 0.8 : 1), n.z ? 3 : n.k, false);
     }
+}
+function drawFx(g, S, tnow, mini) {
     // 맞힌 자리 — 번쩍 · 부서지는 빛
-    P.fx.forEach(function (f) {
+    S.fx.forEach(function (f) {
         const k = (tnow - f.at) / 260; if (k >= 1) return;
         const w = f.w * L.lineW * (1 + k * 0.5), x = xAt(f.x, 1);
         g.save(); g.globalAlpha = (1 - k) * 0.9;
@@ -1636,13 +1681,32 @@ function draw(now) {
         g.fillStyle = rg; g.fillRect(x - w, L.yJ - w * 0.75, w * 2, w * 1.5);
         g.restore();
     });
-    P.parts = P.parts.filter(function (q) { return tnow - q.at < 520; });
-    P.parts.forEach(function (q) {
+    if (mini) return;
+    S.parts = S.parts.filter(function (q) { return tnow - q.at < 520; });
+    S.parts.forEach(function (q) {
         const k = (tnow - q.at) / 520;
         const x = xAt(q.x + q.vx * k * 0.35, 1), y = L.yJ + q.vy * k * VH * 0.35 + k * k * VH * 0.25;
         g.fillStyle = q.k === 'c' ? 'rgba(255,225,240,' + (1 - k) + ')' : 'rgba(200,230,255,' + (1 - k) + ')';
         g.fillRect(x - 2, y - 2, 4, 4);
     });
+}
+function draw(now) {
+    const g = G2; if (!g || !L) return;
+    const vis = 7000 / SET.speed;                     // 멀리서 판정선까지 걸리는 ms
+    const pOf = function (t) { return 1 - (t - now) / vis; };
+    const tnow = performance.now();
+    if (stillPaint(P.s)) { g.clearRect(0, 0, VW, VH); stageBars(g, pOf, P.chart.bars); }
+    else drawStage(g, pOf, P.chart.bars, bgFor(P.s));
+    // 손가락 자리 — 판정선 위 은은한 빛
+    Object.keys(P.ptr).forEach(function (id) {
+        const q = P.ptr[id]; if (!q || q.u == null) return;
+        const x = xAt(q.u, 1);
+        const rg = g.createRadialGradient(x, L.yJ, 0, x, L.yJ, L.lineW * 0.07);
+        rg.addColorStop(0, 'rgba(200,225,255,0.45)'); rg.addColorStop(1, 'rgba(200,225,255,0)');
+        g.fillStyle = rg; g.fillRect(x - L.lineW * 0.07, L.yJ - L.lineW * 0.07, L.lineW * 0.14, L.lineW * 0.14);
+    });
+    drawNotes(g, P, pOf, false);
+    drawFx(g, P, tnow, false);
     // PC — 판정선 밑에 키 (누르고 있으면 밝게)
     if (showKeys()) {
         const ky = L.yJ + Math.min(VH * 0.09, (VH - L.yJ) * 0.55);
@@ -1684,18 +1748,21 @@ function draw(now) {
         g.fillText('C O M B O', VW / 2, VH * 0.3 + VH * 0.045);
         g.restore();
     }
-    // 위 — 진행 · 정확도
-    const prog = Math.max(0, Math.min(1, now / P.chart.dur));
-    g.fillStyle = 'rgba(255,255,255,0.1)'; g.fillRect(0, 0, VW, 2);
-    g.fillStyle = P.s.color; g.fillRect(0, 0, VW * prog, 2);
-    const done = P.cnt.c + P.cnt.n + P.cnt.m;
-    const acc = done ? (P.cnt.c + P.cnt.n * 0.6) / done * 100 : 100;
-    g.textAlign = 'right'; g.textBaseline = 'top';
-    g.fillStyle = '#fff'; g.font = '600 ' + Math.round(VH * 0.048) + 'px Georgia, serif';
-    g.fillText(acc.toFixed(2) + '%', VW - 14, 10);
-    g.font = Math.round(VH * 0.027) + 'px sans-serif'; g.fillStyle = 'rgba(255,255,255,0.55)';
-    const D = DIFFS.find(function (d) { return d[0] === P.d; });
-    g.fillText(P.s.title + ' · ' + D[1] + ' ' + P.chart.charts[P.d].level, VW - 14, 12 + VH * 0.055);
+    // 위 — 진행 · 정확도 (듀얼 — 진행은 파트별로 · 정확도는 왼쪽 위 · 오른쪽 위는 상대 화면)
+    if (DUEL && DUEL.O && P.duel) duelHud(g, now, tnow);
+    else {
+        const prog = Math.max(0, Math.min(1, now / P.chart.dur));
+        g.fillStyle = 'rgba(255,255,255,0.1)'; g.fillRect(0, 0, VW, 2);
+        g.fillStyle = P.s.color; g.fillRect(0, 0, VW * prog, 2);
+        const done = P.cnt.c + P.cnt.n + P.cnt.m;
+        const acc = done ? (P.cnt.c + P.cnt.n * 0.6) / done * 100 : 100;
+        g.textAlign = 'right'; g.textBaseline = 'top';
+        g.fillStyle = '#fff'; g.font = '600 ' + Math.round(VH * 0.048) + 'px Georgia, serif';
+        g.fillText(acc.toFixed(2) + '%', VW - 14, 10);
+        g.font = Math.round(VH * 0.027) + 'px sans-serif'; g.fillStyle = 'rgba(255,255,255,0.55)';
+        const D = DIFFS.find(function (d) { return d[0] === P.d; });
+        g.fillText(P.s.title + ' · ' + D[1] + ' ' + P.chart.charts[P.d].level, VW - 14, 12 + VH * 0.055);
+    }
     g.textBaseline = 'alphabetic';
     if (now < 0) {
         g.save(); g.textAlign = 'center';
@@ -1703,15 +1770,567 @@ function draw(now) {
         g.fillText(P.s.title, VW / 2, VH * 0.42);
         g.font = Math.round(VH * 0.03) + 'px Georgia, serif'; g.fillStyle = 'rgba(255,255,255,0.55)';
         g.fillText(P.s.artist, VW / 2, VH * 0.42 + VH * 0.06);
+        if (DUEL && P.duel) { g.globalAlpha = Math.min(1, -now / 600); g.font = '600 ' + Math.round(VH * 0.036) + 'px Georgia, serif'; g.fillStyle = P.s.color; g.fillText('VS  ' + DUEL.oppName, VW / 2, VH * 0.42 + VH * 0.14); }
         g.restore();
     }
 }
+
+// ==========================================
+// 👥 듀얼 (2026-11-13 사용자 「리듬게임 듀얼 모드 만들자. 파트별로 서로 번갈아 치는 형식으로 해서. 오른쪽 위에 치는 거 보이고」)
+// ==========================================
+//   둘이 한 곡을 **파트별로 번갈아** 친다. 곡 고르기의 [DUEL] → 접속해 있는 사원을 골라 신청 → 상대가 [수락] 하면
+//   둘 다 곡을 받아 두고 같은 때(서버 시각)에 시작한다.
+//   · 파트 — 마디 넷(8 초쯤 · 마디가 긴 곡은 둘)마다 넘어간다. 신청한 쪽이 먼저. 슬라이드 · 지그재그 줄은 끊지 않는다 (줄이 시작한 파트의 몫).
+//   · 내 화면에는 **내 파트의 노트만** 내려온다. 상대 파트에는 판이 비고, **오른쪽 위 작은 화면**에 상대가 치는 모습
+//     (상대 몫의 노트 · 맞힌 자리 · 판정 · 정확도)이 보인다.
+//     친 것은 0.18 초마다 묶어 보내고, 작은 화면은 0.65 초 늦춰 그린다 — 소식이 닿기 전에 노트가 지나가 버리지 않게.
+//   · 점수 — 저마다 제 파트의 정확도. 끝나면 둘을 나란히 보여 주고 높은 쪽이 WIN.
+//   · 멈춤이 없다 (둘의 곡이 어긋난다) — 왼쪽 위 ✕ 는 「나가기」. 한쪽이 나가면 듀얼이 끝난다.
+//     화면을 떠났다 오면(소리 장치가 쉬었다 오면) 서버 시각에 맞는 자리로 곡을 다시 맞춘다.
+//   · 랭킹 · 꿈결 · 이 기기 최고 기록 · 「한 번 플레이」 해금에는 들어가지 않는다 (곡의 반만 치는 판이라 · 사용자가 정한 것은 아니다).
+//   · 잠긴 곡은 둘 다 열어 둔 곡이라야 한다.
+//   적히는 자리
+//     rhythmDuel/<신청한 사번>/m  = { id, host, hn, guest, gn, song, diff, at, st: inv|acc|no|busy|lock|cancel|go,
+//                                     rdy: { 사번: 1 }, startAt (곡의 0 초가 오는 서버 시각), res: { 사번: { s, c, n, m, mc, t } }, quit: 나간 사번 }
+//     rhythmDuel/<신청한 사번>/ev/<사번>/e<차례> = '노트,판정;노트,판정…'   (판정 c · n · m · 길게 누르기 꼬리 C · M,뗀 때)
+//     rhythmDuelInv/<받는 사번>   = { id, host, hn, song, diff, at }     신청 — 받는 쪽 화면이 듣는다 (리듬 게임을 열어 두지 않아도)
+function users() { try { return (typeof db !== 'undefined' && db && db.users) ? db.users : {}; } catch (e) { return {}; } }
+function online() { try { return (typeof onlineUsersMap !== 'undefined' && onlineUsersMap) ? onlineUsersMap : {}; } catch (e) { return {}; } }
+function nameOf(code) { const x = users()[code]; return (x && ((x.badge && x.badge.nickname) || x.name)) || code; }
+function inDark() {
+    try { if (typeof darkRun !== 'undefined' && darkRun) return true; } catch (e) { }
+    try { const o = document.getElementById('dark-run-overlay'); if (o && o.getClientRects().length) return true; } catch (e) { }
+    return false;
+}
+// 받을 수 없는 때 — 다른 판을 치는 중 · 다른 듀얼 중 · 탐사 중
+function duelBusy() {
+    if (DUEL && DUEL.st !== 'result') return true;
+    if (OV && (MODE === 'load' || MODE === 'play' || MODE === 'pause' || MODE === 'cal')) return true;
+    return inDark();
+}
+// ── 파트 나누기
+function duelCuts(chart) {
+    const bars = (chart && chart.bars) || [], gaps = [];
+    for (let i = 1; i < bars.length; i++) gaps.push(bars[i] - bars[i - 1]);
+    const bl = median(gaps) || 2000;
+    const n = Math.max(2, Math.min(8, Math.round(DC.PART_MS / bl / 2) * 2));
+    const cuts = [];
+    for (let i = n; i < bars.length; i += n) cuts.push(bars[i]);
+    return cuts;
+}
+function duelPartAt(cuts, t) { let k = 0; while (k < cuts.length && t >= cuts[k] - 40) k++; return k; }
+// 모든 노트 → 내 몫만 돌려준다 (상대 몫은 DUEL.O — 오른쪽 위 작은 화면)
+function duelSplit(notes, chart) {
+    const my = DUEL;
+    const cuts = my.cuts = duelCuts(chart);
+    const cp = {};
+    notes.forEach(function (n) { if (n.k === 2 && cp[n.ch] == null) cp[n.ch] = duelPartAt(cuts, n.t); });
+    const mine = [], theirs = [];
+    notes.forEach(function (n) {
+        n.pt = n.k === 2 ? cp[n.ch] : duelPartAt(cuts, n.t);
+        ((n.pt % 2) === my.mine ? mine : theirs).push(n);
+    });
+    // 내 노트 — 앞 노트의 끝과 얼마나 떨어져 있나 (「내 차례」 알림)
+    let end = -1e9;
+    mine.forEach(function (n) { n.gap = n.t - end; end = Math.max(end, n.t + (n.len || 0)); });
+    my.lastEnd = end;
+    const chains = {}, byI = {};
+    theirs.forEach(function (n) { byI[n.i] = n; if (n.k === 2) (chains[n.ch] = chains[n.ch] || []).push(n); });
+    my.O = { notes: theirs, chains: chains, byI: byI, head: 0, fx: [], parts: [], pend: [], judge: null, cnt: { c: 0, n: 0, m: 0 }, combo: 0, maxCombo: 0,
+             total: theirs.reduce(function (a, n) { return a + (n.k === 1 ? 2 : 1); }, 0) };
+    my.out = []; my.sent = 0; my.seq = 0; my.flushAt = 0; my.checkAt = 0;
+    return mine;
+}
+// ── 곡 — 서버 시각 startAt 이 곡의 0 초가 되게 튼다 (이미 지났으면 그만큼 건너뛴 자리부터)
+function duelAudio(buf) {
+    const my = DUEL; if (!my || !buf) return;
+    const cx = ctx();
+    try { if (AU.src) { AU.src.onended = null; AU.src.stop(); } } catch (e) { }
+    const lead = (my.startAt - srv()) / 1000;
+    const src = cx.createBufferSource(); src.buffer = buf; src.connect(AU.gain);
+    const t = cx.currentTime;
+    if (lead > 0.08) { AU.startAt = t + lead; src.start(AU.startAt); }
+    else {
+        const off = 0.08 - lead;
+        AU.startAt = t + 0.08 - off;
+        if (off < buf.duration - 0.05) src.start(t + 0.08, off);
+    }
+    src.onended = function () { if (P && MODE === 'play' && AU.src === src) P.audioEnd = true; };
+    AU.src = src;
+    my.syncAt = performance.now();
+    clockReset();
+}
+// ── 내가 친 것 보내기 — 판정이 난 노트를 훑어 묶어 둔다
+function duelScan(now) {
+    const my = DUEL; if (!my || !P) return;
+    for (let i = my.sent; i < P.notes.length; i++) {
+        const n = P.notes[i];
+        if (n.t > now + 400) break;
+        if (n.done && !n.sj) { n.sj = 1; my.out.push(n.i + ',' + (n.j || 'm')); }
+        if (n.k === 1 && n.tail && !n.st) { n.st = 1; my.out.push(n.i + ',' + (n.tail === 'c' ? 'C' : 'M,' + Math.round(Math.min(now, n.t + n.len)))); }
+    }
+    while (my.sent < P.notes.length && P.notes[my.sent].sj && (P.notes[my.sent].k !== 1 || P.notes[my.sent].st)) my.sent++;
+}
+function duelFlush() {
+    const my = DUEL; if (!my || !my.out || !my.out.length) return;
+    try { my.ref.child('ev/' + my.me + '/e' + (my.seq++)).set(my.out.join(';')); } catch (e) { }
+    my.out = []; my.flushAt = performance.now();
+}
+// 한 프레임에 한 번 (판이 도는 동안)
+function duelTick() {
+    const my = DUEL; if (!my || !P || my.st !== 'play') return;
+    const tnow = performance.now();
+    duelScan(P.lastNow);
+    if (my.out.length && tnow - my.flushAt >= DC.FLUSH_MS) duelFlush();
+    // 곡이 서버 시각에서 벗어났으면 (화면을 떠났다 옴 · 소리 장치가 쉬었다 옴) 그 자리로 다시 맞춘다
+    if (tnow - my.checkAt > 1000) {
+        my.checkAt = tnow;
+        const c = AU.ctx;
+        if (c && c.state === 'running' && tnow - my.syncAt > 2500) {
+            const want = srv() - my.startAt, have = (c.currentTime - AU.startAt) * 1000;
+            if (Math.abs(want - have) > 300 && want < P.chart.dur) duelAudio(P.buf);
+        }
+    }
+}
+// ── 상대가 친 것 받기
+function duelListen() {
+    const my = DUEL; if (!my || my.evRef) return;
+    my.evRef = my.ref.child('ev/' + my.opp);
+    my.evRef.on('child_added', function (snap) { if (DUEL === my) duelRecv(snap && snap.val()); });
+}
+function duelRecv(str) {
+    const my = DUEL, O = my && my.O; if (!O || typeof str !== 'string') return;
+    str.split(';').forEach(function (e) {
+        const a = e.split(','), n = O.byI[Number(a[0])], c = a[1];
+        if (!n || !c) return;
+        let at = n.t;
+        if (c === 'm') at = n.t + (n.k === 2 ? W_SLIDE : W_NORMAL);
+        else if (c === 'C') at = n.t + n.len;
+        else if (c === 'M') at = Number(a[2]) || (n.t + n.len);
+        O.pend.push({ n: n, c: c, at: at });
+    });
+}
+function duelDo(O, e) {
+    const n = e.n, t = performance.now();
+    const hit = function (k) {
+        O.cnt[k]++;
+        if (k === 'm') O.combo = 0;
+        else { O.combo++; if (O.combo > O.maxCombo) O.maxCombo = O.combo; O.fx.push({ x: n.x, w: n.w, at: t, k: k }); if (O.fx.length > 30) O.fx.shift(); }
+        O.judge = { k: k, at: t };
+    };
+    if (e.c === 'c' || e.c === 'n' || e.c === 'm') {
+        if (n.hj) return;
+        n.hj = 1; n.done = true; n.j = e.c;
+        if (n.k === 1 && e.c !== 'm') n.hold = 1;
+        hit(e.c);
+    } else if (e.c === 'C' || e.c === 'M') {
+        if (n.tj) return;
+        n.tj = 1; n.tail = e.c === 'C' ? 'c' : 'm'; n.hold = null;
+        hit(n.tail);
+    }
+}
+// 작은 화면의 시각(mnow)까지 온 소식을 판에 옮긴다
+function duelApply(O, mnow) {
+    if (O.pend.length) {
+        const keep = [];
+        for (let i = 0; i < O.pend.length; i++) { const e = O.pend[i]; if (e.at <= mnow) duelDo(O, e); else keep.push(e); }
+        O.pend = keep;
+    }
+    // 소식이 끝내 안 온 노트는 조용히 넘긴다
+    for (let i = O.head; i < O.notes.length; i++) {
+        const n = O.notes[i];
+        if (n.t > mnow - 1200) break;
+        if (!n.done) { n.done = true; n.j = 'x'; if (n.k === 1) n.tail = 'x'; }
+        else if (n.k === 1 && !n.tail && mnow > n.t + n.len + 700) { n.tail = 'x'; n.hold = null; }
+    }
+    while (O.head < O.notes.length && O.notes[O.head].done && (O.notes[O.head].k !== 1 || O.notes[O.head].tail)) O.head++;
+}
+function duelTally(O) {
+    return { s: O.total ? Math.round(1000000 * (O.cnt.c + O.cnt.n * 0.6) / O.total) : 0, c: O.cnt.c, n: O.cnt.n, m: O.cnt.m, mc: O.maxCombo, t: O.total };
+}
+// ── 그리기 — 위 진행 줄 · 내 정확도(왼쪽 위) · 차례 알림 · 오른쪽 위 상대 화면
+function duelHud(g, now, tnow) {
+    const my = DUEL, O = my.O;
+    // 진행 — 내 파트는 곡 빛 · 상대 파트는 흐리게 · 지금 자리는 흰 눈금
+    const dur = P.chart.dur, cuts = my.cuts;
+    let a = 0;
+    for (let k = 0; k <= cuts.length; k++) {
+        const b = k < cuts.length ? cuts[k] : dur, mine = (k % 2) === my.mine;
+        g.globalAlpha = mine ? 0.8 : 0.16;
+        g.fillStyle = mine ? P.s.color : '#fff';
+        g.fillRect(VW * a / dur, 0, Math.max(1, VW * (b - a) / dur - 1), 3);
+        a = b;
+    }
+    g.globalAlpha = 1;
+    g.fillStyle = '#fff'; g.fillRect(VW * Math.max(0, Math.min(1, now / dur)) - 1, 0, 2, 7);
+    // 내 정확도 — ✕ 옆
+    const pb = UI && UI.querySelector('.rg-pause');
+    const hx = pb ? pb.offsetLeft + pb.offsetWidth + 12 : 62, hy = pb ? pb.offsetTop : 8, fs = Math.round(VH * 0.048);
+    const done = P.cnt.c + P.cnt.n + P.cnt.m;
+    const acc = done ? (P.cnt.c + P.cnt.n * 0.6) / done * 100 : 100;
+    g.textAlign = 'left'; g.textBaseline = 'top';
+    g.fillStyle = '#fff'; g.font = '600 ' + fs + 'px Georgia, serif';
+    g.fillText(acc.toFixed(2) + '%', hx, hy + Math.max(0, (34 - fs) / 2));
+    // 차례 — 내 파트가 오기 직전 「내 차례」 · 상대 파트 동안 흐리게 「○○ 차례」
+    let nx = null;
+    for (let i = P.head; i < P.notes.length; i++) { if (!P.notes[i].done) { nx = P.notes[i]; break; } }
+    const left = nx ? nx.t - now : 1e9;
+    g.save(); g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+    if (nx && nx.gap > 2600 && left > 0 && left <= 1700) {
+        g.globalAlpha = Math.max(0, Math.min(1, (1700 - left) / 250) * Math.min(1, left / 250));
+        g.shadowColor = P.s.color; g.shadowBlur = 16;
+        g.fillStyle = '#fff'; g.font = '600 ' + Math.round(VH * 0.075) + 'px Georgia, serif';
+        g.fillText('내 차례', VW / 2, VH * 0.5);
+    } else if (now > 0 && now < dur && !Object.keys(P.ptr).some(function (id) { return P.ptr[id] && P.ptr[id].hold; })
+        && (nx ? (left > 1700 && now > nx.t - nx.gap + 500) : (O.head < O.notes.length && now > my.lastEnd + 500))) {
+        g.fillStyle = 'rgba(255,255,255,0.2)'; g.font = Math.round(VH * 0.045) + 'px sans-serif';
+        g.fillText(my.oppName + ' 차례', VW / 2, VH * 0.5);
+    }
+    g.restore();
+    duelMini(g, now, tnow);
+}
+// 오른쪽 위 — 상대가 치는 모습 (무대를 그대로 줄여 그린다)
+function duelMini(g, now, tnow) {
+    const my = DUEL, O = my.O; if (!O || !L) return;
+    const sc = DC.MINI, w = Math.round(VW * sc), h = Math.round(VH * sc);
+    const x0 = Math.round(VW - w - 12 - SAFE.r), y0 = Math.round(10 + SAFE.t);
+    const mnow = now - DC.DELAY;
+    duelApply(O, mnow);
+    const their = (duelPartAt(my.cuts, mnow) % 2) !== my.mine && mnow > 0;
+    const vis = 7000 / SET.speed;
+    const pOf = function (t) { return 1 - (t - mnow) / vis; };
+    g.save();
+    rr(g, x0, y0, w, h, 9); g.fillStyle = 'rgba(5,5,12,0.72)'; g.fill();
+    g.save(); g.clip();
+    g.translate(x0, y0); g.scale(sc, sc);
+    const s0 = scaleAt(0), yy = yAt(s0);
+    g.beginPath(); g.moveTo(xAt(0, s0), yy); g.lineTo(xAt(1, s0), yy); g.lineTo(xAt(1, 1), L.yJ); g.lineTo(xAt(0, 1), L.yJ); g.closePath();
+    const fl = g.createLinearGradient(0, yy, 0, L.yJ);
+    fl.addColorStop(0, 'rgba(120,150,220,0)'); fl.addColorStop(1, 'rgba(140,170,240,0.22)');
+    g.fillStyle = fl; g.fill();
+    g.fillStyle = their ? 'rgba(235,242,255,0.95)' : 'rgba(235,242,255,0.4)'; g.fillRect(L.lineL, L.yJ - 4, L.lineW, 8);
+    drawNotes(g, O, pOf, true);
+    drawFx(g, O, tnow, true);
+    if (O.judge) {
+        const k = (tnow - O.judge.at) / 520;
+        if (k < 1) {
+            const J = JTX[O.judge.k];
+            g.globalAlpha = 1 - k * k; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+            g.fillStyle = J[1]; g.font = '600 ' + Math.round(VH * 0.13) + 'px Georgia, serif';
+            g.fillText(J[0], VW / 2, L.yJ - VH * 0.2);
+            g.globalAlpha = 1;
+        }
+    }
+    g.restore();
+    rr(g, x0, y0, w, h, 9);
+    g.strokeStyle = their ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.22)'; g.lineWidth = their ? 1.6 : 1; g.stroke();
+    // 이름 · 정확도
+    const fs = Math.max(10, Math.round(VH * 0.03));
+    const done = O.cnt.c + O.cnt.n + O.cnt.m;
+    const acc = (done ? (O.cnt.c + O.cnt.n * 0.6) / done * 100 : 100).toFixed(2) + '%';
+    g.font = '600 ' + fs + 'px sans-serif'; g.textBaseline = 'top';
+    g.fillStyle = 'rgba(255,255,255,0.9)';
+    g.textAlign = 'right'; g.fillText(acc, x0 + w - 8, y0 + 6);
+    let nm = String(my.oppName || '');
+    const room = w - 22 - g.measureText(acc).width;
+    while (nm.length > 1 && g.measureText(nm).width > room) nm = nm.slice(0, -1);
+    g.textAlign = 'left'; g.fillStyle = their ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.6)'; g.fillText(nm, x0 + 8, y0 + 6);
+    g.restore();
+}
+// ── 신청 (곡 고르기의 [DUEL])
+function duelNote(html) {
+    if (!UI) return;
+    const old = UI.querySelector('.rg-duelnote'); if (old) old.remove();
+    const m = document.createElement('div'); m.className = 'rg-modal rg-duelnote';
+    m.innerHTML = '<div class="rg-box" style="align-items:center;text-align:center;gap:12px;min-width:240px;"><div style="font-size:13px;color:#ccd;line-height:1.7;">' + html + '</div><button class="rg-btn" data-k="ok" style="width:140px">확인</button></div>';
+    UI.appendChild(m);
+    m.querySelector('[data-k="ok"]').onclick = function () { m.remove(); };
+}
+function duelPick() {
+    const s = song(), me = u_();
+    if (!me || !UI || DUEL || !owned(s)) return;
+    previewStop(true);
+    sessionOn(); ctx();                                    // 손짓 안에서 소리 장치를 깨워 둔다
+    const old = UI.querySelector('.rg-duelmodal'); if (old) old.remove();
+    const on = online(), book = users();
+    const rows = Object.keys(book).map(function (c) { return book[c]; })
+        .filter(function (x) { return x && x.code && x.code !== me.code && on[x.code]; })
+        .sort(function (a, b) { return String(nameOf(a.code)).localeCompare(String(nameOf(b.code)), 'ko'); });
+    const d = DIFFS.find(function (x) { return x[0] === SET.diff; }), ch = CH[s.key];
+    const lv = ch && ch.charts[SET.diff] ? ' ' + ch.charts[SET.diff].level : '';
+    const m = document.createElement('div'); m.className = 'rg-modal rg-duelmodal';
+    m.innerHTML = '<div class="rg-box rg-rkbox"><div style="display:flex;align-items:center;gap:8px;width:100%;"><b style="flex:1;letter-spacing:3px;">DUEL</b><button class="rg-btn" data-k="c" style="padding:5px 10px;">✕</button></div>'
+        + '<div style="font-size:12px;color:#ccd;">' + esc(s.title) + ' · <b style="color:' + d[3] + '">' + d[1] + lv + '</b></div>'
+        + '<div class="rg-cal-tip">파트를 번갈아 칩니다 — 상대를 골라 주세요</div>'
+        + '<div class="rg-rklist">' + (rows.length ? rows.map(function (x) { return '<div class="rg-drow" data-c="' + esc(x.code) + '"><span class="nm">' + esc(nameOf(x.code)) + '</span><i>● 접속 중</i></div>'; }).join('')
+            : '<div style="color:#889;padding:14px 0;text-align:center;">지금 접속해 있는 사원이 없습니다</div>') + '</div></div>';
+    UI.appendChild(m);
+    m.onclick = function (e) { if (e.target === m) m.remove(); };
+    m.querySelector('[data-k="c"]').onclick = function () { m.remove(); };
+    dragScroll(m.querySelector('.rg-rklist'));
+    Array.prototype.forEach.call(m.querySelectorAll('[data-c]'), function (r) { r.onclick = function () { m.remove(); duelCreate(r.dataset.c, s.key, SET.diff); }; });
+}
+function duelCreate(g, songKey, diff) {
+    const me = u_(), db = db_();
+    if (!me || !db || !UI || DUEL) return;
+    if (!online()[g]) { duelNote(esc(nameOf(g)) + ' 님이 지금 접속해 있지 않습니다'); return; }
+    sessionOn(); ctx(); keepAlive(); goFull();             // 손짓 안에서 — 수락은 한참 뒤에 온다
+    const id = srv().toString(36) + Math.random().toString(36).slice(2, 6);
+    const m = { id: id, host: me.code, hn: myName(), guest: g, gn: nameOf(g), song: songKey, diff: diff, at: srv(), st: 'inv' };
+    const ref = db.ref(DUEL_PATH + '/' + me.code);
+    try {
+        ref.set({ m: m });                                 // 지난 듀얼의 흔적(ev)도 같이 지워진다
+        db.ref(DUEL_INV + '/' + g).set({ id: id, host: me.code, hn: m.hn, song: songKey, diff: diff, at: m.at });
+    } catch (e) { duelNote('신청을 보내지 못했습니다'); return; }
+    const my = DUEL = { id: id, host: me.code, guest: g, me: me.code, opp: g, oppName: m.gn, mine: 0, song: songKey, diff: diff, st: 'inv', ref: ref, mref: ref.child('m'), m: m, at: Date.now() };
+    duelWatch();
+    duelWaitUI();
+    my.to = setTimeout(function () { if (DUEL === my && my.st === 'inv') { duelLeave(); duelNote(esc(my.oppName) + ' 님에게서 답이 없습니다'); } }, DC.INV_MS);
+}
+function duelWaitUI() {
+    const my = DUEL; if (!my || !UI || my.st !== 'inv') return;
+    const old = UI.querySelector('.rg-duelwait'); if (old) old.remove();
+    const m = document.createElement('div'); m.className = 'rg-modal rg-duelwait';
+    m.innerHTML = '<div class="rg-box" style="align-items:center;text-align:center;gap:10px;min-width:250px;"><b style="letter-spacing:4px;">DUEL</b>'
+        + '<div style="font-size:13px;color:#ccd;line-height:1.7;">' + esc(my.oppName) + ' 님의 답을 기다리는 중…<br><small data-v="left" style="color:#99a;"></small></div>'
+        + '<button class="rg-btn" data-k="no" style="width:160px">취소</button></div>';
+    UI.appendChild(m);
+    m.querySelector('[data-k="no"]').onclick = function () { m.remove(); duelLeave(); };
+    const tick = function () {
+        if (!m.isConnected) return;
+        if (DUEL !== my || my.st !== 'inv') { m.remove(); return; }
+        m.querySelector('[data-v="left"]').textContent = Math.max(0, Math.ceil((DC.INV_MS - (Date.now() - my.at)) / 1000)) + '초';
+        setTimeout(tick, 500);
+    };
+    tick();
+}
+// ── 방 듣기
+function duelWatch() {
+    const my = DUEL;
+    my.mref.on('value', function (snap) { if (DUEL === my) duelOnMeta(snap && snap.val()); });
+    try { my.mref.child('quit').onDisconnect().set(my.me); } catch (e) { }       // 접속이 끊기면 나간 것으로
+}
+function duelOnMeta(m) {
+    const my = DUEL; if (!my) return;
+    if (!m || m.id !== my.id) { if (my.st !== 'result') duelEnded('듀얼이 끝났습니다'); return; }
+    my.m = m;
+    if (my.st === 'inv') {
+        if (m.st === 'acc') { my.st = 'load'; clearTimeout(my.to); duelLoad(); }
+        else if (m.st === 'no' || m.st === 'busy' || m.st === 'lock') {
+            const why = m.st === 'no' ? ' 님이 거절했습니다' : m.st === 'lock' ? ' 님이 아직 열지 않은 곡입니다' : ' 님은 지금 받을 수 없습니다';
+            duelDrop();
+            duelNote(esc(my.oppName) + why);
+        }
+        return;
+    }
+    if ((my.st === 'load' || my.st === 'play') && (m.st === 'cancel' || (m.quit && m.quit !== my.me))) { duelEnded(esc(my.oppName) + ' 님이 나갔습니다'); return; }
+    if (my.st === 'load') duelGo();
+    if (m.res && m.res[my.opp] && !my.oppRes) { my.oppRes = m.res[my.opp]; if (my.st === 'result') duelResultPaint(); }
+}
+// 상대가 나갔다 · 방이 없어졌다 — 판을 접고 곡 고르기로
+function duelEnded(html) {
+    duelDrop();
+    stopPlay();
+    try { if (AU.ctx) AU.ctx.resume(); } catch (e) { }
+    P = null;
+    if (!OV) return;
+    menu();
+    duelNote(html);
+}
+// 내가 그만둔다 (취소 · 나가기 · 닫기)
+function duelLeave() {
+    const my = DUEL; if (!my) return;
+    const db = db_();
+    try {
+        if (my.st === 'inv') {
+            my.mref.update({ st: 'cancel' });
+            // 내가 보낸 신청만 걷는다 (그 사이 다른 사원의 신청이 와 있을 수 있다) — 듣고 있지 않은 자리라 트랜잭션 대신 읽고 지운다
+            if (db) { const r = db.ref(DUEL_INV + '/' + my.guest); r.once('value').then(function (snap) { const v = snap && snap.val(); if (v && v.id === my.id) r.remove(); }).catch(function () { }); }
+        } else if (my.st === 'load' || my.st === 'play') my.mref.update({ quit: my.me });
+    } catch (e) { }
+    duelDrop();
+}
+function duelDrop() {
+    const my = DUEL; DUEL = null;
+    if (!my) return;
+    clearTimeout(my.to); clearTimeout(my.to2); clearTimeout(my.to3);
+    try { my.mref.off(); } catch (e) { }
+    try { if (my.evRef) my.evRef.off(); } catch (e) { }
+    try { my.mref.child('quit').onDisconnect().cancel(); } catch (e) { }
+    try { if (my.st === 'result' && my.me === my.host) my.ref.child('ev').remove(); } catch (e) { }      // 다 본 흔적은 치운다
+    if (UI) Array.prototype.forEach.call(UI.querySelectorAll('.rg-duelwait,.rg-duelquit'), function (e) { e.remove(); });
+}
+// ── 곡 받기 → 둘 다 준비되면 같은 때에 시작
+function duelLoad() {
+    const my = DUEL; if (!my || !UI) return;
+    const s = SONGS.find(function (x) { return x.key === my.song; });
+    if (!s) { duelLeave(); menu(); return; }
+    previewStop(true);
+    MODE = 'load';
+    UI.innerHTML = '<div class="rg-bg"></div><div class="rg-load"><div style="text-align:center;line-height:2;"><div style="font-size:12px;letter-spacing:4px;color:#9ab;">DUEL · VS ' + esc(my.oppName) + '</div><div data-v="dl">불러오는 중…</div></div></div>'
+        + '<button class="rg-btn rg-x" data-k="dq">✕</button>';
+    UI.querySelector('[data-k="dq"]').onclick = function () { duelLeave(); menu(); };
+    my.to2 = setTimeout(function () { if (DUEL === my && my.st === 'load') { duelLeave(); menu(); duelNote('상대가 준비되지 않아 듀얼을 접었습니다'); } }, DC.LOAD_MS);
+    Promise.all([loadSong(s), loadChart(s)]).then(function (r) {
+        if (DUEL !== my || !OV || my.st !== 'load') return;
+        my.buf = r[0]; my.chart = r[1]; my.loaded = true;
+        const el = UI.querySelector('[data-v="dl"]'); if (el) el.textContent = '상대를 기다리는 중…';
+        try { my.mref.child('rdy/' + my.me).set(1); } catch (e) { }
+        duelGo();
+    }).catch(function (e) {
+        if (DUEL !== my) return;
+        duelLeave();
+        if (!OV) return;
+        menu();
+        duelNote('곡을 불러오지 못했습니다<br><small style="color:#99a;">' + esc(e && e.message ? e.message : e) + '</small>');
+    });
+}
+function duelGo() {
+    const my = DUEL; if (!my || my.st !== 'load' || !my.loaded || !my.m) return;
+    const m = my.m;
+    if (!m.startAt) {
+        if (my.me === my.host && !my.sentGo && m.rdy && m.rdy[my.host] && m.rdy[my.guest]) {
+            my.sentGo = true;
+            try { my.mref.update({ startAt: srv() + DC.START_MS, st: 'go' }); } catch (e) { }
+        }
+        return;
+    }
+    clearTimeout(my.to2);
+    my.st = 'play'; my.startAt = Number(m.startAt);
+    begin(SONGS.find(function (x) { return x.key === my.song; }), my.diff, my.buf, my.chart);
+}
+// 판 가운데서 ✕ — 곡은 멈추지 않는다
+function duelQuitAsk() {
+    if (!UI || !DUEL || UI.querySelector('.rg-duelquit')) return;
+    const m = document.createElement('div'); m.className = 'rg-modal rg-duelquit';
+    m.innerHTML = '<div class="rg-box" style="align-items:center;text-align:center;"><b style="letter-spacing:4px;">DUEL</b>'
+        + '<div style="font-size:12px;color:#ccd;line-height:1.7;">나가면 듀얼이 끝납니다<br><small style="color:#99a;">곡은 멈추지 않고 흐르고 있습니다</small></div>'
+        + '<button class="rg-btn" data-k="r" style="width:180px">계속</button><button class="rg-btn" data-k="q" style="width:180px">나가기</button></div>';
+    UI.appendChild(m);
+    m.querySelector('[data-k="r"]').onclick = function () { m.remove(); };
+    m.querySelector('[data-k="q"]').onclick = function () { m.remove(); duelLeave(); stopPlay(); try { AU.ctx.resume(); } catch (e) { } P = null; menu(); };
+}
+// ── 끝 — 둘을 나란히
+function duelResult() {
+    const my = DUEL; if (!my || !P) return;
+    MODE = 'result'; my.st = 'result';
+    duelScan(1e12); duelFlush();
+    stopPlay();
+    my.myRes = { s: Math.round(P.score), c: P.cnt.c, n: P.cnt.n, m: P.cnt.m, mc: P.maxCombo, t: P.total };
+    try { my.mref.child('res/' + my.me).set(my.myRes); } catch (e) { }
+    if (my.m && my.m.res && my.m.res[my.opp]) my.oppRes = my.m.res[my.opp];
+    my.to3 = setTimeout(function () { if (DUEL === my && !my.oppRes) { my.oppLost = true; duelResultPaint(); } }, DC.RES_WAIT);
+    duelResultPaint();
+}
+function duelCol(name, r, win) {
+    if (!r) return '<div class="rg-vcol"><div class="nm">' + esc(name) + '</div><div style="font-size:12px;color:#889;padding:44px 0;">기록을 기다리는 중…</div></div>';
+    const ac = r.m === 0 && r.n === 0 && r.c > 0, fc = r.m === 0 && (r.c + r.n) > 0;
+    const rk = rankOf(r.s, ac);
+    return '<div class="rg-vcol' + (win ? ' win' : '') + '"><div class="nm">' + esc(name) + '</div>'
+        + '<div class="rg-rank rg-rk" style="--r:' + rk[2] + ';font-family:Georgia,serif;font-size:' + (rk[0].length > 1 ? 46 : 58) + 'px;">' + rk[0] + '</div>'
+        + '<div style="font-family:Georgia,serif;font-weight:300;font-size:24px;color:#fff;">' + (r.s / 10000).toFixed(2) + '<small style="font-size:13px;">%</small></div>'
+        + '<div class="cnt"><b style="color:#ff9ccf">CHARMING</b> ' + r.c + '<br><b style="color:#7ec8ff">NORMAL</b> ' + r.n + ' · <b style="color:#a3a3b3">MISS</b> ' + r.m + '<br>MAX COMBO ' + r.mc
+        + (ac ? '<br><b style="color:#ffc1e3">ALL CHARMING</b>' : fc ? '<br><b style="color:#ffe066">ALL COMBO</b>' : '') + '</div></div>';
+}
+function duelResultPaint() {
+    const my = DUEL; if (!my || !UI || my.st !== 'result') return;
+    const a = my.myRes, b = my.oppRes || (my.oppLost ? duelTally(my.O) : null);
+    const s = SONGS.find(function (x) { return x.key === my.song; }) || {}, d = DIFFS.find(function (x) { return x[0] === my.diff; }) || DIFFS[1];
+    const lv = my.chart && my.chart.charts[my.diff] ? my.chart.charts[my.diff].level : '';
+    const v = b ? (a.s > b.s ? 'WIN' : a.s < b.s ? 'LOSE' : 'DRAW') : '';
+    const vc = v === 'WIN' ? '#ffe066' : v === 'LOSE' ? '#a3a3b3' : '#9fd4ff';
+    UI.innerHTML = '<div class="rg-bg"></div><div class="rg-modal" style="background:transparent"><div class="rg-box" style="padding:14px 22px;gap:8px;">'
+        + '<div style="font-size:13px;color:#aab;">' + esc(s.title) + ' · <b style="color:' + d[3] + '">' + d[1] + ' ' + lv + '</b> · DUEL</div>'
+        + '<div class="rg-vs">' + duelCol(myName(), a, v === 'WIN') + duelCol(my.oppName, b, v === 'LOSE') + '</div>'
+        + '<div data-v="verdict" style="font-family:Georgia,serif;font-size:26px;font-weight:900;letter-spacing:6px;color:' + vc + ';text-shadow:0 0 18px ' + vc + ';min-height:32px;">' + v + '</div>'
+        + (my.oppLost && !my.oppRes ? '<div style="font-size:11px;color:#889;">상대 기록이 닿지 않아 본 만큼으로 셈했습니다</div>' : '')
+        + '<div style="display:flex;gap:10px;"><button class="rg-btn" data-k="re">한 번 더</button><button class="rg-btn" data-k="q">곡 고르기</button></div></div></div>';
+    UI.querySelector('[data-k="q"]').onclick = function () { duelDrop(); P = null; menu(); };
+    UI.querySelector('[data-k="re"]').onclick = function () { const o = { c: my.opp, s: my.song, d: my.diff }; duelDrop(); duelCreate(o.c, o.s, o.d); };
+}
+// ── 신청 받기 — 리듬 게임을 열어 두지 않아도 뜬다 (다른 판을 치는 중 · 탐사 중이면 「지금은 받을 수 없음」 으로 돌려보낸다)
+let CARD = null, invRef = null, invFor = '';
+function duelReply(v, st) {
+    const db = db_(), me = u_();
+    if (!db || !me || !v) return Promise.resolve(false);
+    try { db.ref(DUEL_INV + '/' + me.code).transaction(function (x) { return (x && x.id === v.id) ? null : undefined; }); } catch (e) { }
+    return db.ref(DUEL_PATH + '/' + v.host + '/m').transaction(function (m) {
+        if (!m) return m;                                  // 아직 못 받은 값 — 서버 값으로 다시 부른다
+        if (m.id !== v.id || m.st !== 'inv' || m.quit) return;
+        m.st = st; return m;
+    }).then(function (r) { const x = r && r.committed && r.snapshot && r.snapshot.val(); return !!(x && x.id === v.id && x.st === st); })
+      .catch(function () { return false; });
+}
+function duelCardHide() { const c = CARD; CARD = null; if (c) { clearInterval(c.iv); c.el.remove(); } }
+function duelInvite(v) {
+    const me = u_();
+    if (!v || !v.id || !v.host || !me) { duelCardHide(); return; }
+    if (CARD && CARD.v.id === v.id) return;
+    if (srv() - Number(v.at) > DC.INV_MS) { duelCardHide(); try { db_().ref(DUEL_INV + '/' + me.code).remove(); } catch (e) { } return; }
+    if (duelBusy()) { duelReply(v, 'busy'); return; }
+    duelCard(v);
+}
+function duelCard(v) {
+    duelCardHide();
+    css();
+    const s = SONGS.find(function (x) { return x.key === v.song; }), d = DIFFS.find(function (x) { return x[0] === v.diff; }) || DIFFS[1];
+    if (!s) { duelReply(v, 'busy'); return; }
+    const el = document.createElement('div'); el.id = 'rg-duel-card';
+    el.style.cssText = 'position:fixed;inset:0;z-index:2147483600;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.72);padding:16px;box-sizing:border-box;color:#eef;';
+    el.innerHTML = '<div class="rg-box" style="width:100%;max-width:300px;min-width:0;box-sizing:border-box;text-align:center;">'
+        + '<div style="font-size:12px;letter-spacing:5px;color:#9ab;">DUEL</div>'
+        + '<div style="width:92px;height:92px;border-radius:12px;background:#000 center/cover no-repeat;border:1px solid rgba(255,255,255,.14);' + (s.cover ? 'background-image:url(\'' + s.cover + '\');' : '') + '"></div>'
+        + '<div><b style="font-size:16px;color:#fff;">' + esc(s.title) + '</b><div style="font-size:12px;font-weight:bold;letter-spacing:2px;color:' + d[3] + ';margin-top:3px;">' + d[1] + '</div></div>'
+        + '<div style="font-size:13px;color:#ccd;line-height:1.7;">' + esc(v.hn || nameOf(v.host)) + ' 님이 듀얼을 신청했습니다<br><small style="color:#99a;">파트를 번갈아 칩니다 · <span data-v="left"></span></small></div>'
+        + '<div style="display:flex;gap:10px;width:100%;"><button class="rg-btn" data-k="no" style="flex:1;">거절</button><button class="rg-btn rg-go" data-k="yes" style="flex:1.4;padding:10px 12px;font-size:15px;">수락</button></div></div>';
+    ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'click', 'wheel'].forEach(function (t) { el.addEventListener(t, function (e) { e.stopPropagation(); }, { passive: true }); });
+    document.body.appendChild(el);
+    const tick = function () {
+        const left = Math.ceil((DC.INV_MS - (srv() - Number(v.at))) / 1000);
+        if (left <= 0) { duelCardHide(); return; }
+        const t = el.querySelector('[data-v="left"]'); if (t) t.textContent = left + '초';
+    };
+    CARD = { v: v, el: el, iv: setInterval(tick, 500) };
+    tick();
+    el.querySelector('[data-k="no"]').onclick = function () { duelCardHide(); duelReply(v, 'no'); };
+    el.querySelector('[data-k="yes"]').onclick = function () {
+        duelCardHide();
+        if (!owned(s)) { duelReply(v, 'lock'); say('🔒 아직 열지 않은 곡이라 함께 칠 수 없습니다.'); return; }
+        if (DUEL) duelDrop();                               // 지난 듀얼의 결과 화면에 있었다
+        // 손짓 안에서 — 화면 · 소리 장치를 먼저 연다 (답이 서버를 다녀오는 동안 손짓이 끊긴다)
+        if (!OV) { try { window.rhythmOpen(); } catch (e) { } }
+        if (!OV) return;
+        previewStop(true);
+        sessionOn(); ctx(); keepAlive(); goFull();
+        duelReply(v, 'acc').then(function (ok) {
+            if (!OV) return;
+            if (!ok) { if (MODE === 'menu') duelNote('이미 취소된 신청입니다'); return; }
+            if (DUEL) return;
+            const me = u_(), ref = db_().ref(DUEL_PATH + '/' + v.host);
+            DUEL = { id: v.id, host: v.host, guest: me.code, me: me.code, opp: v.host, oppName: v.hn || nameOf(v.host), mine: 1, song: v.song, diff: v.diff, st: 'load', ref: ref, mref: ref.child('m'), m: null, at: Date.now() };
+            duelWatch();
+            duelLoad();
+        });
+    };
+}
+// 들어와 있는 사원의 신청 자리를 듣는다 (들어오고 나가면 다시 건다)
+setInterval(function () {
+    const u = u_(), db = db_(), code = (u && db && u.code) || '';
+    if (code === invFor) return;
+    if (invRef) { try { invRef.off(); } catch (e) { } invRef = null; }
+    duelCardHide();
+    invFor = code;
+    if (!code) return;
+    invRef = db.ref(DUEL_INV + '/' + code);
+    invRef.on('value', function (snap) { try { duelInvite(snap && snap.val()); } catch (e) { console.warn('[🎵] 듀얼 신청', e && e.message); } });
+}, 2000);
 
 // ==========================================
 // 끝
 // ==========================================
 function result() {
     if (!P || !OV) return;
+    if (P.duel) { if (DUEL && DUEL.st === 'play') duelResult(); return; }     // 👥 듀얼 — 랭킹 · 꿈결 · 최고 기록에 들지 않는다
     MODE = 'result';
     stopPlay();
     const sc = Math.round(P.score), pct = (sc / 10000).toFixed(2);
@@ -1781,6 +2400,7 @@ function result() {
 window.rhythmState = function () {
     console.log({ 모드: MODE, 곡: SET.song, 난이도: SET.diff, 속도: SET.speed, 판정싱크: SET.offset, 화면싱크: SET.vis, 점수: P && Math.round(P.score), 콤보: P && P.combo, 판정: P && P.cnt, 소리: AU.ctx && AU.ctx.state });
 };
-window.rhythmDebug = { P: function () { return P; }, now: function () { return songMs(); }, mode: function () { return MODE; }, L: function () { return L; }, lag: function () { return AU.lag; }, headLag: headLag, vis: function () { return visMs(); }, clock: function () { return clockMs(); }, cal: function () { return C; }, set: SET, rankOf: rankOf, previewChunk: previewChunk, previewAt: previewAt, drawOnce: function () { if (P && L) draw(P.lastVis || 0); } };   // 시험 · 콘솔
+window.rhythmDebug = { P: function () { return P; }, now: function () { return songMs(); }, mode: function () { return MODE; }, L: function () { return L; }, lag: function () { return AU.lag; }, headLag: headLag, vis: function () { return visMs(); }, clock: function () { return clockMs(); }, cal: function () { return C; }, set: SET, rankOf: rankOf, previewChunk: previewChunk, previewAt: previewAt, drawOnce: function () { if (P && L) draw(P.lastVis || 0); },
+    duel: function () { return DUEL; }, DC: DC, duelCuts: duelCuts, duelCreate: duelCreate, duelLeave: duelLeave, safe: function () { return SAFE; } };   // 시험 · 콘솔
 console.log('[🎵 리듬] rhythmOpen() — 상담사 전용');
 })();
