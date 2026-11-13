@@ -31,6 +31,10 @@
 //      (문제를 다 풀고도 쇼가 끝날 때까지는 단상에 서 있는다). 광장 → 백일몽 → … 빈 가두리 (gaduri.js by 'quiz' · 때가 되면 저절로 풀린다).
 //      이미 갇혀 있으면 남은 때에 더한다. 갇혀 있는 동안은 새 초대장으로 무대에 못 선다. 하루 한 번 제한은 상에만 — 가두리는 틀릴 때마다.
 //   명패 아래 동그라미 셋이 푼 문제다 (초록 · 빨강). 오른쪽 위 [📺 화요 퀴즈쇼] — 현황 · 더 초대 · 쇼를 끝낸다 · 나간다.
+//   🚪 내보내기 (2026-11-13 사용자 「토크쇼 주인이 패널 내보내기도 가능하게 (게스트)」) — 사회자가 현황의 [내보내기] 로 손님을 무대에서 내린다.
+//      앉아 있던 손님은 **지금까지 채점된 만큼** 셈한다 (쇼를 먼저 끝낼 때와 같다 — 맞힌 수대로 상 · 오답 가두리) → 명패가 비고, 그 사람 화면은 광장으로 돌아간다.
+//      아직 초대장을 보는 손님이면 초대를 거둔다 (초대장이 닫힌다). 내보낸 사람은 그 쇼에 다시 못 들고, 남은 사람만 다 풀면 막이 내린다.
+//      내보낸 만큼 [더 초대] 자리가 다시 난다 (다른 사원을 부를 수 있다 · 같은 사원은 다시 못 부른다).
 //
 //   들어갈 때 (쇼마다 처음 한 번 · 다시 들어갈 때는 커튼만) —
 //   붉은 글씨 여섯 장이 빠르게 지나가고 (지지직거리며 서고 → 종이처럼 찢겨 나가면 그 아래 다음 글씨 · 2026-11-13 사용자 「흐려지는 게 아니라
@@ -46,7 +50,7 @@
 //   R.quiz (그림 quiz-show3 · gate · fit · camX · padTop · full · pud · floor · x1) · goRoom 의 문지기 · plazaPin(p, 풀 때 설 자리) / plazaPinned · plazaOnPaint · plazaOnMySay
 //
 // ■ 적히는 자리
-//   quizShow/<사회자 사번> = { id, host, name, at, inst, inv: { 사번: { at, st: p|y|n } }, seat: { s1..s6: { c, nick, at } },
+//   quizShow/<사회자 사번> = { id, host, name, at, inst, inv: { 사번: { at, st: p|y|n|x(내보냄), xat } }, seat: { s1..s6: { c, nick, at } },
 //                              mark: { 사번: { q1..q3: 1(O) | 2(X) } }, last: { c, v, k, at }, paid: { 사번: { n, at, skip } }, q: { t, at } (화면의 문제), fin (모두 다 풂), end }
 //   quizWin/<사번>/<열쇠>  = { pts, dream, n, wrong, by, name, at, claimed }   받을 상 · 오답 가두리 (그 사원 화면이 받고 지운다 — 나가 있었으면 들어올 때)
 //   quizDay/<사번>         = 'YYYY-MM-DD'                      그날 상을 받았다
@@ -132,6 +136,8 @@ function invOf(s) { return (s && s.inv && typeof s.inv === 'object') ? s.inv : {
 function seatsOf(s) { return (s && s.seat && typeof s.seat === 'object') ? s.seat : {}; }
 function wide(s) { return Object.keys(invOf(s)).length > 3; }                       // 앞줄 단상까지 (6인용)
 function seatKeys(s) { return wide(s) ? Q.FILL6 : Q.FILL3; }                        // 앉히는 차례 (앞에서부터 빈 명패)
+function outOf(s, code) { const v = invOf(s)[code]; return !!(v && v.st === 'x'); }  // 사회자가 내보냈다 (🚪)
+function activeN(s) { const inv = invOf(s); return Object.keys(inv).filter(function (c) { return !(inv[c] && inv[c].st === 'x'); }).length; }   // 초대 자리 — 내보낸 사람은 빼고 센다
 function seatOf(s, code) {
     const st = seatsOf(s);
     for (const k in st) if (st[k] && st[k].c === code && Q.SEAT[k]) return k;
@@ -146,14 +152,14 @@ function guestShows() {                                                         
     const me = u_(); if (!me) return [];
     return Object.keys(SHOWS).map(function (h) { return SHOWS[h]; }).filter(function (s) { return live(s) && s.host !== me.code && invOf(s)[me.code]; });
 }
-function seatedShow() { const me = u_(); return guestShows().filter(function (s) { return seatOf(s, me.code); })[0] || null; }
+function seatedShow() { const me = u_(); return guestShows().filter(function (s) { return seatOf(s, me.code) && !outOf(s, me.code); })[0] || null; }
 // 내가 지금 들어 있는(들어가려는) 쇼
 let going = '';                              // 들어가려는 쇼의 사회자 사번
 function curShow() {
     const me = u_(); if (!me) return null;
     if (going && live(SHOWS[going])) {
         const s = SHOWS[going];
-        if (s.host === me.code || seatOf(s, me.code)) return s;
+        if (s.host === me.code || (seatOf(s, me.code) && !outOf(s, me.code))) return s;
     }
     return myHost() || seatedShow();
 }
@@ -202,7 +208,7 @@ function inviteMore(codes) {
     const me = u_(), d = db_(), s = myHost();
     if (!me || !d || !s) return false;
     const inv = invOf(s);
-    const room = Q.MAX - Object.keys(inv).length;
+    const room = Q.MAX - activeN(s);
     codes = codes.filter(function (c, i) { return c && c !== me.code && !inv[c] && codes.indexOf(c) === i; }).slice(0, Math.max(0, room));
     if (!codes.length) return false;
     const up = {};
@@ -248,6 +254,32 @@ function settle(s, code) {
     }).catch(function () { return false; });
 }
 function prizeText(pz) { return fmt(pz.pts) + ' P' + (pz.dream ? ' + ' + fmt(pz.dream) + ' 꿈결' : ''); }
+// 🚪 내보내기 — 사회자가 손님(패널)을 무대에서 내린다 (머리말)
+//   앉아 있었고 채점된 것이 있으면 먼저 셈한다 (상 · 오답 가두리 — 쇼를 먼저 끝낼 때와 같다). 그다음 명패를 비우고 inv/<사번>/st = 'x'.
+function kick(code) {
+    const s = myHost(), d = db_(), me = u_();
+    if (!s || !d || !me || !code || !invOf(s)[code]) return Promise.resolve(false);
+    const k = seatOf(s, code), nick = nickOf(s, code);
+    if (outOf(s, code) && !k) return Promise.resolve(false);   // 이미 내보냈다 (명패가 남아 있으면 그것만 다시 비운다)
+    const marked = markList(s, code).some(function (v) { return v; });
+    const go = function () {
+        const up = {};
+        up['inv/' + code + '/st'] = 'x';
+        up['inv/' + code + '/xat'] = now();
+        if (k) up['seat/' + k] = null;
+        // 내 화면에 먼저 (서버 값이 곧 온다)
+        invOf(s)[code].st = 'x';
+        if (k && s.seat) delete s.seat[k];
+        if (sel === code) sel = '';
+        return d.ref(PATH + '/' + me.code).update(up).then(function () {
+            try { addHistoryLog(me, '[토크쇼] 🎤 화요 퀴즈쇼 — ' + nameOf(code) + ' 사원을 ' + (k ? '무대에서 내보냈습니다.' : '초대에서 뺐습니다.')); saveFields({ history: 1 }); } catch (e) { }
+            if (roomNow() === ROOM) { sys('🚪 ' + nick + ' — ' + (k ? '무대에서 내려갔습니다.' : '초대를 거뒀습니다.')); paintStage(); paintHost(); }
+            return true;
+        });
+    };
+    const first = (k && marked && !(s.paid && s.paid[code])) ? settle(s, code) : Promise.resolve(true);
+    return first.then(go, go).catch(function () { return false; });
+}
 let ending = false;
 function endShow() {
     const d = db_(), me = u_(), s = myHost();
@@ -360,7 +392,7 @@ function ask(text) {
 // 모두 다 풀었나 — 거절하지 않은 초대 손님이 모두 앉아 세 문제씩 채점됐다
 function allDone(s) {
     const inv = invOf(s);
-    const need = Object.keys(inv).filter(function (c) { return inv[c] && inv[c].st !== 'n'; });
+    const need = Object.keys(inv).filter(function (c) { return inv[c] && inv[c].st !== 'n' && inv[c].st !== 'x'; });      // 거절 · 내보낸 사람은 뺀다
     if (!need.length) return false;
     return need.every(function (c) { return seatOf(s, c) && doneAll(s, c); });
 }
@@ -524,7 +556,7 @@ function pickGuests(more) {
     const me = u_(); if (!me) return;
     const s = more ? myHost() : null;
     const inv0 = invOf(s);
-    const room = Q.MAX - Object.keys(inv0).length;
+    const room = Q.MAX - (s ? activeN(s) : 0);
     if (more && room <= 0) { alert_('이미 ' + Q.MAX + '명을 초대했습니다.'); return; }
     const sel = {};
     const w = box('<div style="font-size:13px; color:#f3e6d2; font-weight:bold; margin-bottom:4px;">🎓 화요 퀴즈쇼 — ' + (more ? '더 초대' : '손님 고르기') + '</div>'
@@ -583,6 +615,8 @@ function pickGuests(more) {
 function statusRows(s) {
     const st = seatsOf(s), inv = invOf(s), me = u_();
     const canPick = !!(me && s.host === me.code && roomNow() === ROOM);      // 사회자 — 무대의 작은 사람을 누르기 어려울 때 여기서 지목한다
+    const canKick = !!(me && s.host === me.code);                              // 사회자 — 🚪 내보내기 (무대 밖에서도)
+    const kickBtn = function (c) { return canKick ? '<button class="game-btn qz-kick" data-c="' + esc(c) + '" style="flex:0 0 auto; margin:0; padding:6px 8px; font-size:10.5px; background:linear-gradient(145deg,#5a1a1a,#220a0a) !important; border-color:#a85a5a !important; color:#f3d2d2 !important;">내보내기</button>' : ''; };
     const seated = {};
     let h = '';
     seatKeys(s).forEach(function (k, i) {
@@ -598,6 +632,7 @@ function statusRows(s) {
             + ((canPick && !ml.every(function (m) { return m; })) ? '<button class="game-btn qz-pick" data-c="' + esc(v.c) + '" style="flex:0 0 auto; margin:0; padding:6px 9px; font-size:11px; background:linear-gradient(145deg,#6a4a22,#2a1b0e) !important; border-color:#c79a5b !important; color:#f3e6d2 !important;">🎯 지목</button>' : '')
             + (pd ? '<div style="flex:0 0 auto; font-size:9.5px; text-align:right; line-height:1.5; color:' + (pd.skip ? '#a88d6a' : '#c79a5b') + ';">' + (pd.skip ? '오늘은 이미 받음' : (Q.PRIZE[pd.n] ? prizeText(Q.PRIZE[pd.n]) : '상 없음'))
                 + (pd.cage ? '<br><span style="color:#ff8a8a;">🔒 가두리 ' + pd.cage + '분</span>' : '') + '</div>' : '')
+            + kickBtn(v.c)
             + '</div>';
     });
     Object.keys(inv).forEach(function (c) {
@@ -606,7 +641,8 @@ function statusRows(s) {
         h += '<div style="display:flex; align-items:center; gap:8px; padding:8px 0; border-top:1px solid rgba(255,255,255,0.06);">'
             + '<div style="flex:0 0 auto; width:20px; font-size:10px; color:#a88d6a;">–</div>'
             + '<div style="flex:1; min-width:0; font-size:12px; color:#a88d6a;">' + esc(nameOf(c)) + '</div>'
-            + '<div style="flex:0 0 auto; font-size:10px; color:#a88d6a;">' + (stt === 'n' ? '거절' : '초대장을 보는 중') + '</div></div>';
+            + '<div style="flex:0 0 auto; font-size:10px; color:#a88d6a;">' + (stt === 'n' ? '거절' : stt === 'x' ? '내보냄' : '초대장을 보는 중') + '</div>'
+            + ((stt !== 'n' && stt !== 'x') ? kickBtn(c) : '') + '</div>';
     });
     return h || '<div style="font-size:10.5px; color:#a88d6a; padding:6px 0;">아직 아무도 없습니다.</div>';
 }
@@ -614,7 +650,7 @@ function manage() {
     const me = u_(), s = curShow();
     if (!me || !s) { shut(); return; }
     const host = s.host === me.code, inRoom = roomNow() === ROOM;
-    const left = Q.MAX - Object.keys(invOf(s)).length;
+    const left = Q.MAX - activeN(s);
     const w = box('<div style="font-size:13px; color:#f3e6d2; font-weight:bold; margin-bottom:4px;">🎓 화요 퀴즈쇼' + (host ? ' — 진행' : '') + '</div>'
         + '<div style="font-size:10px; color:#a88d6a; margin-bottom:8px; line-height:1.6;">' + (host
             ? '참가자를 <b>눌러 지목</b>한 뒤 「정답」 · 「오답」 · 「땡」 이 든 말을 하면(또는 아래 띠의 ⭕ ❌) 그 사람에게 <b style="color:#3ddc6a;">O</b> · <b style="color:#ff4a4a;">X</b> 가 들어갑니다. 한 사람에 세 문제 — 다 채점되면 그 자리에서 상이 나가고, <b>모두 다 풀면 막이 내립니다.</b>'
@@ -632,6 +668,20 @@ function manage() {
         const b = e.target && e.target.closest ? e.target.closest('.qz-pick') : null;
         if (!b) return;
         e.stopPropagation(); shut(); sel = ''; pick(b.dataset.c);
+    });
+    w.addEventListener('click', function (e) {                 // 🚪 내보내기 — 한 번 더 묻는다
+        const b = e.target && e.target.closest ? e.target.closest('.qz-kick') : null;
+        if (!b || !host) return;
+        e.stopPropagation();
+        const c = b.dataset.c, cur = myHost();
+        if (!cur || !invOf(cur)[c] || (outOf(cur, c) && !seatOf(cur, c))) { manage(); return; }
+        const on = !!seatOf(cur, c), nm = nickOf(cur, c);
+        const w2 = box('<div style="text-align:center; padding:10px 4px 2px;"><div style="font-size:15px; color:#f3e6d2; letter-spacing:1px; margin-bottom:10px;">' + esc(nm) + ' — ' + (on ? '무대에서 내보냅니까?' : '초대를 거둡니까?') + '</div>'
+            + '<div style="font-size:11px; color:#a88d6a; line-height:1.7;">' + (on ? '지금까지 채점된 만큼 셈하고(맞힌 수대로 상 · 오답 가두리) 명패를 비웁니다.<br>' : '') + '이 쇼에는 다시 들어오지 못합니다.</div></div>'
+            + '<div style="display:flex; gap:8px; margin-top:16px;"><button id="qz-n" class="game-btn" style="flex:1; ' + B_GREY + '">아니다</button>'
+            + '<button id="qz-y" class="game-btn" style="flex:1; ' + B_RED + '">' + (on ? '내보낸다' : '거둔다') + '</button></div>');
+        w2.querySelector('#qz-n').onclick = manage;
+        w2.querySelector('#qz-y').onclick = function () { const y = w2.querySelector('#qz-y'); y.disabled = true; kick(c).then(manage, manage); };
     });
     if (q('qz-in')) q('qz-in').onclick = function () { shut(); enter(s.host); };
     if (q('qz-more')) q('qz-more').onclick = function () { pickGuests(true); };
@@ -653,7 +703,7 @@ window.quizShowManage = manage;
 const later = {};                            // { 쇼 id: 1 } — 「나중에」 로 접어 둔 초대장
 function pendingShow() {
     const me = u_(); if (!me) return null;
-    return guestShows().filter(function (s) { const v = invOf(s)[me.code]; return v && v.st !== 'n' && !seatOf(s, me.code); })[0] || null;
+    return guestShows().filter(function (s) { const v = invOf(s)[me.code]; return v && v.st !== 'n' && v.st !== 'x' && !seatOf(s, me.code); })[0] || null;
 }
 function inDark() {
     try { if (typeof darkRun !== 'undefined' && darkRun) return true; } catch (e) { }
@@ -702,6 +752,7 @@ function accept(s, nick) {
     const me = u_(), d = db_();
     if (!me || !d) return;
     if (!live(SHOWS[s.host])) { shut(); alert_('이미 끝난 쇼입니다.'); return; }
+    if (!invOf(SHOWS[s.host])[me.code] || outOf(SHOWS[s.host], me.code)) { shut(); alert_('초대가 거둬졌습니다.'); return; }
     if (caged()) { alert_('🔒 가두리에 갇혀 있는 동안은 무대에 설 수 없습니다.\n풀려난 뒤에 [입장] 을 눌러 주세요.'); return; }
     const keys = seatKeys(SHOWS[s.host]);
     let got = '';
@@ -713,7 +764,11 @@ function accept(s, nick) {
         return;                                                                                    // 자리가 없다
     }).then(function (r) {
         if (!r || !r.committed || !got) { alert_('단상에 빈자리가 없습니다.'); return; }
-        try { d.ref(PATH + '/' + s.host + '/inv/' + me.code + '/st').set('y'); } catch (e) { }
+        if (outOf(SHOWS[s.host], me.code)) {                   // 앉는 사이에 사회자가 초대를 거뒀다 — 자리를 도로 비운다
+            try { d.ref(PATH + '/' + s.host + '/seat/' + got).transaction(function (v) { return (v && v.c === me.code) ? null : undefined; }); } catch (e) { }
+            shut(); alert_('초대가 거둬졌습니다.'); return;
+        }
+        try { d.ref(PATH + '/' + s.host + '/inv/' + me.code + '/st').transaction(function (v) { return v === 'x' ? undefined : 'y'; }); } catch (e) { }
         // 내 화면에 먼저 (서버 값이 곧 온다)
         const cur = SHOWS[s.host];
         if (cur) { cur.seat = r.snapshot.val() || cur.seat; }
@@ -828,6 +883,7 @@ function enter(host) {
     const me = u_();
     const s = SHOWS[host];
     if (!me || !live(s)) { alert_('이미 끝난 쇼입니다.'); return; }
+    if (s.host !== me.code && outOf(s, me.code)) { alert_('사회자가 내보낸 쇼에는 다시 들어갈 수 없습니다.'); return; }
     if (s.host !== me.code && !seatOf(s, me.code)) { alert_('초대장으로 먼저 자리에 앉아야 합니다.'); return; }
     if (caged()) { alert_('🔒 가두리에 갇혀 있는 동안은 무대에 설 수 없습니다.'); return; }
     bgmUnlock();                                               // 🎺 누른 손길 안에서 소리 길을 열어 둔다
@@ -1424,9 +1480,36 @@ function onShows(was) {
         if (s.fin && !finSaid[s.id]) { finSaid[s.id] = 1; if (prev && prev.id === s.id) sys('🎉 모든 참가자가 문제를 마쳤습니다 — 곧 막이 내립니다.'); }
         paintStage(); seat();
     }
+    // 🚪 사회자가 나를 내보냈다 (초대를 거뒀다) — 앞서 본 것에서는 아니었는데 이제 x
+    Object.keys(SHOWS).forEach(function (h) {
+        const s2 = SHOWS[h], p = was && was[h];
+        if (h === me.code || !live(s2) || !outOf(s2, me.code)) return;
+        if (!p || p.id !== s2.id || !invOf(p)[me.code] || outOf(p, me.code)) return;       // 들어오자마자 받은 것 · 이미 알린 것
+        kickedOut(s2, !!seatOf(p, me.code));
+    });
+    // 남이 내려갔다 — 방 안이면 한 줄
+    if (s && roomNow() === ROOM && s.host !== me.code) {
+        const p = was && was[s.host];
+        if (p && p.id === s.id) Object.keys(seatsOf(p)).forEach(function (k) {
+            const c = seatsOf(p)[k] && seatsOf(p)[k].c;
+            if (c && c !== me.code && !seatOf(s, c) && outOf(s, c)) sys('🚪 ' + (seatsOf(p)[k].nick || nameOf(c)) + ' — 무대에서 내려갔습니다.');
+        });
+    }
     // 내가 들어 있던 쇼가 끝났다 — 커튼이 닫힌 뒤 광장으로
     if (roomNow() === ROOM && !s) endLeave((going && (SHOWS[going] || (was && was[going]))) || null);
     if (document.getElementById('qz-status') && s) { try { document.getElementById('qz-status').innerHTML = statusRows(s); } catch (e) { } }
+    chip();
+}
+// 🚪 내보내졌다 — 무대에 서 있었으면 막 없이 바로 광장으로 (쇼는 이어진다). 초대장만 보고 있었으면 초대장을 닫는다.
+function kickedOut(s, wasSeated) {
+    const me = u_(), d = db_();
+    const onStage = roomNow() === ROOM && going === s.host;
+    // 같은 순간에 앉았으면 명패가 남는다 — 내 손으로 비운다
+    try { const k = me && seatOf(s, me.code); if (k && d) d.ref(PATH + '/' + s.host + '/seat/' + k).transaction(function (v) { return (v && v.c === me.code) ? null : undefined; }); } catch (e) { }
+    if (document.getElementById('qz-nick') || onStage) shut();
+    if (onStage) { sys('🚪 사회자가 무대에서 내보냈습니다 — 광장으로 돌아갑니다.'); leave(); }
+    else if (going === s.host) going = '';
+    if (wasSeated) alert_('📺 화요 퀴즈쇼 — 사회자가 무대에서 내보냈습니다.');
     chip();
 }
 setInterval(function () {
@@ -1435,6 +1518,8 @@ setInterval(function () {
         const inRoom = roomNow() === ROOM;
         if (inRoom) {
             const s = curShow();
+            // 🚪 내보내진 채로 무대에 남아 있다 (바뀐 것을 놓쳤다) — 막을 내리지 않고 나간다
+            if (!s && going && live(SHOWS[going]) && SHOWS[going].host !== me.code && outOf(SHOWS[going], me.code)) { kickedOut(SHOWS[going], true); return; }
             if (!s) { endLeave((going && SHOWS[going]) || null); return; }
             paintStage(); seat();
         } else if (document.querySelector('.qz-layer, #qz-ctl')) clearStage();
@@ -1796,7 +1881,7 @@ window.quizShowState = function () {
         console.table(Object.keys(seatsOf(s)).map(function (k) { const v = seatsOf(s)[k]; return { 자리: k, 명패: v.nick, 사원: nameOf(v.c), 채점: markList(s, v.c).map(function (m) { return m === 1 ? 'O' : (m === 2 ? 'X' : '·'); }).join(''), 셈: (s.paid && s.paid[v.c]) ? '끝' : '-' }; }));
     });
 };
-window.quizShowDebug = { Q: Q, IN: IN, shows: function () { return SHOWS; }, cur: curShow, verdictOf: verdictOf, paint: paintStage, enter: enter, leave: leave, pending: pendingShow, sweep: sweepMine, cage: cageMe, cageWait: cageWait, judge: judge, pick: pick, sel: function () { return sel; }, ask: ask, walk: hostWalk, down: function () { return hostDown; }, fin: finCheck, sfx: function () { return SFX ? { state: SFX.ctx.state, n: SFX.n || 0, last: SFX.last || 0 } : null; }, sfxTest: sfxVerdict, BGM: BGM, el: function () { return bgm; }, bgm: function () { return bgm ? { paused: bgm.paused, t: bgm.currentTime, want: bgmWant, muted: bgm.muted, open: !!bgm._open, src: bgm.src } : { want: bgmWant }; } };
+window.quizShowDebug = { Q: Q, IN: IN, shows: function () { return SHOWS; }, cur: curShow, verdictOf: verdictOf, paint: paintStage, enter: enter, kick: function (c) { return kick(c); }, leave: leave, pending: pendingShow, sweep: sweepMine, cage: cageMe, cageWait: cageWait, judge: judge, pick: pick, sel: function () { return sel; }, ask: ask, walk: hostWalk, down: function () { return hostDown; }, fin: finCheck, sfx: function () { return SFX ? { state: SFX.ctx.state, n: SFX.n || 0, last: SFX.last || 0 } : null; }, sfxTest: sfxVerdict, BGM: BGM, el: function () { return bgm; }, bgm: function () { return bgm ? { paused: bgm.paused, t: bgm.currentTime, want: bgmWant, muted: bgm.muted, open: !!bgm._open, src: bgm.src } : { want: bgmWant }; } };
 
 console.log('[토크쇼] 🎤 초대 — 화요 퀴즈쇼 (단상 · 명패 · 정답 O / 오답 X · 붉은 글씨 → 브라운관 꺼짐 → 커튼)');
 })();
