@@ -186,6 +186,7 @@ const JOBS = {
 //   ■ L 이 되면 kroomHidden 에 'L' 을 적고 상담사에게 알린다 — 그에 맞는 물건은 추후 정한다.
 //   ■ Lv (2026-10-25) — 전직하면 **Lv 1** 부터 다시 오른다 (전에는 Lv 을 그대로 가져갔다). 히든 직업만 **Lv 120** 까지 오르고,
 //     한 Lv 오르는 데 드는 경험치가 보통 직업의 **다섯 배**다 (HIDDEN_LV_MAX · HIDDEN_EXP_MULT).
+//     ★ 2026-11-13 — 대신 히든 직업으로 얻는 경험치도 **다섯 배** (HIDDEN_EXP_GAIN · expGainX). 정산 · 탐사 중 막대 · 여우 신도의 몫을 받을 때.
 //     그 전에 전직한 사원도 한 번 Lv 1 로 맞춘다 (hiddenLv1 — 등급 · 각성은 그대로).
 //   ■ 내용 — 히든 직업만의 갈림길 · 선택지는 아직 없어서, **같은 속성 다섯 직업의 것**을 함께 쓴다.
 //   ■ 한 사람에 하나 (2026-10-25) — 속성을 여럿 열어도 히든 직업은 한 번만 받는다 (hadHidden).
@@ -234,6 +235,12 @@ const HIDDEN_WAKE = { D: 30, C: 40, B: 50, A: 60, S: 100 };
 const HIDDEN_LV_MAX = 120;            // 히든 직업만 Lv 120 까지
 const HIDDEN_EXP_MULT = 5;            // 한 Lv 에 드는 경험치 — 보통 직업의 다섯 배
 const EXP_X2 = 2;                     // ★ 얻는 경험치 두 배 — 히든 · 보통 직업 모두 (2026-10-28 · 횟수를 50 → 20 으로 줄인 대신)
+// ★ 히든 직업은 얻는 경험치 다섯 배 (2026-11-13 사용자 「히든 직업 가진 사람들 레벨 경험치 5배 정도로 더 받게 해줘」)
+//   지금 들고 들어간 직업이 히든 직업일 때 — 그 직업의 Lv 에 쌓이는 경험치다 (같은 사원이 다른 속성의 보통 직업으로 들어간 판은 그대로).
+//   EXP_X2 위에 곱한다. 탐사 중 막대의 「경험치 +」 와 정산에 같은 수가 보인다.
+//   🎐 여우 신도가 장착자에게 나누는 몫은 불리기 전 값이다 (받는 장착자가 히든 직업이면 받을 때 그쪽에서 곱한다 — kroomExpGift).
+const HIDDEN_EXP_GAIN = 5;
+function expGainX(k) { return (k && isHiddenJob(k.job)) ? HIDDEN_EXP_GAIN : 1; }
 const NEXT_GRADE = { D: 'C', C: 'B', B: 'A', A: 'S', S: 'L' };
 
 // ── 전용 장비 — 이 방에서는 속성마다 「몇 번」 쓰는 능력이 된다
@@ -1227,7 +1234,7 @@ function bar() {
         </div>${rows}
         ${kr.gear && Object.keys(kr.gear).length ? '<div style="font-size:10px; color:#b9a3e0; margin-top:4px;">' + Object.keys(kr.gear).map(function (a) { return ATTR[a].i + ' ' + GEAR_K[a].n + ' ' + kr.gear[a].left + '/' + kr.gear[a].n; }).join(' · ') + '</div>' : ''}
         <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#888; margin-top:4px;">
-            <span>경험치 +${kr.exp}</span><span style="color:#c9a8ff;">꿈결 +${kr.dream} D</span>
+            <span>경험치 +${kr.exp * expGainX(k)}</span><span style="color:#c9a8ff;">꿈결 +${kr.dream} D</span>
             ${(!kr.dead && !kr._settled && !kr.trial) ? '<button class="game-btn" onclick="kroomGiveUp()" style="margin:0; padding:3px 8px; font-size:9.5px; background:rgba(255,255,255,.06) !important; border:1px solid #4a3a3a !important; color:#c9a0a0 !important; width:auto;">🏳 포기</button>' : ''}</div>
     </div>`;
 }
@@ -3275,6 +3282,9 @@ function settle(how, txt) {
     if (how === 'leave' || how === 'out') { exp = Math.round(exp * 0.5); dream = Math.floor(dream * 0.5); }
     if (how === 'dead') { exp = Math.round(exp * 0.35); dream = 0; }   // ★ 쓰러지면 이번에 얻은 꿈결도 없다 (가진 것은 hardDeath 가 걷는다)
     if (helper) { exp = 0; dream = 0; }                         // 헬퍼 — 경험치 · 꿈결 없음
+    const expShare = exp;                                       // 🎐 여우 신도의 몫 — 불리기 전 값
+    const expX = expGainX(k);                                   // ★ 히든 직업 — 얻는 경험치 다섯 배 (2026-11-13)
+    if (expX > 1) exp = exp * expX;
     // (꿈결 5분의 1 은 dreamRoll 에서 — 탐사 중 보인 수와 정산 수가 같다 · 2026-10-28)
     const extra = [];                                           // 특수 물건이 보탠 것 — 정산에 한 줄씩
     // ★ 꿈결은 특수 물건이 불리지 않는다 (2026-10-24) — 🐾 아기 여우(행운) · 📺 토크 쇼(사회자와 끝까지)의 배수는
@@ -3348,7 +3358,7 @@ function settle(how, txt) {
     // 🎐 여우 신도 — 역병을 뿌린 장착자에게도 같은 몫 (포인트 · 경험치)
     if (!helper && foxc()) {
         try {
-            const ls = foxc().share(pts, exp, '『 K 의 방 』');          // 「🎐 여우 신도의 몫 - "…"」 줄
+            const ls = foxc().share(pts, expShare, '『 K 의 방 』');          // 「🎐 여우 신도의 몫 - "…"」 줄
             if (ls && ls.length) ls.forEach(function (l) { extra.push(esc(l)); });
         } catch (e) { }
     }
@@ -3381,7 +3391,7 @@ function settle(how, txt) {
             ${kr.dun ? '던전 <b>' + esc(DUNS[kr.dun].n) + '</b> · Lv ' + kr.dunLv + '<br>' : ''}
             ${kr.job ? '직업 <b>' + esc(jobName(kr.job, k.grade)) + '</b> ' + k.grade + (wakeNeed(k) ? ' <span style="color:#888;">(각성 ' + (k.wake[k.grade] || 0) + '/' + wakeNeed(k) + ' · ' + (k.grade === 'S' && isHiddenJob(k.job) ? 'S' : k.grade) + ' 던전에서)</span>' : '') + '<br>' : ''}
             ${helper ? '<div style="color:#81c784; margin-bottom:6px;">헬퍼로 들어온 탐사입니다 — 경험치 · 꿈결 · 각성 점수 · 포인트를 받지 않고, 탐사 횟수도 줄지 않았습니다.</div>' : ''}
-            경험치 <b>+${exp}</b>${how !== 'clear' && !helper ? ' <span style="color:#888;">(' + (how === 'dead' ? '35%' : '절반') + ')</span>' : ''}<br>
+            경험치 <b>+${exp}</b>${how !== 'clear' && !helper ? ' <span style="color:#888;">(' + (how === 'dead' ? '35%' : '절반') + ')</span>' : ''}${expX > 1 && !helper ? ' <span style="color:#e3c172;">(히든 직업 ×' + expX + ')</span>' : ''}<br>
             Lv <b style="color:${up ? '#4CAF50' : '#ddd'};">${lv0}${up ? ' → ' + k.lv : ''}</b> <span style="color:#888;">(${k.lv >= lvCap(k) ? '최고 Lv' : k.exp + ' / ' + expNeed(k, k.lv)}${isHiddenJob(k.job) ? ' · 히든 직업 Lv ' + HIDDEN_LV_MAX + ' 까지' : ''})</span><br>
             꿈결 <b style="color:#c9a8ff;">+${dream} D</b> <span style="color:#888;">(${how === 'dead' && !helper ? '쓰러짐 — 이번에 얻은 것 없음 · ' : ''}모두 ${k.dream.toLocaleString()} D)</span><br>
             ${extra.length ? '<div style="margin-top:6px; padding-top:6px; border-top:1px dashed #4a3a6a; color:#d4bbff; font-size:11px;">' + extra.join('<br>') + '</div>' : ''}
@@ -3406,10 +3416,11 @@ window.kroomExpGift = function (n) {
     n = Math.round(Number(n) || 0);
     if (!u || n <= 0) return null;
     const k = prof(u), lv0 = k.lv;
+    n = n * expGainX(k);                                        // ★ 히든 직업이면 받는 몫도 다섯 배 (2026-11-13)
     k.exp = (k.exp || 0) + n;
     lvUp(k);
     try { saveFields({ kroom: 1 }); } catch (e) { }
-    return { lv0: lv0, lv: k.lv };
+    return { lv0: lv0, lv: k.lv, n: n };
 };
 
 window.kroomFinish = function () {
@@ -3918,7 +3929,7 @@ function hiddenPopup(cont) {
         + '<div class="khid-q">『 선택받은 자여 전직하겠습니까? 』</div>'
         + '<div class="khid-note">전직하면 지금 직업(' + esc(jobName(k.job, k.grade)) + ' ' + k.grade + ')을 내려놓고<br>'
         + esc(H[2][0]) + ' D · Lv 1 부터 다시 시작합니다.<br>'
-        + '히든 직업은 Lv ' + HIDDEN_LV_MAX + ' 까지 오르며, 한 Lv 오르는 데 보통 직업의 다섯 배가 듭니다.</div>'
+        + '히든 직업은 Lv ' + HIDDEN_LV_MAX + ' 까지 오르며, 한 Lv 오르는 데 보통 직업의 다섯 배가 듭니다 (얻는 경험치도 다섯 배).</div>'
         + '<div class="khid-btns"><button class="khid-no">거절한다</button><button class="khid-yes">전직한다</button></div>';
     document.body.appendChild(ov);
     let done = false;

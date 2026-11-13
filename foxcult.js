@@ -763,9 +763,10 @@ setInterval(function () {
                 const n = Math.round(Number(v.exp) || 0);
                 let got = null;
                 try { if (n > 0 && typeof window.kroomExpGift === 'function') got = window.kroomExpGift(n); } catch (e) { }
-                log_(u_(), '[' + NAME + '] ' + (v.fromName || '') + ' 사원의 탐사 몫 (' + (v.where || '') + ') — K의 방 경험치 +' + n + (got && got.lv > got.lv0 ? ' · Lv ' + got.lv0 + ' → ' + got.lv : ''));
+                const gn = (got && got.n) || n;                       // 히든 직업이면 kroom-core 가 다섯 배로 넣는다 (2026-11-13)
+                log_(u_(), '[' + NAME + '] ' + (v.fromName || '') + ' 사원의 탐사 몫 (' + (v.where || '') + ') — K의 방 경험치 +' + gn + (got && got.lv > got.lv0 ? ' · Lv ' + got.lv0 + ' → ' + got.lv : ''));
                 save({ history: 1 });
-                toast('🎐 ' + (v.fromName || '') + ' 사원의 몫 — 경험치 +' + n);
+                toast('🎐 ' + (v.fromName || '') + ' 사원의 몫 — 경험치 +' + gn);
                 d.ref('foxShare/' + shareCode + '/' + id).remove().catch(function () { });
             }).catch(function () { });
         });
