@@ -114,7 +114,7 @@ wrap('emLootMult', function (_e) {
 }, '_gearCap');
 
 // ── 포인트 배수 겹침 — 장비마다 붙인 몫을 적는다 (정산 하나 동안만)
-const PTS_NAME = { bfly: '🦋 환영 나비', chil: '🌟 칠성군', eb: '🐺 정예 B조', eye: '🔎 감지하는 눈', jisan: '📖 종말예언', show: '📺 토크 쇼', moon: '🌙 달빛 문신' };
+const PTS_NAME = { bfly: '🦋 환영 나비', chil: '🌟 칠성군', eb: '🐺 정예 B조', eye: '🔎 감지하는 눈', jisan: '📖 종말예언', show: '📺 토크 쇼', moon: '🌙 달빛 문신', hg: '🦊 호갑투' };
 let marks = null, depth = 0, lastTop = null, lastOver = null;
 window.gearPtsMark = function (id, m, extra) {
     if (!marks) return;

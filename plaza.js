@@ -6175,6 +6175,7 @@ function onSeat(code, v, fresh) {
     q.pt = (v.pt != null) ? v.pt : null;              // 🧸 데리고 다니는 봉제인형 (doll-walk.js)
     q.po = v.po ? 1 : 0;                              // 🎨 예전 펫 그림으로 보이는 사원 (doll-walk.js)
     q.ds = (v.ds && Array.isArray(v.ds.c) && v.ds.c.length) ? v.ds : null;   // 🪩 디스코 조명
+    q.fr = Number(v.fr) || 0;                         // 🌧 여우비 — 🦊 호갑투를 찬 사람이 이 방에 들어온 때 (foxrain.js)
     q.j = v.j || 0;                        // 옛 판(j 없음)은 먼저 온 사람으로 친다
     // 🍍 뛰었다 — 새 때(jp)가 오면 받은 순간부터 포물선 (처음 본 사람의 묵은 jp 는 따라 뛰지 않는다)
     if (v.jp && v.jp !== q.jp) { if (!isNew && now() - v.jp < 3000 && q.sm) q.jumpT0 = performance.now(); q.jp = v.jp; }
@@ -8137,7 +8138,14 @@ window.plazaWhere = function () {
 window.plazaPeerPos = function (code) {
     const q = run && run.peers && run.peers[code];
     if (!q) return null;
-    return { x: q.x, y: q.y, face: q.face || 1, hid: !!q.hid, pt: q.pt || null, po: !!q.po, moving: !!q.moving };
+    return { x: q.x, y: q.y, face: q.face || 1, hid: !!q.hid, pt: q.pt || null, po: !!q.po, moving: !!q.moving, fr: q.fr || 0 };
+};
+// 🌧 지금 방의 길 띠 (방 그림 좌표 · 내가 선 층) — 여우비 웅덩이가 놓일 자리 (foxrain.js)
+window.plazaFloor = function () {
+    if (!run || !run.el || !run.room || !R[run.room]) return null;
+    const r = roomOf(), b = bandOf(r, run.lv || 0);
+    if (!Array.isArray(b) || b.length < 2) return null;
+    return { band: [Number(b[0]), Number(b[1])], w: r.w, h: r.h, z: zz() };
 };
 window.plazaMeFace = function () { try { return (run && run.me && run.me.actor.facing()) || 1; } catch (e) { return 1; } };
 // ⚔ 펫 배틀 연출(pet-arena.js) — 그 사번의 사람 칸 (나 · 같은 방의 남). 없으면 null

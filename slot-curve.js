@@ -195,10 +195,17 @@ function addNet(u, d) {
     try { if (typeof saveFields === 'function') saveFields({ slotDay: 1, slotNet: 1 }); } catch (e) { }
 }
 // 이 판에 줄 수 있는 몫 — 천장에 걸리면 깎는다
+// ★ 하루 상한을 올려 주는 것 (2026-11-13 · 🦊 호갑투 제 一 금제 — 150만 · hogaptu.js 의 window.slotCapOf)
+function capOf(u) {
+    let c = DAY_CAP;
+    try { if (typeof window.slotCapOf === 'function') c = Math.max(c, Number(window.slotCapOf(u)) || 0); } catch (e) { }
+    return c;
+}
+window._slotDayCap = capOf;
 function capPrize(u, bet, prize) {
     const want = prize - bet;                       // 이 판에서 번 몫
     if (want <= 0) return { prize: prize, cut: 0 };
-    const room = Math.max(0, DAY_CAP - dayNet(u));
+    const room = Math.max(0, capOf(u) - dayNet(u));
     if (want <= room) return { prize: prize, cut: 0 };
     return { prize: bet + room, cut: want - room };
 }
@@ -302,7 +309,7 @@ function has(u, name) {
                 const capNote = function (cut) {
                     if (!cut) return '';
                     return '<div style="font-size:10px; color:#8d8578; margin-top:3px;">'
-                        + '오늘 치 상한(' + DAY_CAP.toLocaleString() + ' P)에 닿아 '
+                        + '오늘 치 상한(' + capOf(currentUser).toLocaleString() + ' P)에 닿아 '
                         + cut.toLocaleString() + ' P 는 들어오지 않았습니다.</div>';
                 };
                 if (res1.char === res2.char && res2.char === res3.char) {
