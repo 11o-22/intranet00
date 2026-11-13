@@ -1,5 +1,5 @@
 // ==========================================
-// ★ 🌧 여우비 — 코드로 만든 비 (그림 · 소리 파일 없음)   (2026-11-13 사용자)
+// ★ 🌧 여우비 — 코드로 그린 비 (그림 파일 없음 · 소리는 받은 녹음 snd/fox-rain.mp3)   (2026-11-13 사용자)
 // bundles.json 마지막 묶음 — plaza.js 뒤 · hogaptu.js 앞
 // ==========================================
 //
@@ -23,9 +23,13 @@
 //   웅덩이 — 방 그림 위(사람 발밑 · 길 띠)에 놓는다. 방을 따라 움직인다. 자리는 「들어온 때」로 정해 누구 화면에서나 같다.
 //   흐린 빛 — 비가 굵을수록 화면이 살짝 어둡고 푸르다.
 //
-// ■ 소리 (Web Audio — 잡음을 걸러 만든다)
-//   깔리는 비   잡음 → 고역 · 중역 두 갈래 → 굵기를 따라 커지고 작아진다
-//   방울        「투둑」 짧은 잡음 두 번 · 「툭」 낮은 음 하나 — 비가 잦아들수록 또렷하다
+// ■ 소리 — 받은 빗소리 (snd/fox-rain.mp3)
+//   ★ 2026-11-13 사용자 「빗소리 사운드 이걸로 바꿔줘」 — 처음엔 잡음을 걸러 코드로 만들었고(쏴아아 + 투둑 · 툭), 이제 사용자가 준 녹음을 튼다.
+//     받은 것은 14 분짜리 — 가장 고른 자리에서 20 초를 떼어 이음매 없이 돌게 다듬었다 (앞뒤 2 초를 겹쳐 녹임 · -18 LUFS · 160 kbps).
+//     mp3 는 풀면 앞뒤에 빈 틈이 붙어 파일 처음 ↔ 끝으로는 매끈하게 못 돈다 — 그래서 파일은 「끝 0.4 초 + 고리 20 초 + 처음 0.4 초」 이고
+//     그 안쪽 20 초(0.2 ~ 20.2 초)만 돌린다. 돌 때마다 다른 자리에서 시작한다.
+//   굵기를 따라 소리 크기만 바꾼다 — 쏴아아(크게) → 잦아든다 → 그친다. 코드로 만들던 「투둑 · 툭」 소리는 뺐다 (그림의 성긴 방울은 그대로).
+//   곡은 광장에서 화면을 처음 누를 때 미리 받아 두고(소리 장치를 여는 그때), 비가 처음 올 때 푼다.
 //   광장에서 화면을 한 번이라도 누른 뒤에만 난다 (브라우저 규칙) · 탐사 중에는 광장 비 소리를 내지 않는다
 //   ★ 광장 위 🔊 를 꺼 두면 광장 비 소리도 나지 않는다 (2026-11-13 사용자 「빗소리 소리 끄면 안 들리게 하자」)
 //     광장 음악 · 퀴즈쇼 효과음과 같은 단추(event-bgm.js eventBgmMuted) — 비가 내리는 가운데 끄면 바로 잦아들고, 다시 켜면 남은 비만큼 난다. 그림은 그대로
@@ -205,7 +209,8 @@ function pudPaint(st, seed, t, raining) {
 // ==========================================
 // 소리 — 잡음을 걸러 만든 비
 // ==========================================
-const A = { ctx: null, bed: null, hiss: null, body: null, master: null, buf: null, on: false, nextDrip: 0 };
+const A = { ctx: null, bed: null, master: null, buf: null, bytes: null, wait: null, fail: 0, on: false };
+const SND = { src: 'snd/fox-rain.mp3', L0: 0.2, L1: 20.2 };       // 돌리는 자리 (초) — 머리말
 function ac() {
     if (A.ctx) return A.ctx;
     const C = window.AudioContext || window.webkitAudioContext;
@@ -213,68 +218,51 @@ function ac() {
     try { A.ctx = new C(); } catch (e) { return null; }
     return A.ctx;
 }
-function noiseBuf(c) {
-    if (A.buf) return A.buf;
-    const n = Math.floor(c.sampleRate * 2.5), b = c.createBuffer(1, n, c.sampleRate), d = b.getChannelData(0);
-    let last = 0;
-    for (let i = 0; i < n; i++) { const w = Math.random() * 2 - 1; last = (last + 0.045 * w) / 1.045; d[i] = w * 0.55 + last * 6.5; }   // 흰 잡음 + 낮은 잡음을 조금 섞는다
-    A.buf = b;
-    return b;
+// 빗소리 받기 — 바이트만 먼저 (한 번) · 푸는 것은 비가 처음 올 때
+function rainBytes() {
+    if (!A.bytes) {
+        A.bytes = fetch(SND.src).then(function (r) { if (!r.ok) throw new Error('빗소리 ' + r.status); return r.arrayBuffer(); })
+            .catch(function (e) { A.bytes = null; throw e; });
+    }
+    return A.bytes;
+}
+function rainLoad(c) {
+    if (A.buf || A.wait) return;
+    A.wait = rainBytes().then(function (ab) {
+        return new Promise(function (res, rej) {
+            try { const p = c.decodeAudioData(ab.slice(0), res, rej); if (p && p.then) p.then(res, rej); } catch (e) { rej(e); }
+        });
+    }).then(function (buf) { A.buf = buf; A.wait = null; A.bytes = null; })
+      .catch(function (e) { A.wait = null; A.fail = (A.fail | 0) + 1; console.warn('[🌧] 빗소리를 받지 못했습니다', e && e.message); });
 }
 function audioStart() {
     if (A.on) return true;
     const c = A.ctx;
     if (!c || c.state !== 'running') return false;
+    if (!A.buf) { if ((A.fail | 0) < 3) rainLoad(c); return false; }        // 아직 못 받았다 — 받으면 다음 장면에 튼다 (그동안은 그림만)
     try {
-        const src = c.createBufferSource(); src.buffer = noiseBuf(c); src.loop = true;
-        const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2600;
-        const hiss = c.createGain(); hiss.gain.value = 0;
-        const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 0.55;
-        const body = c.createGain(); body.gain.value = 0;
-        const master = c.createGain(); master.gain.value = R.VOL;
-        src.connect(hp); hp.connect(hiss); hiss.connect(master);
-        src.connect(bp); bp.connect(body); body.connect(master);
-        master.connect(c.destination);
-        src.start();
-        A.bed = src; A.hiss = hiss; A.body = body; A.master = master; A.on = true;
+        const src = c.createBufferSource(); src.buffer = A.buf; src.loop = true;
+        const span = Math.min(SND.L1, A.buf.duration - 0.05) - SND.L0;
+        if (span > 1) { src.loopStart = SND.L0; src.loopEnd = SND.L0 + span; }
+        const master = c.createGain(); master.gain.value = 0;
+        src.connect(master); master.connect(c.destination);
+        src.start(0, span > 1 ? SND.L0 + Math.random() * (span - 0.5) : 0);    // 돌 때마다 다른 자리부터
+        A.bed = src; A.master = master; A.on = true;
         return true;
     } catch (e) { return false; }
 }
 function audioStop() {
     if (!A.on) return;
     const c = A.ctx, m = A.master, s = A.bed;
-    A.on = false; A.bed = null; A.hiss = null; A.body = null; A.master = null;
+    A.on = false; A.bed = null; A.master = null;
     try { m.gain.cancelScheduledValues(c.currentTime); m.gain.setTargetAtTime(0, c.currentTime, 0.25); } catch (e) { }
     setTimeout(function () { try { s.stop(); } catch (e) { } try { m.disconnect(); } catch (e) { } }, 1400);
 }
+// 굵기(0~1)를 따라 소리 크기만 — 굵을 때 크게 · 잦아들면 작게
 function audioLevel(lv, vol) {
     if (!A.on) return;
     const c = A.ctx, t = c.currentTime;
-    try {
-        A.hiss.gain.setTargetAtTime(0.5 * lv * lv, t, 0.35);                 // 쏴아아 — 굵을 때만 크게
-        A.body.gain.setTargetAtTime(0.42 * lv, t, 0.35);
-        A.master.gain.setTargetAtTime(R.VOL * (vol == null ? 1 : vol), t, 0.3);
-    } catch (e) { }
-}
-// 툭 — 낮은 음 하나 · 투둑 — 짧은 잡음 둘
-function drip(kind, vol) {
-    const c = A.ctx;
-    if (!c || c.state !== 'running' || !A.master) return;
-    const t = c.currentTime + 0.01, v = (vol == null ? 1 : vol);
-    try {
-        const hit = function (at, f, g, len) {
-            const o = c.createOscillator(), og = c.createGain();
-            o.type = 'sine'; o.frequency.setValueAtTime(f, at); o.frequency.exponentialRampToValueAtTime(f * 0.5, at + len);
-            og.gain.setValueAtTime(0.0001, at); og.gain.exponentialRampToValueAtTime(g * v, at + 0.006); og.gain.exponentialRampToValueAtTime(0.0001, at + len);
-            o.connect(og); og.connect(A.master); o.start(at); o.stop(at + len + 0.02);
-            const n = c.createBufferSource(), ng = c.createGain(), nf = c.createBiquadFilter();
-            n.buffer = noiseBuf(c); nf.type = 'bandpass'; nf.frequency.value = f * 9; nf.Q.value = 1.2;
-            ng.gain.setValueAtTime(g * 0.55 * v, at); ng.gain.exponentialRampToValueAtTime(0.0001, at + 0.035);
-            n.connect(nf); nf.connect(ng); ng.connect(A.master); n.start(at, Math.random() * 2, 0.05);
-        };
-        if (kind === 'tuduk') { hit(t, 250 + Math.random() * 90, 0.34, 0.07); hit(t + 0.085 + Math.random() * 0.04, 190 + Math.random() * 60, 0.26, 0.08); }
-        else hit(t, 150 + Math.random() * 50, 0.42, 0.12);
-    } catch (e) { }
+    try { A.master.gain.setTargetAtTime(R.VOL * Math.pow(Math.max(0, Math.min(1, lv)), 0.8) * (vol == null ? 1 : vol), t, 0.35); } catch (e) { }
 }
 // 화면을 누를 때 소리 장치를 연다 (그 전에는 소리 없이 그림만)
 ['pointerdown', 'touchend', 'keydown', 'click'].forEach(function (ev) {
@@ -282,6 +270,7 @@ function drip(kind, vol) {
         if (!NOW.plaza && !NOW.steady && !stage() && !A.ctx) return;       // 광장에 있거나 비가 올 때 열어 둔다 (누가 들어서면 바로 나게 — lp.js 도 광장에서 이렇게 연다)
         const c = ac();
         if (c && c.state !== 'running' && c.state !== 'closed') { try { const p = c.resume(); if (p && p.catch) p.catch(function () { }); } catch (e) { } }
+        if (c && !A.buf && !A.wait && (A.fail | 0) < 3) { try { rainBytes().catch(function () { }); } catch (e) { } }      // 빗소리를 미리 받아 둔다 (비가 오면 바로 나게)
     }, { capture: true, passive: true });
 });
 document.addEventListener('visibilitychange', function () { if (document.hidden) audioStop(); });
@@ -378,13 +367,6 @@ function loop(ts) {
     if (snd > 0) {
         if (!A.on) { ac(); audioStart(); }
         audioLevel(snd, 1);
-        if (A.on && ts > A.nextDrip) {
-            const sparse = plazaSnd > 0 ? drp : true;
-            if (sparse) {
-                drip(Math.random() < 0.55 ? 'tuduk' : 'tuk', plazaSnd > 0 ? 1 : 0.6);
-                A.nextDrip = ts + (plazaSnd > 0 ? 500 + Math.random() * 1500 : 1600 + Math.random() * 3200);
-            } else A.nextDrip = ts + 400;
-        }
     } else if (A.on) audioStop();
 }
 
@@ -406,14 +388,15 @@ window.FOXRAIN = {
     level: function () { const s = rainSeed(); return s ? levelAt(clock() - s) : 0; },
     seed: rainSeed,
     levelAt: levelAt,
-    mine: function () { return ME.fr; }
+    mine: function () { return ME.fr; },
+    audio: function () { return { on: A.on, buf: A.buf ? A.buf.duration : 0, loop: A.bed ? [A.bed.loop, A.bed.loopStart, A.bed.loopEnd] : null, gain: A.master ? A.master.gain.value : null, fail: A.fail }; }      // 시험 · 콘솔
 };
 window.foxRainMute = function (on) { try { if (on) localStorage.setItem(MUTE_KEY, '1'); else localStorage.removeItem(MUTE_KEY); } catch (e) { } return muted(); };
 window.foxRainTest = function () { NOW.test = clock(); setTimeout(function () { NOW.test = 0; }, R.TOTAL + R.DRY + 500); try { tick(); } catch (e) { } return '🌧 ' + Math.round(R.TOTAL / 1000) + '초 동안 내립니다 (내 화면만)'; };
 window.foxRainState = function () {
     const s = rainSeed(), t = s ? clock() - s : -1;
     const out = { 방: ME.key, 내가찼나: wearsMe(), 내들어온때: ME.fr, 씨앗: s, 흐른초: t >= 0 ? Math.round(t / 100) / 10 : null, 굵기: Math.round(levelAt(t) * 100) / 100,
-                  빗줄기: NOW.plaza ? NOW.plaza.drops.length : 0, 웅덩이: PUD.list.length, 소리: A.on, 소리장치: A.ctx ? A.ctx.state : '없음', 음소거: muted(), 광장소리끔: plazaOff(), 어둠비: !!NOW.steady };
+                  빗줄기: NOW.plaza ? NOW.plaza.drops.length : 0, 웅덩이: PUD.list.length, 소리: A.on, 빗소리: A.buf ? Math.round(A.buf.duration * 10) / 10 + '초' : (A.wait ? '받는 중' : '아직'), 소리장치: A.ctx ? A.ctx.state : '없음', 음소거: muted(), 광장소리끔: plazaOff(), 어둠비: !!NOW.steady };
     console.log(out);
     return out;
 };
