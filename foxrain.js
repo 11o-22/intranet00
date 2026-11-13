@@ -27,7 +27,9 @@
 //   깔리는 비   잡음 → 고역 · 중역 두 갈래 → 굵기를 따라 커지고 작아진다
 //   방울        「투둑」 짧은 잡음 두 번 · 「툭」 낮은 음 하나 — 비가 잦아들수록 또렷하다
 //   광장에서 화면을 한 번이라도 누른 뒤에만 난다 (브라우저 규칙) · 탐사 중에는 광장 비 소리를 내지 않는다
-//   🔇 foxRainMute(true) — 이 기기에서 소리만 끈다 (그림은 그대로)
+//   ★ 광장 위 🔊 를 꺼 두면 광장 비 소리도 나지 않는다 (2026-11-13 사용자 「빗소리 소리 끄면 안 들리게 하자」)
+//     광장 음악 · 퀴즈쇼 효과음과 같은 단추(event-bgm.js eventBgmMuted) — 비가 내리는 가운데 끄면 바로 잦아들고, 다시 켜면 남은 비만큼 난다. 그림은 그대로
+//   🔇 foxRainMute(true) — 이 기기에서 소리만 끈다 (그림은 그대로 · 콘솔)
 //
 // ■ 어둠의 여우비 (hogaptu.js 제 零 금제)
 //   FOXRAIN.steady(true) — 탐사 화면에 가늘게 계속 내린다 · 소리는 어둠 음소거(🔇)를 따른다
@@ -47,6 +49,8 @@ function stage() { try { return (typeof window.plazaStage === 'function') ? wind
 function clock() { try { if (typeof serverNow === 'function') { const t = Number(serverNow()); if (t > 1.5e12) return t; } } catch (e) { } return Date.now(); }
 function inRun() { try { return (typeof darkRun !== 'undefined' && !!darkRun) || (typeof window.kroomOn === 'function' && window.kroomOn()); } catch (e) { return false; } }
 function muted() { try { return localStorage.getItem(MUTE_KEY) === '1'; } catch (e) { return false; } }
+// 광장 위 🔊 를 꺼 두었나 — 광장 음악 · 퀴즈쇼 효과음과 같은 단추
+function plazaOff() { try { return typeof window.eventBgmMuted === 'function' && !!window.eventBgmMuted(); } catch (e) { return false; } }
 
 // 굵기 0~1 · 방울(투둑 · 툭) 차례인가
 function levelAt(t) {
@@ -365,8 +369,8 @@ function loop(ts) {
         if (!host || !host.isConnected || !host.getClientRects().length) { NOW.steady.kill(); NOW.steady = null; }      // 닫힌 화면 (fixed 라 offsetParent 로는 못 본다)
         else { lvS = 0.34; NOW.steady.size(); NOW.steady.frame(lvS, Math.random() < 0.3, dt); }
     }
-    // ── 소리 — 광장 비는 탐사 중이 아닐 때 · 어둠 비는 어둠 음소거를 따른다
-    const plazaSnd = (lv > 0 && !inRun()) ? lv : 0;
+    // ── 소리 — 광장 비는 탐사 중이 아닐 때 · 광장 🔊 가 켜져 있을 때 · 어둠 비는 어둠 음소거를 따른다
+    const plazaSnd = (lv > 0 && !inRun() && !plazaOff()) ? lv : 0;
     let darkMute = false;
     try { darkMute = (typeof darkAudio !== 'undefined' && darkAudio && !!darkAudio.muted); } catch (e) { }
     const steadySnd = (lvS > 0 && !darkMute) ? lvS * 0.8 : 0;
@@ -409,7 +413,7 @@ window.foxRainTest = function () { NOW.test = clock(); setTimeout(function () { 
 window.foxRainState = function () {
     const s = rainSeed(), t = s ? clock() - s : -1;
     const out = { 방: ME.key, 내가찼나: wearsMe(), 내들어온때: ME.fr, 씨앗: s, 흐른초: t >= 0 ? Math.round(t / 100) / 10 : null, 굵기: Math.round(levelAt(t) * 100) / 100,
-                  빗줄기: NOW.plaza ? NOW.plaza.drops.length : 0, 웅덩이: PUD.list.length, 소리: A.on, 소리장치: A.ctx ? A.ctx.state : '없음', 음소거: muted(), 어둠비: !!NOW.steady };
+                  빗줄기: NOW.plaza ? NOW.plaza.drops.length : 0, 웅덩이: PUD.list.length, 소리: A.on, 소리장치: A.ctx ? A.ctx.state : '없음', 음소거: muted(), 광장소리끔: plazaOff(), 어둠비: !!NOW.steady };
     console.log(out);
     return out;
 };
