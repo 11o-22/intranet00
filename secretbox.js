@@ -23,6 +23,15 @@
 //                       우주 쇼핑몰    ALIEN_ITEMS_POOL 전부 (평소엔 진열된 9칸만)
 //                   소속·직급으로 막힌 품목은 평소 규칙대로 빼고 보여 준다.
 //
+//                   ★ 그립톡에만 따로 올리는 것 (2026-11-13 사용자 「그립톡 안에 소원권, 도깨비 방망이를 제외한 아이템들
+//                     (진주 세트, 아쿠아마린 세트, 닉네임 변경권 10000p, 복사기, 우리가 도움.) 다 넣어줘」) — 아래 EXTRA
+//                       진주 세트          진주 혀 피어싱 + 진주 목걸이 (둘을 한 번에 · 값은 낱개 값의 합)
+//                       아쿠아마린 세트    아쿠아마린 귀걸이 + 아쿠아마린 렌즈 (위와 같다)
+//                       📝 사원명 변경권   10,000 P (사용자가 정한 값 — 물품 목록에는 값이 없다)
+//                       복사기 · 우리가 도움   물품 목록의 값 그대로
+//                     🫙 소원권 · 🪄 도깨비 방망이는 올리지 않는다 (NEVER).
+//                     복사기는 2026-10-25 에 판에서 빼고 거두던 것 — 여기로 다시 구할 수 있게 되어 거두기(copier-refund.js)를 껐다.
+//
 //   찢어진 메모지   쓰면 사택이 L 등급이 된다. houseL 자리에 적어 두므로
 //                   이사로 내려가지 않는다. (house-L.js 의 isL 이 이 자리를 본다)
 //
@@ -197,7 +206,33 @@ function alienAllowed(u, it) {
 }
 
 // 그립톡에는 안 올리는 품목 — 값이 매겨져 있어도 뺀다
-const NEVER = ['🫙 소원권', '소원권'];
+const NEVER = ['🫙 소원권', '소원권', '🪄 도깨비 방망이', '도깨비 방망이'];
+
+// ★ 그립톡에만 따로 올리는 품목 (2026-11-13 사용자) — 어느 상점에도 안 깔리는 것들이다
+//   give 가 있으면 그것들을 한 번에 준다(세트). price 가 없으면 물품 목록의 값(세트는 낱개 값의 합).
+const EXTRA = [
+    { name: '진주 세트', give: ['진주 혀 피어싱', '진주 목걸이'],
+      desc: '진주 혀 피어싱 + 진주 목걸이. 장착 시 하루에 한 번 가두리에서 나올 수 있고, 세트로 착용 시 행운 250%.' },
+    { name: '아쿠아마린 세트', give: ['아쿠아마린 귀걸이', '아쿠아마린 렌즈'],
+      desc: '아쿠아마린 귀걸이 + 아쿠아마린 렌즈. 세트로 착용 시 회수품 상승 250%, 사망 시 포인트 + 8000p, 행운 120%.' },
+    { name: '📝 사원명 변경권', price: 10000 },
+    { name: '복사기' },
+    { name: '우리가 도움' }
+];
+function extraRows() {
+    if (typeof ITEM_CATALOG === 'undefined') return [];
+    const out = [];
+    EXTRA.forEach(function (x) {
+        const give = x.give || [x.name];
+        if (give.some(function (n) { return !ITEM_CATALOG[n]; })) return;       // 아직 안 올라온 물품 — 건너뛴다
+        const price = x.price != null ? x.price
+            : give.reduce(function (a, n) { return a + (Number(ITEM_CATALOG[n].price) || 0); }, 0);
+        if (!(price > 0)) return;
+        out.push({ where: GRIP, name: x.name, price: price, give: give,
+                   desc: x.desc || String(ITEM_CATALOG[x.name].desc || '') });
+    });
+    return out;
+}
 
 // 살 수 있는 품목인가 — 값이 매겨져 있고, 고유 아이템이 아니고, 우리 셋이 아니다
 function buyable(nm) {
@@ -230,7 +265,10 @@ function shopLists(u) {
     if (typeof ALIEN_ITEMS_POOL !== 'undefined') {
         add('우주 쇼핑몰', ALIEN_ITEMS_POOL.filter(function (it) { return alienAllowed(u, it); }));
     }
-    return out;
+    // 그립톡에만 올리는 것 — 맨 위에 (상점 목록에 같은 이름이 있으면 그쪽을 뺀다)
+    const ex = extraRows(), exNames = {};
+    ex.forEach(function (r) { r.give.forEach(function (n) { exNames[n] = 1; }); exNames[r.name] = 1; });
+    return ex.concat(out.filter(function (r) { return !exNames[r.name]; }));
 }
 
 function shut() {
@@ -257,7 +295,7 @@ function openGrip() {
     const body = rows.map(function (r, i) {
         const can = pts >= r.price;
         const cat = ITEM_CATALOG[r.name] || {};
-        const d = String(cat.desc || '').replace('[???] ', '');
+        const d = String(r.desc || cat.desc || '').replace('[???] ', '');
         return '<div style="display:flex; align-items:center; gap:9px; padding:8px 0;'
             + ' border-bottom:1px solid #262626;">'
             + '<div style="flex:1; min-width:0;">'
@@ -309,15 +347,17 @@ function buyOne(r) {
 
     u.gripBuy = 0;
     if (!Array.isArray(u.inventory)) u.inventory = [];
-    u.inventory.push(r.name);
+    (r.give || [r.name]).forEach(function (n) { u.inventory.push(n); });        // 세트는 든 것을 다 준다
     if (typeof changePoints === 'function') changePoints(-r.price);
     else u.points = Math.max(0, (Number(u.points) || 0) - r.price);
 
-    log(u, '[' + GRIP + '] ' + r.where + ' — ' + r.name + ' (-' + r.price.toLocaleString() + ' P)');
+    log(u, '[' + GRIP + '] ' + (r.where === GRIP ? '' : r.where + ' — ') + r.name
+        + (r.give && r.give.length > 1 ? ' (' + r.give.join(' · ') + ')' : '') + ' (-' + r.price.toLocaleString() + ' P)');
     save({ inventory: 1, history: 1, gripBuy: 1, points: 1 });
     paint();
     shut();
-    toast(r.name + '\n\n' + r.where + '에서 가져왔습니다.\n-' + r.price.toLocaleString() + ' P');
+    toast(r.name + (r.give && r.give.length > 1 ? '\n(' + r.give.join(' · ') + ')' : '')
+        + '\n\n' + r.where + (r.where === GRIP ? '으로' : '에서') + ' 가져왔습니다.\n-' + r.price.toLocaleString() + ' P');
 }
 
 function useGrip() {

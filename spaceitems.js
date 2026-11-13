@@ -9,6 +9,7 @@
 //        둘 다 「남이 채워 줘야」 효력이 돈다 (다이아 플러그와 같은 규칙)
 //   3. 복사기        2,000,000 P   하루 두 개까지 복제. 복사기는 안 사라진다
 //      ★ 2026-10-25 판에서 뺐다 — 우주 쇼핑몰 후보에서 빼고(rare-odds.js NEVER) 가진 것은 거두고 값을 돌려준다 (copier-refund.js)
+//      ★ 2026-11-13 그립톡에서만 다시 구할 수 있다 (secretbox.js EXTRA) — 거두기는 껐고, 쓰면 예전처럼 베끼는 창이 뜬다. 우주 쇼핑몰에는 여전히 안 깔린다
 //   4. 우리가 도움   9,999,999 P   ???????? (전용 장비의 다음 속성 자리 하나 · 최대 5)
 //
 //   넷 다 진열 확률 0.5% 다. (RARE_ALIEN_RATE)
@@ -467,11 +468,13 @@ function copyFree(real, label, fn) {
         useInventoryItem = function (itemName) {
             const cat = ITEM_CATALOG[itemName];
 
-            // 복사기 — 거둬들였다 (2026-10-25 · copier-refund.js). 쓰면 복사 창 대신 환불이 돈다
+            // 복사기 — 베낄 것을 고르는 창
+            //   2026-10-25 에 판에서 빼고 쓰면 환불이 돌게 했다가, 2026-11-13 그립톡으로 다시 구할 수 있게 되어 되돌렸다
+            //   (사용자 「그립톡 안에 … 복사기 … 다 넣어줘」 — secretbox.js EXTRA · 거두기 copier-refund.js 는 껐다)
             if (cat && cat.effect === 'copier') {
                 if (!currentUser) return;
-                if (typeof window.copierRefundMe === 'function') { window.copierRefundMe(true); return; }
-                showCustomAlert('복사기는 회수되었습니다. 곧 값을 돌려드립니다.');
+                if ((currentUser.inventory || []).indexOf(itemName) < 0) return;
+                copierOpen();
                 return;
             }
 
