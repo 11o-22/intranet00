@@ -33,6 +33,8 @@
 //   방 그림과 같은 자리 · 같은 크기라 방 안에 겹쳐 깔고 위에서부터 걷는다. 끝 프레임은 무대 양옆에 걷힌 커튼으로 늘 남는다.
 //   (처음에는 그림 없이 붉은색으로 그린 커튼이었다 — 「걷히는 커튼은 같은 붉은색 코드로」 → 그림으로 바뀜)
 //
+//   🎺 커튼이 걷히는 순간 「Showtime!」 이 처음부터 크게 나고(빰), 두 마디 뒤부터는 잔잔하게 깔린다 (2026-11-13 사용자 · 아래 「쇼타임」).
+//
 // ■ 광장 쪽 (plaza.js)
 //   R.quiz (그림 quiz-show2 · gate · fit · camX · padTop · full · pud) · goRoom 의 문지기 · plazaPin / plazaPinned · plazaOnPaint · plazaOnMySay · plazaOnPeerSay
 //
@@ -619,6 +621,7 @@ function inviteCard(s) {
         shut(); chip();
     };
     w.querySelector('#qz-yes').onclick = function () {
+        bgmUnlock();                                           // 🎺 자리를 잡는 동안(서버를 다녀오는 동안) 손길이 끊기므로 여기서 미리 연다
         const nick = String(inp.value || '').replace(/\s+/g, ' ').trim().slice(0, Q.NICK_MAX);
         if (!nick) { alert_('명패에 적을 닉네임을 적어 주세요.'); return; }
         accept(s, nick);
@@ -670,6 +673,83 @@ function chip() {
 }
 
 // ==========================================
+// 🎺 쇼타임 — 들어갈 때 「빰」 하고 틀고, 그 뒤로는 잔잔하게 깐다 (2026-11-13 사용자)
+// ==========================================
+//   곡은 리듬 게임의 「Showtime!」 (snd/rhythm-showtime.mp3). 그 곡에 **세기를 미리 입혀 둔** 한 벌을 따로 쓴다 (snd/quiz-showtime.mp3):
+//       처음 두 마디(4.9초까지)는 크게(0.85) → 셋째 마디(4.9 ~ 6.8초)에 걸쳐 줄어 → 넷째 마디부터 끝까지 잔잔하게(0.17).
+//   ★ 화면에서 소리 크기를 줄이지 않는 까닭 — 아이폰은 audio.volume 을 못 바꾼다 (늘 1). 줄여서 틀면 아이폰에서만 끝까지 크게 난다.
+//     크기를 파일에 입혀 두면 어느 기기에서든 같다.
+//   끝까지 가면 잔잔한 데(LOOP_AT · 넷째 마디)로 돌아가 되풀이한다 — 「빰」 은 들어올 때 한 번만.
+//   쉬는 때 — 광장 위 🔊 를 꺼 두었거나 · 플레이리스트 · 리듬 게임 · 광장 피아노가 소리를 내는 동안. 무대에서 내려오면 멈춘다.
+const BGM = { SRC: 'snd/quiz-showtime.mp3', LOOP_AT: 6.757 };
+let bgm = null, bgmWant = false;
+function bgmEl() {
+    if (bgm) return bgm;
+    bgm = new Audio(BGM.SRC);
+    bgm.preload = 'auto';
+    bgm.addEventListener('ended', function () {
+        if (!bgmWant) return;
+        try { bgm.currentTime = BGM.LOOP_AT; const p = bgm.play(); if (p && p.catch) p.catch(function () { }); } catch (e) { }
+    });
+    return bgm;
+}
+function bgmOk() {
+    try { if (typeof window.eventBgmMuted === 'function' && window.eventBgmMuted()) return false; } catch (e) { }
+    try { if (typeof window.playlistOn === 'function' && window.playlistOn()) return false; } catch (e) { }
+    try { if (typeof window.lpPianoBusy === 'function' && window.lpPianoBusy()) return false; } catch (e) { }
+    try { if (document.body.classList.contains('rg-on')) return false; } catch (e) { }
+    return true;
+}
+// 누른 그 손길 안에서 소리 길을 열어 둔다 — 소리는 연출이 끝난 뒤(몇 초 뒤)에 나는데, 아이폰은 손길 없이 처음 트는 소리를 막는다
+function bgmUnlock() {
+    try {
+        const a = bgmEl();
+        if (a._open || !a.paused) return;
+        a.muted = true;
+        const done = function (ok) {
+            if (ok) a._open = true;
+            if (a.muted) { try { a.pause(); a.currentTime = 0; } catch (e) { } a.muted = false; }      // 그 사이 진짜로 틀기 시작했으면(muted 가 풀렸으면) 건드리지 않는다
+        };
+        const p = a.play();
+        if (p && p.then) p.then(function () { done(true); }, function () { done(false); }); else done(true);
+    } catch (e) { }
+}
+// bang — 처음부터 (빰). 아니면 잔잔한 데서부터 (광장을 닫았다 열어 무대로 돌아온 때 · 🔊 를 다시 켠 때)
+function bgmStart(bang) {
+    bgmWant = true;
+    if (!bgmOk()) return;
+    try {
+        const a = bgmEl();
+        a.muted = false;
+        try { a.volume = 1; } catch (e) { }
+        try { a.currentTime = bang ? 0 : BGM.LOOP_AT; } catch (e) { }
+        const p = a.play();
+        if (p && p.catch) p.catch(function () { /* 아직 막혀 있다 — 다음 누름 때 (아래) */ });
+    } catch (e) { }
+}
+function bgmStop() {
+    bgmWant = false;
+    if (bgm && !bgm.paused) { try { bgm.pause(); } catch (e) { } }
+}
+// 무대에 있는 동안 — 쉬어야 하면 멈추고, 다시 틀어도 되면 잔잔한 데서 잇는다
+function bgmTick(inRoom) {
+    if (!inRoom) { if (bgmWant || (bgm && !bgm.paused && !bgm.muted)) bgmStop(); return; }
+    if (document.getElementById('qz-intro')) return;             // 연출 중 — 커튼이 걷힐 때 튼다
+    if (!bgmWant) { bgmStart(false); return; }                   // 연출 없이 무대에 서 있다 (광장을 닫았다 연 때)
+    const a = bgmEl();
+    if (!bgmOk()) { if (!a.paused) { try { a.pause(); } catch (e) { } } return; }
+    if (a.paused) {
+        try { if (a.currentTime < BGM.LOOP_AT) a.currentTime = BGM.LOOP_AT; const p = a.play(); if (p && p.catch) p.catch(function () { }); } catch (e) { }
+    }
+}
+['pointerdown', 'keydown', 'touchend'].forEach(function (t) {     // 브라우저가 막았다가 풀린 때 — 누를 때 한 번 더 청한다
+    document.addEventListener(t, function () {
+        if (!bgmWant || !bgm || !bgm.paused || roomNow() !== ROOM || !bgmOk()) return;
+        try { if (bgm.currentTime < BGM.LOOP_AT) bgm.currentTime = BGM.LOOP_AT; const p = bgm.play(); if (p && p.catch) p.catch(function () { }); } catch (e) { }
+    }, true);
+});
+
+// ==========================================
 // 들어가기 · 나가기
 // ==========================================
 function enter(host) {
@@ -678,6 +758,7 @@ function enter(host) {
     if (!me || !live(s)) { alert_('이미 끝난 쇼입니다.'); return; }
     if (s.host !== me.code && !seatOf(s, me.code)) { alert_('초대장으로 먼저 자리에 앉아야 합니다.'); return; }
     if (caged()) { alert_('🔒 가두리에 갇혀 있는 동안은 무대에 설 수 없습니다.'); return; }
+    bgmUnlock();                                               // 🎺 누른 손길 안에서 소리 길을 열어 둔다
     going = host;
     try { if (typeof window.plazaPanelClose === 'function') window.plazaPanelClose(); } catch (e) { }
     if (!roomNow()) { try { if (typeof window.plazaOpen === 'function') window.plazaOpen(); } catch (e) { } }
@@ -694,6 +775,7 @@ function enter(host) {
 }
 function leave() {
     going = '';
+    bgmStop();
     try { if (typeof window.plazaPin === 'function') window.plazaPin(null); } catch (e) { }
     try { if (roomNow() === ROOM) window.plazaGo(START); } catch (e) { }
     clearStage();
@@ -960,6 +1042,7 @@ setInterval(function () {
             if (!s) { sys('📺 화요 퀴즈쇼가 끝나 광장으로 돌아갑니다.'); shut(); leave(); return; }
             paintStage(); seat();
         } else if (document.querySelector('.qz-layer, #qz-ctl')) clearStage();
+        bgmTick(roomNow() === ROOM && !!curShow());
         cageTry();                                              // 무대에서 내려왔으면 오답 가두리를 건다
         // 초대장 — 한가할 때 띄운다
         const pend = pendingShow();
@@ -1291,7 +1374,7 @@ function intro(full, behind) {
             return Promise.race([curtainReady(box), wait(4000)]).then(function () { return wait(120); }).then(function () {
                 ov.style.transition = 'opacity .45s ease'; ov.style.opacity = '0';       // 검은 막이 걷히면 — 닫힌 커튼
                 return wait(450 + IN.SHUT);
-            }).then(function () { return curtainOpen(box); }).then(fin);
+            }).then(function () { bgmStart(true); return curtainOpen(box); }).then(fin);       // 🎺 커튼이 걷히는 순간 — 빰
         });
     };
     const safety = setTimeout(function () { if (introOn && ov.isConnected) { try { behind(); } catch (e) { } fin(); } }, 22000);
@@ -1316,7 +1399,7 @@ window.quizShowState = function () {
         console.table(Object.keys(seatsOf(s)).map(function (k) { const v = seatsOf(s)[k]; return { 자리: k, 명패: v.nick, 사원: nameOf(v.c), 채점: markList(s, v.c).map(function (m) { return m === 1 ? 'O' : (m === 2 ? 'X' : '·'); }).join(''), 셈: (s.paid && s.paid[v.c]) ? '끝' : '-' }; }));
     });
 };
-window.quizShowDebug = { Q: Q, IN: IN, shows: function () { return SHOWS; }, cur: curShow, verdictOf: verdictOf, paint: paintStage, enter: enter, leave: leave, pending: pendingShow, sweep: sweepMine, cage: cageMe, cageWait: cageWait };
+window.quizShowDebug = { Q: Q, IN: IN, shows: function () { return SHOWS; }, cur: curShow, verdictOf: verdictOf, paint: paintStage, enter: enter, leave: leave, pending: pendingShow, sweep: sweepMine, cage: cageMe, cageWait: cageWait, BGM: BGM, el: function () { return bgm; }, bgm: function () { return bgm ? { paused: bgm.paused, t: bgm.currentTime, want: bgmWant, muted: bgm.muted, open: !!bgm._open, src: bgm.src } : { want: bgmWant }; } };
 
 console.log('[토크쇼] 🎤 초대 — 화요 퀴즈쇼 (단상 · 명패 · 정답 O / 오답 X · 붉은 글씨 → 브라운관 꺼짐 → 커튼)');
 })();
