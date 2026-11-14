@@ -1750,9 +1750,13 @@ NEW.forEach(function (row) { SHOP_AFFIL[row[0]] = row[2]; });
 // ==========================================
 // 어둠 소속은 어느 소속 물건이든 찬다
 // ==========================================
-function isDark(u) {
+function isDark(u, nm) {
     // ★ 🫧 흔적 칭호를 가진 사람도 어둠 소속처럼 어느 소속 물품이든 본다 · 찬다 (2026-11-08 사용자 · trace.js _traceHas)
-    try { if (typeof window._traceHas === 'function' && window._traceHas(u)) return true; } catch (e) { }
+    //   nm — 어느 물품을 두고 묻나. 🪄 도깨비 방망이 · 🫙 소원권은 칭호로는 안 된다 (2026-11-14 사용자 「그 두 개는 칭호에서 빼줘」 · trace.js _traceFree)
+    try {
+        if (nm !== undefined && typeof window._traceFree === 'function') { if (window._traceFree(u, nm)) return true; }
+        else if (typeof window._traceHas === 'function' && window._traceHas(u)) return true;
+    } catch (e) { }
     return /어둠/.test(((u && u.affiliation) || '') + ' ' + ((u && u.team) || ''));
 }
 
@@ -1762,7 +1766,7 @@ function isDark(u) {
         if (canWearItem._darkFree) { clearInterval(iv); return; }
         const _c = canWearItem;
         canWearItem = function (user, itemName) {
-            if (isDark(user)) return true;
+            if (isDark(user, itemName)) return true;
             return _c.apply(this, arguments);
         };
         canWearItem._darkFree = true;
@@ -1787,7 +1791,7 @@ function shopAllowed(nm) {
         || ((typeof EQUIP_AFFIL !== 'undefined' && EQUIP_AFFIL) ? EQUIP_AFFIL[nm] : null);
     if (!need) return true;
     if (isCounsel(currentUser)) return true;
-    if (isDark(currentUser)) return true;          // 어둠 소속은 전부 본다
+    if (isDark(currentUser, nm)) return true;      // 어둠 소속은 전부 본다 (🫧 흔적 칭호도 — 🪄 도깨비 방망이 · 🫙 소원권만 빼고)
     return affilText(currentUser).includes(need);
 }
 

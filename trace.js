@@ -15,6 +15,8 @@
 //   ⑤ 소속 없는 물품    칭호를 **가진** 사람(titleAdmin)은 소속과 상관없이 — 우주 쇼핑몰에 어느 소속 물품이든 나오고(index.html · newitems2.js ·
 //                      rare-odds.js · secretbox.js 가 _traceHas 를 본다), 어느 소속 물품이든 쓰고 찬다 (canWearItem)
 //                      (2026-11-08 사용자 「그 칭호를 가진 사람은 소속 상관 없이 아이템이 무작위로 다 우주 쇼핑몰에 나오게 · 사용도 다 가능하게」)
+//                      ★ 🪄 도깨비 방망이 · 🫙 소원권은 뺀다 — 이 둘은 칭호로는 진열되지도 쓰이지도 않고 소속만 본다 (NOT_FREE · _traceFree)
+//                        (2026-11-14 사용자 「그 두 개는 칭호에서 빼줘」)
 //
 //   「혼자 든 탐사」 = 처음 들어간 인원이 나 하나 (1인 파티 · 혼자 들어가는 구역 · EPIC 혼자 · K의 방 혼자).
 //   인원은 칠성(chilseong.js)이 판을 열 때 세어 둔 것을 쓴다 (chilRunSize).
@@ -49,14 +51,24 @@ function has(u) {
     return !!(u && Array.isArray(u.titleAdmin) && u.titleAdmin.indexOf(TR.NAME) >= 0);
 }
 window._traceHas = has;
-// ⑤ 어느 소속 물품이든 쓰고 찬다
+// ⑤ 에서 빼는 물품 — 칭호로는 진열되지도 쓰이지도 않는다. 소속(백일몽 / 재난관리국 · 어둠 · 상담사)만 본다
+//   2026-11-14 사용자 「그 두 개는 칭호에서 빼줘」 — 🪄 도깨비 방망이 · 🫙 소원권 (뒤의 둘은 그림을 달기 전 이름)
+const NOT_FREE = ['🪄 도깨비 방망이', '🫙 소원권', '도깨비 방망이', '소원권'];
+function baseOf(n) { try { return (typeof getEquipBaseName === 'function') ? String(getEquipBaseName(n) || '') : String(n || ''); } catch (e) { return String(n || ''); } }
+//   이 물품에 칭호의 「소속 없이」 가 듣나 — 우주 쇼핑몰 진열(newitems2.js isDark) · 쓰기 / 차기(아래 hookWear)가 본다
+function freeFor(u, itemName) {
+    if (!has(u)) return false;
+    return NOT_FREE.indexOf(String(itemName || '')) < 0 && NOT_FREE.indexOf(baseOf(itemName)) < 0;
+}
+window._traceFree = freeFor;
+// ⑤ 어느 소속 물품이든 쓰고 찬다 (NOT_FREE 는 빼고)
 (function hookWear() {
     const iv = setInterval(function () {
         if (typeof canWearItem !== 'function') return;
         if (canWearItem._trace) { clearInterval(iv); return; }
         const _c = canWearItem;
-        const w = function (user) {
-            if (has(user)) return true;
+        const w = function (user, itemName) {
+            if (freeFor(user, itemName)) return true;
             return _c.apply(this, arguments);
         };
         Object.keys(_c).forEach(function (k) { try { w[k] = _c[k]; } catch (e) { } });
