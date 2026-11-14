@@ -416,6 +416,11 @@ function fallen(text) {
             if (solo && /바이올린/.test(String(l.name || ''))) return;
             if (Math.random() < l.chance * mult) { currentUser.inventory.push(l.name); gained.push(l.name); }
         });
+        // ★ 조합 재료 — 10판을 뛰면 하나는 꼭 (craft-pity.js · 2026-11-14) · 커스텀 장비로 만든 방은 한 판을 0.1 판으로
+        if (typeof window.craftPityAfter === 'function') {
+            window.craftPityAfter(loot.map(function (l) { return l.name; }), gained, mult)
+                .forEach(function (n) { currentUser.inventory.push(n); gained.push(n); });
+        }
     } catch (e) { }
 
     try { addHistoryLog(currentUser, '[어둠] ' + ZONE + ' — 신도에게 당했습니다. (오염도 +50%)'

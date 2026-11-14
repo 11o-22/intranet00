@@ -4931,6 +4931,14 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
             if (typeof window.gearRoomMult === 'function') c *= window.gearRoomMult();   // ★ 커스텀 장비로 만든 방 ×0.1 (gear-room.js)
             if (Math.random() < c) { currentUser.inventory.push(l.name); gained.push(l.name); }
         });
+        // ★ 조합 재료(두 번째 · 세 번째 자리 · 확정 승인서) — 10판을 뛰면 하나는 꼭 (craft-pity.js · 2026-11-14)
+        //   제 확률로 안 나온 판을 세어 열 번째 판에 하나를 준다. 커스텀 장비로 만든 방은 한 판을 0.1 판으로 센다.
+        try {
+            if (typeof window.craftPityAfter === 'function') {
+                const w = (typeof window.gearRoomMult === 'function') ? window.gearRoomMult() : 1;
+                window.craftPityAfter(zoneLoot.map(l => l.name), gained, w).forEach(n => { currentUser.inventory.push(n); gained.push(n); });
+            }
+        } catch (e) { console.warn('[조합 재료] 보장 건너뜀:', e && e.message); }
 
         addHistoryLog(currentUser, `[어둠 귀환] ${z.code} 탐사 완료 (+${total} P)`);
 

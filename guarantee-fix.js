@@ -117,7 +117,11 @@ window.GUAR_EPIC_RATE = 0.005;   // 영웅 구역에서 살아 돌아왔을 때 
             const r = _s.apply(this, arguments);
             try {
                 if (how === 'dead') return r;                       // 쓰러지면 없다
-                if (Math.random() >= window.GUAR_EPIC_RATE) return r;
+                // ★ 10판을 뛰면 하나는 꼭 (craft-pity.js · 2026-11-14) — 제 확률로 안 나온 판을 세어 열 번째에 준다
+                const hit = Math.random() < window.GUAR_EPIC_RATE;
+                let sure = [];
+                try { if (typeof window.craftPityAfter === 'function') sure = window.craftPityAfter([GUAR_MAT], hit ? [GUAR_MAT] : [], 1); } catch (e) { }
+                if (!hit && !sure.length) return r;
 
                 if (!Array.isArray(currentUser.inventory)) currentUser.inventory = [];
                 currentUser.inventory.push(GUAR_MAT);
