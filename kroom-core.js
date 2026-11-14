@@ -1240,15 +1240,19 @@ function bar() {
 }
 // ★ 중간에 포기한다 — 어느 장면에서든 (2026-11-08 사용자 「K의 방 중간에 포기할 수 있게」)
 //   쉼터의 「여기서 돌아간다」와 같은 정산(leave) — 얻은 경험치 · 꿈결의 절반 · 포인트 조금 · 횟수는 쓴 것. 혼자 S(올라온 길이 없다)에서는 전처럼 못 나간다.
+//   ★ 묻는 창은 탐사 화면(#dark-run-overlay · z-index 9999998) **위에** 떠야 한다 (2026-11-14 사용자 「포기 버튼 누르면 끝나고나서 팝업이 나와」)
+//     전에는 z-index 9999 라 탐사 화면 뒤에 깔렸다 — 눌러도 아무 일도 없어 보이고, 판이 끝나 탐사 화면이 걷힌 뒤에야 드러났다.
+//     판이 끝나면(정산 · 단말로 복귀) 남아 있는 창은 걷는다 (quitClose).
+function quitClose() { try { const q = document.getElementById('kroom-quit'); if (q) q.remove(); } catch (e) { } if (kr) kr._askQuit = false; }
 window.kroomGiveUp = function () {
     if (!kr || kr.dead || kr._settled) return;
     if (hard().doom) { try { showDarkToast('올라온 길이 없다.'); } catch (e) { } return; }
-    if (kr._askQuit) return;
+    if (kr._askQuit && document.getElementById('kroom-quit')) return;
+    quitClose();
     kr._askQuit = true;
-    const body = document.getElementById('dro-body');
     const box = document.createElement('div');
     box.id = 'kroom-quit';
-    box.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.72); display:flex; align-items:center; justify-content:center; padding:20px;';
+    box.style.cssText = 'position:fixed; inset:0; z-index:2147483000; background:rgba(0,0,0,.72); display:flex; align-items:center; justify-content:center; padding:20px; box-sizing:border-box;';
     box.innerHTML = '<div style="background:#0f1518; border:1px solid #3a2a2a; border-radius:8px; padding:16px; max-width:320px; width:100%;">'
         + '<div style="font-size:13px; color:#ffb3b3; font-weight:bold; margin-bottom:8px;">🏳 여기서 포기합니까?</div>'
         + '<div style="font-size:11px; color:#ccc; line-height:1.7; margin-bottom:12px;">얻은 경험치와 꿈결의 <b>절반</b>만 들고 나옵니다.<br>오늘 횟수는 쓴 것으로 칩니다.' + ((darkRun && darkRun.isParty) ? '<br>일행은 그대로 이어 갑니다.' : '') + '</div>'
@@ -3274,6 +3278,7 @@ function settle(how, txt) {
     if (!kr || kr._settled) return;
     kr._settled = true;
     if (darkRun) darkRun._settled = true;
+    quitClose();                                            // 「포기합니까?」 창이 떠 있었으면 걷는다 — 판은 끝났다
     try { kDrop(); } catch (e) { }                          // 정산했다 — 이어 갈 자리를 지운다 (두 번 받지 않게)
     const u = me(), k = prof(u);
     const alive = (how === 'clear' || how === 'leave');
@@ -3439,6 +3444,7 @@ window.kroomFinish = function () {
     if (pid) { try { partyRunCleanup(pid, K_CODE); } catch (e) { } }
     try { if (typeof clearDarkRunState === 'function') clearDarkRunState(); } catch (e) { }
     try { kDrop(); } catch (e) { }
+    quitClose();
     kr = null;
     darkRun = null;
     try { updateUI(); } catch (e) { }
