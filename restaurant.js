@@ -358,6 +358,8 @@ const MINI = {
 };
 
 let mini = null;
+// 손가락으로 만지는 기계인가 — 자판 안내는 자판이 있는 쪽에만 (plaza.js 와 같은 셈)
+const MINI_TOUCH = (function () { try { return !!(('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0); } catch (e) { return false; } })();
 
 // 바늘을 왜 CSS 쪽에 넘겼나
 //
@@ -452,9 +454,31 @@ function miniClose() {
     if (mini && mini.raf) cancelAnimationFrame(mini.raf);
     if (mini && mini.anim) { try { mini.anim.cancel(); } catch (e) { } }
     try { window.removeEventListener('resize', miniResize); } catch (e) { }
+    try { window.removeEventListener('keydown', miniKey, true); window.removeEventListener('keyup', miniKey, true); } catch (e) { }
     mini = null;
     const el = document.getElementById('cook-mini');
     if (el) el.remove();
+}
+
+// ★ 자판 (PC) — 스페이스 · 엔터로 멈춘다 · Esc 로 그만둔다
+//   2026-11-14 사용자 「냄비에서 나오기 PC에서는 안 돼서 봐줘」 — 마우스로는 됐지만 자판으로는 아무 일도 없었다.
+//     판이 떠 있어도 자판은 뒤의 화면이 받았다: 광장에서는 스페이스가 🍍 점프로 가고(누른 것이 거기서 먹힌다),
+//     엔터는 방금 누른 「나온다」 단추를 다시 누를 뿐이고, Esc 는 판이 아니라 광장을 닫았다.
+//   판이 떠 있는 동안에는 이 셋을 창(window)의 붙잡는 단계에서 먼저 받아 뒤로 넘기지 않는다.
+//   누른 때는 마우스 · 손가락과 같이 그 순간(event.timeStamp)으로 잰다. 꾹 누르고 있는 것(repeat)은 한 번으로 친다.
+function miniKey(e) {
+    if (!mini) return;
+    const k = e.key;
+    const isStop = (k === ' ' || k === 'Spacebar' || e.code === 'Space' || k === 'Enter');
+    const isEsc = (k === 'Escape' || k === 'Esc');
+    if (!isStop && !isEsc) return;
+    if (e.isComposing) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+    if (e.type !== 'keydown' || e.repeat || mini.over) return;
+    if (isEsc) { window.cookCancel(); return; }
+    if (typeof mini.press === 'function') mini.press(e);
 }
 
 function miniOpen(d, done) {
@@ -479,7 +503,8 @@ function miniOpen(d, done) {
         + ' will-change:transform; transform:translateX(0px);"></div>'
         + '</div>'
         + '<div style="font-size:10px; color:#777; margin-top:9px; line-height:1.6;">'
-        + '바늘이 초록 칸에 있을 때 멈추세요.</div>'
+        + '바늘이 초록 칸에 있을 때 멈추세요.'
+        + (MINI_TOUCH ? '' : '<br><span style="color:#5f5f5f;">스페이스 · 엔터로도 멈춥니다 (Esc 그만두기)</span>') + '</div>'
         + '<button class="game-btn" id="cook-stop" style="width:100%; margin:14px 0 0 0; padding:14px;'
         + ' font-size:13px; background:linear-gradient(145deg,#7f5a00,#4a3300) !important;'
         + ' border-color:#b07000 !important; color:#ffd9a0 !important;">멈춘다</button>'
@@ -516,6 +541,7 @@ function miniOpen(d, done) {
             last = t;
             miniHit(e);
         };
+        if (mini) mini.press = press;        // 자판(miniKey)도 같은 길로 — 한 번 누른 것이 두 번 들어오지 않게 같은 0.35초를 쓴다
         if (typeof window.PointerEvent === 'function') {
             stop.addEventListener('pointerdown', press);
         } else {
@@ -526,6 +552,9 @@ function miniOpen(d, done) {
             if (e && e.preventDefault) e.preventDefault();
         };
     })();
+    // 자판 — 방금 누른 단추(「나온다」 · 「요리한다」)에 남은 초점을 풀어, 엔터가 그 단추를 다시 누르지 않게 한다
+    try { if (document.activeElement && document.activeElement !== document.body && document.activeElement.blur) document.activeElement.blur(); } catch (e) { }
+    try { window.addEventListener('keydown', miniKey, true); window.addEventListener('keyup', miniKey, true); } catch (e) { }
 }
 
 function nextRound() {
