@@ -1911,7 +1911,13 @@ if (database) {
     }
     function getEquipOwner(user, fullName) {
         if (!user || !user.equipOwner) return null;
-        return user.equipOwner[fullName] || null;
+        const o = user.equipOwner[fullName] || null;
+        // ★ 기록의 사번이 엉뚱할 때(인가 코드가 바뀐 뒤 옛 코드가 남은 것 따위) 지금의 주인으로 푼다 — gear-own.js 「넷」
+        //   꼬리표 없는 것은 스스로 찬 것 · 장착자/시술자는 이름으로 · 연동/연결은 짝의 기록으로
+        if (o && typeof window.equipOwnerLive === 'function') {
+            try { return window.equipOwnerLive(user, fullName, o) || o; } catch (e) { }
+        }
+        return o;
     }
     function clearEquipOwner(user, fullName) {
         if (user && user.equipOwner && user.equipOwner[fullName]) delete user.equipOwner[fullName];
@@ -10319,6 +10325,11 @@ function saveSelfFull() {
             if (snapRun.val()) { showCustomAlert('진행 중인 탐사가 있습니다.\n정리된 뒤에 다시 시도해주세요.'); return; }
 
             data.code = newCode;
+            // ★ 스스로 찬 장비의 주인 기록(equipOwner)도 새 코드로 옮긴다 (2026-11-15)
+            //   옛 코드로 남으면 제 것이 전부 「남이 채운 것」이 되어 못 뺀다 (남의 기록에 적힌 것은 아래에서 바꾼다)
+            if (data.equipOwner && typeof data.equipOwner === 'object') {
+                Object.keys(data.equipOwner).forEach(k => { if (data.equipOwner[k] === oldCode) data.equipOwner[k] = newCode; });
+            }
             addHistoryLog(data, `[당국 개입] 인가 코드가 재발급되었습니다.`);
 
             const updates = {};

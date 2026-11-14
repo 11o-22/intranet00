@@ -55,6 +55,7 @@
 //   gearOwnClaim()    내가 남에게 채운 것의 사라진 주인 기록 (회수 목록에 뜨게)
 //   gearOwnScan()     사원 전체 — 라벨엔 장착자가 있는데 기록이 없는 것
 //   gearOwnScan(true) 찾은 것을 전부 되살린다 (상담사만)
+//   gearOwnHeal()     내 장착칸에서 엉뚱한 사번을 가리키는 주인 기록을 바로잡는다 (들어올 때 저절로 · 아래 「넷」)
 
 (function gearOwn() {
 
@@ -404,6 +405,137 @@ window.gearOwnScan = function (doFix) {
     console.log('%c  ' + n + '개를 되살렸습니다.', 'color:#4CAF50');
 };
 
-console.log('[장착잠금] gearOwnFix() · gearOwnScan()');
+// ==========================================
+// 넷 — 주인 기록이 엉뚱한 사번을 가리킬 때 (2026-11-15)
+// ==========================================
+//
+// 2026-11-15 사용자
+//   「그리고 특정 사람이 채운 게 도구가 사라져서 제거를 못 하고, 본인이 착용한 게 남이 착용한 걸로 되어서 해제를 못 해.」
+//
+// ■ 왜
+//   주인 기록(equipOwner)에는 채운 사람의 **인가 코드**가 적힌다. 스스로 찬 것에는 제 코드가 적힌다.
+//   상담사가 「인가 코드 변경」을 하면 사원 기록이 새 코드 자리로 통째로 옮겨 가는데, 그 안의 주인 기록은
+//   옛 코드 그대로였다 (남의 기록에 적힌 것만 새 코드로 바꿔 줬다 — index.html adminChangeCode · 같이 고쳤다).
+//     · 내가 찬 것           기록 = 옛 코드 ≠ 지금 코드 → 전부 「남이 채운 것」 · 해제 불가 · 「내 것 0 / 12」
+//     · 내가 남에게 채운 것   그 사원이 그때 접속해 있었으면 그 화면이 옛 기록을 통째로 되써서 옛 코드로 돌아간다
+//                           → 내 회수 목록에서 사라지고, 차고 있는 쪽은 스스로 못 빼니 **아무도 못 뺀다**
+//   위 「셋」(gearOwnClaim)은 기록이 **없을 때만** 되찾는다 — 없는 사번이 적혀 있는 것은 못 고쳤다.
+//
+// ■ 어떻게
+//   남이 채운 것에는 **반드시** 이름 꼬리표가 붙는다 — (장착자: …) (시술자: …) (연동: …) (연결: …).
+//   꼬리표가 없는 것은 스스로 찬 것이다 (장착칸에 넣는 자리 전부가 그렇다).
+//     · 꼬리표 없음       → 차고 있는 사람 것 (기록에 무엇이 적혀 있든)
+//     · 장착자 · 시술자    → 기록의 사번이 아무도 아니면 꼬리표의 이름으로 다시 찾는다 (못 찾으면 그대로 둔다)
+//     · 연동 · 연결 (짝)   → 기록의 사번이 아무도 아니면 짝의 기록을 본다. 짝의 것도 모르면 차고 있는 사람 것
+//   기록의 사번이 살아 있는 사원이면 (꼬리표가 있는 것은) 기록을 믿는다 — 지금까지와 같다.
+//   「아무도 아닌 사번」 은 사원 표가 **다 내려온 뒤에만** 판단한다 (덜 왔을 때 잘못 보지 않게).
+//
+//   index.html 의 getEquipOwner 가 이 풀이(equipOwnerLive)를 거친다 — 장착 목록 · 해제 · 회수 목록 · 회수 ·
+//   「남이 채워 줬을 때만」 도는 효과가 전부 같은 답을 본다.
+//   들어올 때 내 기록은 고쳐서 저장해 둔다 (gearOwnHeal). 남의 기록은 건드리지 않는다 — 읽을 때 풀어 보고,
+//   거둬 가면 그 줄이 지워진다 (gearPull).
+const TAG_PAIR = /\((?:연동|연결)\s*:\s*([^)]+)\)/;
+let usersAll = false;                    // 사원 표가 다 내려왔는가
+
+function baseName(w) { return (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : String(w || ''); }
+function liveCode(c) { try { return !!(c && typeof db !== 'undefined' && db.users && db.users[c]); } catch (e) { return false; } }
+
+// 짝(연동 · 연결)의 기록에서 주인을 찾는다 — 짝이 차고 있는 같은 물건 가운데 나를 가리키는 이름표
+function pairOwner(u, w) {
+    const m = TAG_PAIR.exec(String(w || ''));
+    if (!m) return null;
+    const hit = findBy(m[1].trim());
+    if (hit.length !== 1 || hit[0].code === u.code) return null;
+    const p = hit[0], base = baseName(w), me = String(u.name || '');
+    const pe = Array.isArray(p.equippedWeapons) ? p.equippedWeapons : [];
+    for (let i = 0; i < pe.length; i++) {
+        const x = String(pe[i] || '');
+        if (baseName(x) !== base) continue;
+        const pm = TAG_PAIR.exec(x);
+        if (!pm) continue;
+        const who = pm[1].trim();
+        if (!me || (who !== me && who.indexOf(me + ' ') !== 0)) continue;
+        const r = (p.equipOwner || {})[x];
+        if (r && liveCode(r)) return r;
+    }
+    return null;
+}
+
+// 기록에 적힌 사번(raw)을 지금의 주인으로 푼다
+window.equipOwnerLive = function (u, w, raw) {
+    if (!raw || !u || !u.code) return raw || null;
+    if (raw === u.code) return raw;
+    const s = String(w || '');
+    const isTag = PAT.test(s);
+    const isPair = !isTag && TAG_PAIR.test(s);
+    if (!isTag && !isPair) return u.code;                 // 꼬리표가 없다 = 스스로 찬 것
+    if (liveCode(raw)) return raw;                        // 살아 있는 사번 — 기록을 믿는다
+    if (!usersAll) return raw;                            // 사원 표가 덜 왔다 — 아직 모른다
+    if (isTag) {
+        const hit = findBy(labelWho(s));
+        return (hit.length === 1) ? hit[0].code : raw;    // 이름으로도 못 찾으면 그대로 둔다
+    }
+    return pairOwner(u, s) || u.code;
+};
+
+// 내 장착칸의 기록을 바로잡아 저장한다
+function healMine() {
+    const u = currentUser;
+    const out = [];
+    if (!u || !Array.isArray(u.equippedWeapons) || !u.equipOwner || typeof u.equipOwner !== 'object') return out;
+    const seen = {};
+    u.equippedWeapons.forEach(function (w) {
+        if (seen[w]) return;
+        seen[w] = 1;
+        const raw = u.equipOwner[w];
+        if (!raw) return;
+        const now = window.equipOwnerLive(u, w, raw);
+        if (!now || now === raw) return;
+        u.equipOwner[w] = now;
+        out.push({ 장비: w, 주인: now === u.code ? '본인' : ((db.users[now] || {}).name || '?') });
+    });
+    return out;
+}
+window.gearOwnHeal = function (quiet) {
+    if (!currentUser) { if (!quiet) console.warn('로그인이 필요합니다.'); return 0; }
+    const rows = healMine();
+    if (rows.length) {
+        try { if (typeof saveFields === 'function') saveFields({ equipOwner: 1 }); } catch (e) { }
+        console.log('%c[장착잠금] 엉뚱한 사번을 가리키던 주인 기록 ' + rows.length + '개를 바로잡았습니다.', 'color:#4CAF50');
+        if (!quiet) console.table(rows);
+        try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+    } else if (!quiet) {
+        console.log('[장착잠금] 바로잡을 주인 기록이 없습니다.' + (usersAll ? '' : ' (사원 표가 아직 덜 내려왔습니다)'));
+    }
+    return rows.length;
+};
+
+// 사원 표가 다 내려왔는지 — 이미 붙어 있는 사원 표 듣기(index.html)가 처음 한 바퀴를 마치면 불린다
+(function waitUsers() {
+    let asked = false, healedFor = null;
+    setInterval(function () {
+        let me = null;
+        try { me = currentUser || null; } catch (e) { me = null; }
+        if (!me) { healedFor = null; return; }
+        if (!usersAll) {
+            if (asked || typeof database === 'undefined' || !database) return;
+            asked = true;
+            try {
+                database.ref('users').once('value').then(function () {
+                    usersAll = true;
+                    // 풀이가 달라졌으니 소지품 칸을 한 번 다시 그린다 — updateUI 는 내 기록이 그대로면 건너뛴다 (norepaint2.js)
+                    try { if (typeof renderInventory === 'function') renderInventory(); } catch (e) { }
+                    try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+                }).catch(function () { asked = false; });
+            } catch (e) { asked = false; }
+            return;
+        }
+        if (healedFor === me.code) return;                 // 들어올 때 한 번
+        healedFor = me.code;
+        try { window.gearOwnHeal(true); } catch (e) { }
+    }, 1200);
+})();
+
+console.log('[장착잠금] gearOwnFix() · gearOwnScan() · gearOwnHeal()');
 
 })();
