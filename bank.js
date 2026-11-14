@@ -9,6 +9,11 @@ const BANK_GRADES = [
     { g:5, min:0,   cap:50000,    rate:0.002, loan:0,     fee:0,    label:'5등급' }
 ];
 const BANK_VIP = { cap: 30000000, label: 'VIP' };
+// ★ VIP 자동 승급 (2026-11-14 사용자 「VIP 그냥 심사 없이 천만원 차면 자동 등급 되게 해줘」)
+//   예금이 이만큼(1등급 예금 한도) 차면 심사 없이 VIP 가 된다 — bankAutoVip()
+//   · 블랙리스트는 안 된다 · 한 번 되면 예금이 줄어도 그대로다 (심사로 된 VIP 와 같다)
+//   · 상담사가 박탈한 사원(vipHold)은 저절로 다시 오르지 않는다 — 그 사원만 예전처럼 심사를 신청하고, 상담사가 승인하면 풀린다
+const BANK_VIP_AUTO = 10000000;
 const BANK_LOAN_DAYS = 3;
 const BANK_START = 700;           // 새 계좌의 신용 점수 — 2등급 (2026-10-26)
 const BANK_DAY = 24 * 60 * 60 * 1000;
@@ -101,11 +106,36 @@ function attachBank() {
     bankRef = database.ref(bankPath(currentUser.code));
     bankRef.on('value', s => {
         bankState = s.val();
+        bankAutoVip();                 // 예금이 1,000만 P 에 찼으면 그 자리에서 VIP (어느 길로 찼든 여기서 본다)
         checkVIPStatus();
         const panel = document.getElementById('tab-vip');
         if (panel && panel.classList.contains('active')) renderBank();
     });
     bankSettle();
+}
+
+// --- VIP 자동 승급 — 예금이 BANK_VIP_AUTO 에 차면 심사 없이 ---
+function bankAutoVipOk(b) {
+    return !!b && !b.vip && !b.blacklist && !b.vipHold && (Number(b.deposit) || 0) >= BANK_VIP_AUTO;
+}
+let bankAutoBusy = false;
+function bankAutoVip() {
+    if (!database || !currentUser || bankAutoBusy) return;
+    const me = currentUser;
+    if (bankKey !== me.code || !bankAutoVipOk(bankState)) return;
+    bankAutoBusy = true;
+    bankTx(bankPath(me.code), b => {
+        if (!bankAutoVipOk(b)) return;
+        b.vip = { at: Date.now(), by: 'auto' };
+        b.vipRequest = null;
+        return b;
+    }).then(res => {
+        bankAutoBusy = false;
+        if (!res || !res.committed || !currentUser || currentUser.code !== me.code) return;
+        addHistoryLog(currentUser, `[은행] 예금이 ${BANK_VIP_AUTO.toLocaleString()} P 에 차 VIP 가 되었습니다.`);
+        saveFields({ history: 1 });
+        showCustomAlert(`🏦 VIP 가 되었습니다.\n\n예금이 ${BANK_VIP_AUTO.toLocaleString()} P 에 차 심사 없이 올라갔습니다.\n예금 한도 ${BANK_VIP.cap.toLocaleString()} P`);
+    }).catch(e => { bankAutoBusy = false; console.error('[은행] VIP 자동 승급 실패:', e); });
 }
 
 // --- 개설 · 이자 · 연체 정산 ---
@@ -481,7 +511,7 @@ function renderBank() {
             </div>
             <div style="font-size:10px; color:#888; display:flex; justify-content:space-between;">
                 <span>${score} / 1000</span>
-                <span>${black ? '점수 동결' : vip ? 'VIP 회원' : next ? `${next.label}까지 ${next.min - score}점` : 'VIP는 심사가 필요합니다'}</span>
+                <span>${black ? '점수 동결' : vip ? 'VIP 회원' : next ? `${next.label}까지 ${next.min - score}점` : (b.vipHold ? 'VIP는 심사가 필요합니다' : `VIP는 예금 ${man(BANK_VIP_AUTO)} P`)}</span>
             </div>
         </div>`;
 
@@ -493,13 +523,20 @@ function renderBank() {
                 VIP 회원입니다. 예금 한도 <b style="color:#d4af37;">${man(BANK_VIP.cap)} P</b><br>
                 <span style="font-size:10px; color:#888;">승인일 ${new Date(b.vip.at).toLocaleDateString()}</span>
             </div>`;
+    } else if (black) {
+        html += `<div style="font-size:11px; color:#666; text-align:center; padding:6px 0;">거래 정지 상태에서는 VIP 가 될 수 없습니다.</div>`;
+    } else if (!b.vipHold) {
+        // ★ 심사 없이 — 예금이 1,000만 P 에 차면 그 자리에서 VIP (2026-11-14)
+        const dep = Number(b.deposit) || 0;
+        html += `<div style="font-size:11px; color:#ccc; line-height:1.8;">
+                예금이 <b style="color:#d4af37;">${man(BANK_VIP_AUTO)} P</b> 에 차면 심사 없이 VIP 가 됩니다.<br>
+                <span style="font-size:10px; color:#888;">지금 예금 ${dep.toLocaleString()} P · VIP 가 되면 예금 한도가 ${man(BANK_VIP.cap)} P 가 됩니다.</span>
+            </div>`;
     } else if (b.vipRequest) {
         html += `<div style="font-size:11px; color:#ffb74d; line-height:1.8;">
                 심사 대기 중입니다.<br>
                 <span style="color:#aaa;">상담사에게 찾아가 심사를 받으세요.</span>
             </div>`;
-    } else if (black) {
-        html += `<div style="font-size:11px; color:#666; text-align:center; padding:6px 0;">거래 정지 상태에서는 신청할 수 없습니다.</div>`;
     } else if (score >= 850) {
         const cool = b.vipRejectedAt && (Date.now() - b.vipRejectedAt < BANK_DAY);
         html += `<div style="font-size:10px; color:#888; line-height:1.7; margin-bottom:10px;">
@@ -577,7 +614,7 @@ function renderBank() {
         <details style="font-size:10px; color:#888;">
             <summary style="cursor:pointer; margin-bottom:8px;">등급별 혜택 보기</summary>
             <div style="display:flex; justify-content:space-between; padding:5px 3px; border-bottom:1px solid rgba(255,255,255,0.05); color:#d4af37; ${vip ? 'font-weight:bold;' : ''}">
-                <span>VIP (심사)</span>
+                <span>VIP (예금 ${man(BANK_VIP_AUTO)} P)</span>
                 <span>예금 ${man(BANK_VIP.cap)} · 1등급 혜택 동일</span>
             </div>
             ${BANK_GRADES.map(x => `
@@ -637,6 +674,8 @@ function adminBankBlacklist(on) {
 
 // ==========================================
 // ★ VIP 심사
+//   2026-11-14 부터 VIP 는 예금이 1,000만 P 에 차면 저절로 된다 (bankAutoVip).
+//   심사는 상담사가 VIP 를 박탈한 사원(vipHold)에게만 남아 있다 — 승인하면 vipHold 도 풀린다.
 // ==========================================
 function bankApplyVip() {
     if (!buyGuard()) return;
@@ -707,7 +746,7 @@ function adminVipDecide(code, ok) {
     bankEdit(code, function (b) {
         if (!b || !b.vipRequest) { gone = true; return null; }
         const f = { vipRequest: null };
-        if (ok) f.vip = { at: Date.now(), by: 'admin' };
+        if (ok) { f.vip = { at: Date.now(), by: 'admin' }; f.vipHold = null; }
         else f.vipRejectedAt = Date.now();
         return f;
     }).then(function (done) {
@@ -733,7 +772,7 @@ function adminVipRevoke(code) {
     if (!database) return;
     bankEdit(code, function (b) {
         if (!b || !b.vip) return null;
-        return { vip: null };
+        return { vip: null, vipHold: Date.now() };       // 박탈한 사원은 예금이 차 있어도 저절로 다시 오르지 않는다
     }).then(function (done) {
         if (!done) { showCustomAlert('이미 VIP가 아닙니다.'); renderAdminVipList(); return; }
         const u = db.users[code];
