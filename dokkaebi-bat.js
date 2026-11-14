@@ -15,14 +15,19 @@
 //    그리고 기존의 소원권 아이템도 백일몽 사람들만 쓸 수 있게 해주고 어둠 소속은 둘 다 사용 가능하게.
 //    선물상자에서 도깨비 방망이가 뜰 시에 소원권처럼 팝업 뜨게 해줘.」
 //   「그리고 도깨비 방망이에 🪄 이거 붙여줘.」
+// 2026-11-14 사용자
+//   「소원권도 도깨비 방망이랑 같은 확률로 우주 쇼핑몰에 뜨게 해주고, 대신 백일몽 주식회사랑 어둠 소속만 뜨게 해줘.
+//    사용도 그 둘만 가능하게. 도깨비 방망이는 어둠이랑 재난관리국만. 아니다. 둘 다. 확률을 10 배 더 낮추자」
+//   → 우주 쇼핑몰 진열 확률 둘 다 0.0000001% (선물 상자 쪽 확률은 그대로) · 소속은 아래 그대로
+//     🫙 소원권을 진열에서 숨기던 곳 셋을 풀었다 — rare-odds.js (확률 0) · index.html renderAlienShop · newitems2.js SHELF_HIDDEN
 //
 // ■ 나누어 맡는 곳
 //
-//   이 파일    물품 등록 · 우주 쇼핑몰(재난관리국 · 0.000001%) · 쓰기(장착 / 소원) · 소속 안내 · 소원 보내기
+//   이 파일    물품 등록 · 우주 쇼핑몰(재난관리국 · 어둠 · 0.0000001%) · 쓰기(장착 / 소원) · 소속 안내 · 소원 보내기
 //   plaza.js   광장에서 때리기 · 물약 모습 · 손에 들기 · 두 배 빠르기 · 「사용」 단추 · 30분 뒤 돌아오기
 //              (「🪄 도깨비 방망이 — 소원권 물약」 칸)
 //   treasure.js 선물 상자 한정품 (0.000001% · 서버 전체 하나) · 주우면 모두에게 팝업
-//   rare-odds.js 진열 확률 0.000001%
+//   rare-odds.js 진열 확률 0.0000001% (🪄 · 🫙 둘 다)
 //   time-freeze.js 셧다운 동안 물약 30분은 멈춘다 (wishForm)
 //
 // ■ 소속
@@ -43,7 +48,8 @@
 const BAT = '🪄 도깨비 방망이';
 const WISH = '🫙 소원권';
 const PRICE = 15000000;
-const RATE = 0.00000001;           // 0.000001%
+const RATE = 0.000000001;          // 0.0000001% — 우주 쇼핑몰 진열 확률 (2026-11-06 0.000001% → 2026-11-14 사용자 「둘 다. 확률을 10 배 더 낮추자」)
+                                   //   🫙 소원권도 같은 확률로 진열한다 (rare-odds.js ODDS · newitems.js)
 
 function u_() { try { return (typeof currentUser !== 'undefined') ? currentUser : null; } catch (e) { return null; } }
 function alert_(m) { try { if (typeof showCustomAlert === 'function') showCustomAlert(m); else console.log(m); } catch (e) { } }
@@ -167,8 +173,8 @@ function batWish() {
 
 // 소속이 안 맞을 때 — 어느 소속 물건인지 알려 준다
 function affilMsg(name) {
-    if (name === BAT) return '🪄 도깨비 방망이는 재난관리국 소속만 쓸 수 있습니다.';
-    if (name === WISH) return '🫙 소원권은 백일몽 소속만 쓸 수 있습니다.';
+    if (name === BAT) return '🪄 도깨비 방망이는 재난관리국 · 어둠 소속만 쓸 수 있습니다.';
+    if (name === WISH) return '🫙 소원권은 백일몽 주식회사 · 어둠 소속만 쓸 수 있습니다.';
     return '';
 }
 

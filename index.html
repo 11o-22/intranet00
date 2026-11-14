@@ -9913,8 +9913,9 @@ function bjFinish(mode) {
             // ★ 상담사가 아니면 여우구슬 절대 노출 불가
             if (item === "여우구슬" && currentUser.code !== 'kario0987') return false; 
             if (item === "금고" && currentUser.code !== 'kario0987') return false;
-            // ★ 소원권은 우주 쇼핑몰에 띄우지 않는다 — 상담사 화면 · 오늘 이미 스캔한 칸도 (2026-10-20)
-            if (item === "🫙 소원권" || item === "소원권") return false;
+            // ★ 🫙 소원권 — 2026-10-20 에 숨겼다가 2026-11-14 다시 띄운다 (백일몽 주식회사 · 어둠 소속만 · 진열 확률은 🪄 도깨비 방망이와 같다 — rare-odds.js)
+            //   소속은 EQUIP_AFFIL 「백일몽」 을 newitems2.js shopAllowed 가 본다. 이름을 갈기 전의 「소원권」 은 그대로 숨긴다.
+            if (item === "소원권") return false;
             return true;
         });
         // 진열칸은 자르지 않는다 — 리셋 뒤에 더 이긴 몫도 다 보인다 (2026-10-23 · 전에는 12칸에서 잘랐다)

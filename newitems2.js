@@ -1828,7 +1828,7 @@ function withPool(fn, ctx, args) {
 //  지우면 칸이 비어 1~2개만 보이게 되므로, 같은 수를 유지한다.)
 // ==========================================
 // 진열에 있어도 화면이 숨기는 것 (index.html renderAlienShop) — 칸만 차지하고 안 보이므로 바꿔 준다 (2026-10-29)
-const SHELF_HIDDEN = ['🫙 소원권', '소원권'];
+const SHELF_HIDDEN = ['소원권'];                             // 🫙 소원권은 2026-11-14 부터 다시 진열한다 (백일몽 주식회사 · 어둠 · 0.0000001%) — 옛 이름만 남긴다
 function shelfOk(nm) {
     if (!shopAllowed(nm) || SHELF_HIDDEN.indexOf(nm) >= 0) return false;
     // 목록에 없는 이름도 화면이 비운다 — 다만 묶음이 늦게 올라오는 동안(40초)은 기다린다
