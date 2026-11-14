@@ -363,21 +363,25 @@ function capTake(s) {
     }).then(function (r) { return !!(r && r.committed); }).catch(function () { return false; });
 }
 // 🫙 소원권이 반드시 나오는 사원 (2026-11-14 사용자 「Benz 라고 되어있는 사원은 선물상자 까면 소원권이 100% 나오게」)
-//   이름이 아니라 **사번으로 고정**한다 — 이름으로 보면 📝 사원명 변경권으로 누구나 「Benz」가 될 수 있다 (doll-data.js ART_OLD_CODES 와 같은 사번 0010)
-//   · 서버 전체 개수(treasureCap)는 세지도 줄이지도 않는다 — 한 장 한정과 따로 간다
-//   · 모두에게 띄우는 「소원권을 주웠습니다」 팝업은 띄우지 않는다 (sure 표시) — 하루 세 번씩 모두에게 뜨게 된다
+//   이름이 아니라 **사번으로 고정**한다 — 이름으로 보면 📝 사원명 변경권으로 누구나 「Benz」가 될 수 있다
+//   ★ 같은 날 사용자 「사번 1738로 하고 서버 한정 갯수로 쳐줘. 그 뒤에는 소원권이 안 나오게. 그리고. 전체 팝업도 띄우고.」
+//   · 사번(u.no) 1738 — 인가 코드는 보지 않는다
+//   · **서버 전체 개수(treasureCap/wish)로 센다** — 자리가 남았을 때만 반드시 나오고, 그 한 장이 나간 뒤에는 이 사원도 보통 뽑기
+//     (보통 뽑기의 소원권도 같은 개수를 보므로, 그 뒤로는 누구에게도 소원권이 나오지 않는다)
+//   · 모두에게 띄우는 「소원권을 주웠습니다」 팝업도 그대로 띄운다
 //   · 하루에 여는 상자 수(PER_DAY)는 그대로
-const WISH_SURE = ['0010'];
+const WISH_SURE = ['1738'];
 function wishSure(u) {
     u = u || u_();
     if (!u) return false;
-    return WISH_SURE.indexOf(String(u.no || '')) >= 0 || WISH_SURE.indexOf(String(u.code || '')) >= 0;
+    return WISH_SURE.indexOf(String(u.no == null ? '' : u.no).trim()) >= 0;
 }
 function roll() {
-    if (wishSure()) {
-        const w = SPECIAL.filter(function (s) { return s.k === 'wish'; })[0];
-        if (w) return Promise.resolve({ kind: 'item', name: w.n, special: 'wish', sure: true });
-    }
+    const w = wishSure() ? SPECIAL.filter(function (s) { return s.k === 'wish'; })[0] : null;
+    if (!w) return rollPlain();
+    return capTake(w).then(function (ok) { return ok ? { kind: 'item', name: w.n, special: 'wish' } : rollPlain(); });
+}
+function rollPlain() {
     const q = Math.random();
     let acc = 0;
     for (let i = 0; i < SPECIAL.length; i++) {
@@ -413,7 +417,7 @@ function give(p, rec) {
     const left = isAdm() ? '' : '\n\n오늘 남은 상자 ' + Math.max(0, PER_DAY - (Number(rec.n) || 0)) + ' / ' + PER_DAY;
     const desc = (p.kind === 'item' && typeof ITEM_CATALOG !== 'undefined' && ITEM_CATALOG[p.name]) ? '\n' + ITEM_CATALOG[p.name].desc : '';
     alert_('🎁 보물 상자를 열었습니다!\n\n' + (p.special ? '✨ ' : '') + line + desc + left);
-    if (p.special === 'wish' && !p.sure) wishShout(u);       // 반드시 나오는 사원의 소원권은 모두에게 알리지 않는다
+    if (p.special === 'wish') wishShout(u);
     if (p.special === 'bat') wishShout(u, 'bat');            // 🪄 도깨비 방망이도 소원권처럼 모두에게 (2026-11-06)
 }
 
@@ -624,7 +628,7 @@ window.treasureState = function () {
     const r = dayRec();
     console.log('%c===== 🎁 보물 찾기 =====', 'color:#ffcf8f; font-size:13px');
     console.log('  오늘 연 상자', r.n, '/', PER_DAY, isAdm() ? '(상담사 — 세지 않음)' : '');
-    if (wishSure()) console.log('  🫙 이 사원은 상자를 열면 반드시 소원권이 나온다 (사번 고정)');
+    if (wishSure()) console.log('  🫙 이 사원은 서버에 소원권이 남아 있으면 상자를 열 때 반드시 소원권이 나온다 (사번 고정 · 아래 표의 나간수 / 끝)');
     console.log('  지금 방', curRoom || '-', '· 상자', Object.keys(boxes).length, '/', perRoom(curRoom), '· 모든 방', Object.keys(rooms()).map(function (k) { return k + ' ' + perRoom(k); }).join(' · '));
     if (Object.keys(boxes).length) console.table(Object.keys(boxes).map(function (k) { const b = boxes[k]; return { 칸: k, x: b.x, y: b.y, 층: b.lv ? '지하' : '길', 모양: b.k }; }));
     const d = db_();
