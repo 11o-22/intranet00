@@ -109,6 +109,8 @@ function hasCustom(u) {
         return CUSTOM.indexOf(s) >= 0 || CUSTOM.indexOf(baseOf(s)) >= 0;
     });
 }
+// 커스텀 장비를 가졌나 (뿅망치는 세지 않는다) — craft-pity.js 도 이것으로 본다 (조합 재료 10판 보장에서 빠진다)
+window.hasCustomGear = function (u) { return hasCustom(u || u_()); };
 function hasTitle(u) { return !!u && arr(u.titleAdmin).filter(function (x) { return !!x; }).length > 0; }
 function tierOf(u) { return !hasCustom(u) ? 1 : (hasTitle(u) ? 3 : 2); }
 // 이 사원의 소속으로 보이는 물품 — 어둠은 둘 다 (칭호로는 안 된다)
