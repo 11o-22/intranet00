@@ -1011,6 +1011,9 @@ function stampSafe(ov) {
         '#plaza-jump:active{background:rgba(217,160,90,.35);}',
         '#plaza-jump .pc{font-size:9px;font-weight:normal;color:#9a9284;margin-left:4px;}',
         // 🛹 리듬 보드 타기 / 내리기 (2026-11-15) — 보드를 단 사람에게만 · 점프 단추 왼쪽 (점프가 없으면 그 자리)
+        // 💤 졸음 (🍊 자몽맛 물약 · potion-chat.js · 2026-11-16) — 머리 오른쪽 위에서 둥실
+        '.plaza-zz{position:absolute;left:60%;top:20%;pointer-events:none;z-index:3;animation:plazaZz 2.6s ease-in-out infinite;filter:drop-shadow(0 1px 1px rgba(0,0,0,.35));}',
+        '@keyframes plazaZz{0%{transform:translate(0,4px) scale(.85);opacity:.35}50%{transform:translate(6px,-6px) scale(1);opacity:1}100%{transform:translate(12px,-14px) scale(.9);opacity:0}}',
         '#plaza-ride{position:absolute;z-index:19;display:none;width:96px;padding:9px 0;border-radius:13px;',
         '  border:1px solid rgba(120,170,230,.45);background:rgba(12,14,22,.7);color:#d8e8ff;font-size:12px;font-weight:bold;',
         '  cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none;',
@@ -2907,6 +2910,7 @@ function jumpPaint() {
     }
     if (jumpShown !== on) { b.classList.toggle('on', on); jumpShown = on; }
     ridePaint();
+    try { if (run && run.me) zzPaint(run.me, typeof window.potionDrowsy === 'function' && window.potionDrowsy()); } catch (e) { }
 }
 
 // ==========================================
@@ -2954,6 +2958,22 @@ function boardOn(one) {
 function boardOff(one) {
     if (run && one === run.me) { const u = u_(); return !!(u && u.boardOff); }
     return !!one.boff;
+}
+// 💤 졸음 표시 — 나는 내 물약으로 · 남은 자리 기록 zz 로
+function zzPaint(one, on) {
+    if (!one || !one.wrap) return;
+    on = !!on;
+    if (one._zz === on) return;
+    one._zz = on;
+    let el = one.wrap.querySelector(':scope > .plaza-zz');
+    if (!on) { if (el) el.remove(); return; }
+    if (!el) {
+        el = document.createElement('div');
+        el.className = 'plaza-zz';
+        el.textContent = '💤';
+        el.style.fontSize = Math.max(10, Math.round((one.h || 384 * (run ? run.k : 0.5)) * 0.075)) + 'px';
+        one.wrap.appendChild(el);
+    }
 }
 function rideToggle() {
     const u = u_();
@@ -5949,6 +5969,7 @@ function send(moving) {
             fx: run.fx || null, ds: run.ds || null,
             jp: run.jumpAt || null,                 // 🍍 마지막으로 뛴 때
             bo: (run.me && run.me.board && u.boardOff) ? 1 : null,   // 🛹 보드에서 내려 있다
+            zz: (typeof window.potionDrowsy === 'function' && window.potionDrowsy(u)) ? 1 : null,   // 💤 졸음 (🍊 자몽맛 물약)
             tr: (run.me && run.me.tet && typeof window.tetRideMine === 'function') ? window.tetRideMine(u) : null,   // 🧩 테트리스 탈것 조합
             ts: (run.me && run.me.tet && u.tetRideSkin && u.tetRideSkin !== 'base') ? u.tetRideSkin : null,          // 🧩 그 블럭 모양
             dk: run.sDk ? 1 : null,                 // 🔦 탐사 중 (어둠 · K의 방 · EPIC · 이벤트 어둠 …)
@@ -6522,6 +6543,7 @@ function onSeat(code, v, fresh) {
     q.fr = Number(v.fr) || 0;                         // 🌧 여우비 — 🦊 호갑투를 찬 사람이 이 방에 들어온 때 (foxrain.js)
     q.fs = v.fs ? 1 : 0;                              // ❄ 그때 기온이 0도 밑이었다 — 비 대신 눈 (foxrain.js)
     q.one.boff = v.bo ? 1 : 0;                        // 🛹 보드에서 내려 있다
+    zzPaint(q.one, !!v.zz);                           // 💤 졸음
     q.j = v.j || 0;                        // 옛 판(j 없음)은 먼저 온 사람으로 친다
     // 🍍 뛰었다 — 새 때(jp)가 오면 받은 순간부터 포물선 (처음 본 사람의 묵은 jp 는 따라 뛰지 않는다)
     if (v.jp && v.jp !== q.jp) { if (!isNew && now() - v.jp < 3000 && (q.sm || boardOn(q.one))) q.jumpT0 = performance.now(); q.jp = v.jp; }   // 🍍 · 🛹
@@ -7311,9 +7333,11 @@ window.__plazaSys = sysLine;
 
 function say(text) {
     const u = u_(); if (!run || !u) return;
-    const t = String(text || '').trim().slice(0, P.SAY_MAX);
+    let t = String(text || '').trim().slice(0, P.SAY_MAX);
     if (!t) return;
     { const cb = hsCall('chatBlock'); if (cb) { sysLine(cb); return; } }       // 🕵️ 행맨 — 회의 때만 말한다
+    // 🍋 레몬맛 · 🫐 블루베리맛 물약 — 보내는 순간 말이 바뀐다 (potion-chat.js · 지난 줄 = 이 광장 채팅 칸 · 2026-11-16)
+    try { if (typeof window.potionChatXform === 'function') t = String(window.potionChatXform(t, run.lines || [])).slice(0, P.SAY_MAX) || t; } catch (e) { }
 
     // ── 🤫 귓속말 — 받는 사람 앞으로만 적는다 (말풍선 없음)
     if (chatCh === 'wh') {

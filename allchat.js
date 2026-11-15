@@ -410,6 +410,7 @@ setInterval(function () {
 // 확인
 // ==========================================
 window.allChatRepaint = function () { try { paintLog(false); } catch (e) { } };
+window.allChatRecent = function () { return log.slice(-20); };     // 🫐 블루베리맛 물약 — 최근 20 줄 (potion-chat.js · 2026-11-16)
 window.allChatState = function () {
     console.log('%c===== 사내 채팅 =====', 'color:#d4af37; font-size:13px');
     console.log('  받아 둔 줄 :', log.length + ' (최근 ' + ALLCHAT.KEEP + '줄만 내려옵니다)');
