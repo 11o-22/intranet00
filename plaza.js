@@ -5753,7 +5753,17 @@ function tick(ts) {
     //   안 움직이고 카메라도 멈췄으면 0.25초에 한 번만 깨어 본다 — 말풍선을
     //   거두고, 서 있다는 것을 알리는(BEAT_MS) 일은 그것으로 넉넉하다.
     //   손을 대거나(누름 · 자판) 남이 움직이기 시작하면 wake() 가 바로 깨운다.
-    if (busy || run.camBusy) {
+    // 🎵 리듬 게임이 덮고 있으면 (body.rg-on) 광장은 안 보인다 — 1 초에 한 번만 돈다 (자리 알리기 · 말풍선 거두기는 그것으로 넉넉하다)
+    //   리듬 게임과 한 틀을 나눠 쓰지 않게 (2026-11-15 사용자 「리듬게임 버퍼링도 좀 있는 거 수정해 줘」)
+    if (document.body && document.body.classList.contains('rg-on')) {
+        run.idle = true;
+        run.idleT = setTimeout(function () {
+            if (!run) return;
+            run.idleT = 0;
+            run.last = performance.now();
+            run.raf = requestAnimationFrame(tick);
+        }, 1000);
+    } else if (busy || run.camBusy) {
         run.idle = false;
         run.raf = requestAnimationFrame(tick);
     } else {
@@ -5769,6 +5779,7 @@ function tick(ts) {
 // 쉬고 있으면 바로 깨운다 — 손짓 · 남의 움직임 · 말
 function wake() {
     if (!run || !run.idle) return;
+    if (document.body && document.body.classList.contains('rg-on')) return;     // 🎵 리듬 게임 중 — 1 초 시계가 깨운다
     run.idle = false;
     if (run.idleT) { clearTimeout(run.idleT); run.idleT = 0; }
     try { cancelAnimationFrame(run.raf); } catch (e) { }

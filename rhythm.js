@@ -310,7 +310,7 @@ function rankSave(sk, d, run) {
 // ==========================================
 // 소리
 // ==========================================
-const AU = { ctx: null, bufs: {}, src: null, gain: null, startAt: 0, click: null, sess: null, lag: {}, lagNow: 0 };
+const AU = { ctx: null, bufs: {}, src: null, gain: null, startAt: 0, click: null, sess: null, lag: {}, lagNow: 0, loading: null, want: '' };
 function ctx() {
     if (!AU.ctx) {
         const C = window.AudioContext || window.webkitAudioContext;
@@ -349,14 +349,39 @@ function decode(ab) {
 }
 function loadSong(s) {
     if (AU.bufs[s.key]) return Promise.resolve(AU.bufs[s.key]);
+    // ★ 받는 중(미리 받기)이면 그것을 기다린다 — 같은 곡을 두 번 받아 풀지 않게 (2026-11-15 「버퍼링」)
+    if (AU.loading && AU.loading.key === s.key) return AU.loading.p;
     // ★ 앞 곡을 쥔 채 다음 곡을 풀면 잠깐 두 곡 몫(100 MB 넘게)을 쥔다 — 휴대폰에서 풀기가 막히지 않게 먼저 놓는다 (2026-11-11)
     Object.keys(AU.bufs).forEach(function (k) { delete AU.bufs[k]; });
-    return fetch(s.audio).then(function (r) { if (!r.ok) throw new Error('곡을 받지 못했습니다 (' + r.status + ')'); return r.arrayBuffer(); })
+    const my = { key: s.key, p: null };
+    my.p = fetch(s.audio).then(function (r) { if (!r.ok) throw new Error('곡을 받지 못했습니다 (' + r.status + ')'); return r.arrayBuffer(); })
         .then(decode).then(function (b) {
+            if (AU.loading === my) AU.loading = null;
+            // 그사이 다른 곡을 고르러 갔으면(미리 받기) 이것은 버린다 — 고른 곡이 그대로면 쥐고 있는다
+            if (AU.want && AU.want !== s.key) return b;
             // 풀어 둔 곡은 한 곡에 50 MB 가까이 — 곡이 일곱이라 지금 곡만 남긴다 (휴대폰 메모리)
             Object.keys(AU.bufs).forEach(function (k) { if (k !== s.key) delete AU.bufs[k]; });
             AU.bufs[s.key] = b; return b;
-        });
+        }, function (e) { if (AU.loading === my) AU.loading = null; throw e; });
+    AU.loading = my;
+    return my.p;
+}
+// ★ 미리 받기 (2026-11-15 사용자 「리듬게임 버퍼링도 좀 있는 거 수정해 줘」) — 곡 고르는 화면에서 한 곡을 잠깐(PRELOAD_MS) 골라 두고 있으면
+//   그 곡을 미리 받아 풀어 둔다 → START 를 누르면 「불러오는 중…」 없이 바로. 미리 듣기와 겹치지 않게 조금 뒤에.
+//   여러 곡을 넘겨 보기만 하면 받지 않는다 (데이터 · 메모리). 한 번 받은 곡은 서비스 워커가 쥐고 있어 다시 안 받는다.
+const PRELOAD_MS = 1500;
+let preT = 0;
+function preload(s) {
+    clearTimeout(preT);
+    if (!s || !s.audio) return;
+    AU.want = s.key;
+    preT = setTimeout(function () {
+        if (!OV || MODE !== 'menu' || !owned(s) || AU.want !== s.key) return;
+        if (AU.bufs[s.key] || (AU.loading && AU.loading.key === s.key)) return;
+        if (AU.loading) return;                                   // 다른 곡을 받는 중 — 그것이 끝난 뒤 다시 고르면 받는다
+        loadSong(s).catch(function () { });
+        loadChart(s).catch(function () { });
+    }, PRELOAD_MS);
 }
 
 // ==========================================
@@ -770,6 +795,40 @@ function close() {
     MODE = 'off';
 }
 window.rhythmOpen = open;
+// ★ 치는 동안 뒤의 화면 다시 그리기(updateUI)를 미룬다 (2026-11-15 사용자 「리듬게임 버퍼링도 좀 있는 거 수정해 줘」)
+//   리듬 게임이 덮고 있어 안 보이는데, 남의 기록이 바뀔 때마다 · 여러 시계가 불러 한 번에 10 ms 넘게(휴대폰) 들었다 — 그 틀이 끊겨 보였다.
+//   치는 동안(불러오기 · 치기)은 5 초에 한 번만 그리고, 끝나면 밀린 것을 한 번 그린다.
+const QUIET = { pend: false, last: 0, t: 0, f: null, n: 0 };
+function quietOn() { return !!OV && (MODE === 'play' || MODE === 'load'); }
+function quietFlush() {
+    clearTimeout(QUIET.t); QUIET.t = 0;
+    if (!QUIET.pend || !QUIET.f) return;
+    QUIET.pend = false; QUIET.last = performance.now();
+    try { QUIET.f(); } catch (e) { }
+}
+(function quietUI() {
+    const iv = setInterval(function () {
+        const f = window.updateUI;
+        if (typeof f !== 'function') return;
+        if (f._rgQuiet) { clearInterval(iv); return; }
+        QUIET.f = f;
+        const w = function () {
+            if (quietOn()) {
+                const n = performance.now();
+                if (n - QUIET.last < 5000) { QUIET.pend = true; QUIET.n++; if (!QUIET.t) QUIET.t = setTimeout(quietFlush, 5000 - (n - QUIET.last)); return; }
+                QUIET.last = n;
+            }
+            return f.apply(this, arguments);
+        };
+        Object.keys(f).forEach(function (k) { if (!(k in w)) { try { w[k] = f[k]; } catch (e) { } } });
+        w._rgQuiet = true;
+        window.updateUI = w;
+        clearInterval(iv);
+    }, 500);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+    setInterval(function () { if (QUIET.pend && !quietOn()) quietFlush(); }, 400);
+})();
+window.rhythmQuiet = function () { return { on: quietOn(), pend: QUIET.pend, held: QUIET.n }; };
 // 🎧 플레이리스트(playlist.js)가 곡 목록을 빌려 쓴다 (2026-11-11) — 곡을 새로 넣으면 플레이리스트에도 저절로 들어간다
 window.rhythmSongs = function () { return SONGS.map(function (s) { return { key: s.key, title: s.title, artist: s.artist, audio: s.audio, cover: s.cover, color: s.color, price: s.price || 0, need: s.need ? needText(s) : '', needMsg: s.need ? needMsg(s) : '', needSpec: s.need || null, locked: !owned(s) }; }); };
 window.rhythmCheckNeeds = checkNeeds;
@@ -840,7 +899,7 @@ function menu() {
         if (songTop != null) sl.scrollTop = songTop;
         else { const on = sl.querySelector('.rg-song.on'); if (on) sl.scrollTop = Math.max(0, on.offsetTop - sl.offsetTop - 8); }
     }
-    Array.prototype.forEach.call(UI.querySelectorAll('[data-song]'), function (el) { el.onclick = function () { SET.song = el.dataset.song; saveSet(); previewPlay(song()); menu(); }; });
+    Array.prototype.forEach.call(UI.querySelectorAll('[data-song]'), function (el) { el.onclick = function () { SET.song = el.dataset.song; saveSet(); previewPlay(song()); menu(); preload(song()); }; });
     Array.prototype.forEach.call(UI.querySelectorAll('[data-diff]'), function (el) { el.onclick = function () { SET.diff = el.dataset.diff; saveSet(); menu(); }; });
     Array.prototype.forEach.call(UI.querySelectorAll('[data-k]'), function (el) {
         el.onclick = function () {
@@ -970,6 +1029,7 @@ function start() {
     if (!owned(song())) { if (song().price) buyModal(song()); else needModal(song()); return; }
     previewStop(true);
     const s = song(), d = SET.diff;
+    AU.want = s.key; clearTimeout(preT);
     // 손짓 안에서 — 소리 · 전체 화면 · 가로 고정 (소리 종류를 먼저 — 도는 소리 장치 위에서 바꾸지 않게)
     sessionOn(); ctx(); keepAlive();
     goFull();
@@ -2060,6 +2120,7 @@ function duelTally(O) {
     return { s: O.total ? Math.round(1000000 * (O.cnt.c + O.cnt.n * 0.6) / O.total) : 0, c: O.cnt.c, n: O.cnt.n, m: O.cnt.m, mc: O.maxCombo, t: O.total };
 }
 // ── 그리기 — 위 진행 줄 · 내 정확도(왼쪽 위) · 차례 알림 · 오른쪽 위 상대 화면
+const HUDPB = { el: null, at: 0, x: 62, y: 8 };
 function duelHud(g, now, tnow) {
     const my = DUEL, O = my.O;
     // 진행 — 내 파트는 곡 빛 · 상대 파트는 흐리게 · 지금 자리는 흰 눈금
@@ -2075,8 +2136,12 @@ function duelHud(g, now, tnow) {
     g.globalAlpha = 1;
     g.fillStyle = '#fff'; g.fillRect(VW * Math.max(0, Math.min(1, now / dur)) - 1, 0, 2, 7);
     // 내 정확도 — ✕ 옆
+    // ★ 틀마다 단추 자리를 재면(offsetLeft) 화면 전체를 다시 재게 된다 — 뒤에서 다른 것이 바뀌면 한 틀이 길어진다 (2026-11-15 「버퍼링」)
+    //   단추가 바뀌거나 1 초가 지났을 때만 다시 잰다
     const pb = UI && UI.querySelector('.rg-pause');
-    const hx = pb ? pb.offsetLeft + pb.offsetWidth + 12 : 62, hy = pb ? pb.offsetTop : 8, fs = Math.round(VH * 0.048);
+    const tn = performance.now();
+    if (!HUDPB.at || HUDPB.el !== pb || tn - HUDPB.at > 1000) { HUDPB.el = pb; HUDPB.at = tn; HUDPB.x = pb ? pb.offsetLeft + pb.offsetWidth + 12 : 62; HUDPB.y = pb ? pb.offsetTop : 8; }
+    const hx = HUDPB.x, hy = HUDPB.y, fs = Math.round(VH * 0.048);
     const done = P.cnt.c + P.cnt.n + P.cnt.m;
     const acc = done ? (P.cnt.c + P.cnt.n * 0.6) / done * 100 : 100;
     g.textAlign = 'left'; g.textBaseline = 'top';
@@ -2350,6 +2415,7 @@ function duelLoad() {
     const s = SONGS.find(function (x) { return x.key === my.song; });
     if (!s) { duelLeave(); menu(); return; }
     previewStop(true);
+    AU.want = s.key; clearTimeout(preT);
     MODE = 'load';
     UI.innerHTML = '<div class="rg-bg"></div><div class="rg-load"><div style="text-align:center;line-height:2;"><div style="font-size:12px;letter-spacing:4px;color:#9ab;">DUEL · VS ' + esc(my.oppName) + '</div><div data-v="dl">불러오는 중…</div></div></div>'
         + '<button class="rg-btn rg-x" data-k="dq">✕</button>';
@@ -2401,6 +2467,7 @@ function duelResult() {
     duelScan(1e12); duelFlush();
     stopPlay();
     my.myRes = { s: Math.round(P.score), c: P.cnt.c, n: P.cnt.n, m: P.cnt.m, mc: P.maxCombo, t: P.total };
+    try { const st = SONGS.find(function (x) { return x.key === my.song; }) || {}; my.djMsg = (typeof window.djRhythmDone === 'function') ? window.djRhythmDone({ song: my.song, diff: my.diff, title: st.title, duel: 1 }) : ''; } catch (e) { my.djMsg = ''; }   // 🎧 더블링 (dj.js)
     try { my.mref.child('res/' + my.me).set(my.myRes); } catch (e) { }
     if (my.m && my.m.res && my.m.res[my.opp]) my.oppRes = my.m.res[my.opp];
     my.to3 = setTimeout(function () { if (DUEL === my && !my.oppRes) { my.oppLost = true; duelResultPaint(); } }, DC.RES_WAIT);
@@ -2548,6 +2615,7 @@ function duelResultPaint() {
         + '<div data-v="verdict" style="font-family:Georgia,serif;font-size:26px;font-weight:900;letter-spacing:6px;color:' + vc + ';text-shadow:0 0 18px ' + vc + ';min-height:32px;">' + v + '</div>'
         + (duet ? '<div data-v="duet" style="font-size:12px;color:#ffd9ee;line-height:1.6;text-align:center;max-width:420px;">' + duetLine(my, got) + '</div>' : '')
         + (my.oppLost && !my.oppRes ? '<div style="font-size:11px;color:#889;">상대 기록이 닿지 않아 본 만큼으로 셈했습니다</div>' : '')
+        + (my.djMsg ? '<div style="font-size:11px;color:#9fe7ff;">' + esc(my.djMsg) + '</div>' : '')
         + '<div style="display:flex;gap:10px;"><button class="rg-btn" data-k="re">한 번 더</button><button class="rg-btn" data-k="q">곡 고르기</button></div></div></div>';
     UI.querySelector('[data-k="q"]').onclick = function () { duelDrop(); P = null; menu(); };
     UI.querySelector('[data-k="re"]').onclick = function () { const o = { c: my.opp, s: my.song, d: my.diff }; duelDrop(); duelCreate(o.c, o.s, o.d); };
@@ -2837,6 +2905,12 @@ function result() {
             if (box) box.insertAdjacentHTML('beforeend', '<div style="font-size:12px;color:' + x.color + ';">🔓 「' + esc(x.title) + '」 열림</div>');
         }
     });
+    // 🎧 Disc Jockey 「더블링」 — 차고 있으면 하루 한 번, 한 곡을 끝까지 치면 그날 모든 어둠에서 보정 +3 (dj.js)
+    try {
+        const dj = (typeof window.djRhythmDone === 'function') ? window.djRhythmDone({ song: sk, diff: dk, title: P.s.title }) : '';
+        const box = dj && UI && UI.querySelector('.rg-tbl');
+        if (box) box.insertAdjacentHTML('beforeend', '<div style="font-size:12px;color:#9fe7ff;">' + esc(dj) + '</div>');
+    } catch (e) { }
     if (pay) dreamGive(pay, '[🎵 리듬 게임] ' + P.s.title + ' HARD ' + lv + ' · ' + rk[0] + ' — 💤 꿈결 +' + pay.toLocaleString() + ' D').then(function (g) {
         const el = UI && UI.querySelector('[data-v="dream"]'); if (!el) return;
         el.textContent = g.ok ? '💤 꿈결 +' + pay.toLocaleString() + ' D · 오늘 ' + g.n + '/' + DREAM_DAY
