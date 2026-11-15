@@ -2590,15 +2590,27 @@ function duetGrant(my) {
     try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
     return true;
 }
-// 듀엣 결과 줄 — 모은 곡 · 받았나
+// 듀엣 결과 줄 — 리듬 보드까지 남은 곡 수 · 받았나
+//   ★ 2026-11-15 사용자 「리듬게임 듀얼 하드 둘 다 A로 나올 경우 남은 곡 수를 띄워주자. 보기 편하게. 그리고 얻으면 사라지게 하고.」
+//     · 남은 곡 수를 크게 · 그 밑에 13칸 눈금(마친 곡은 분홍 · 곡 이름은 눌러 두면 뜬다). 곡 이름 줄은 걷었다.
+//     · 받은 판에는 「받았습니다」만 · 받은 뒤의 판에는 아무것도 띄우지 않는다.
 function duetLine(my, got) {
+    if (got) return '🛹 리듬 보드를 받았습니다<br><small style="color:#b9a9c4;">' + (my.duetCase ? '탈것에 이미 있어 소지품 · 기타 칸에 「' + BOARD_CASE + '」 로 넣었습니다' : '옷장 · 악세 · 탈것') + '</small>';
+    if (my.duetHad) return '';
     const pg = my.duetProg || { n: 0, N: DUET_SONGS.length, left: DUET_SONGS };
-    const cnt = '🎵 듀엣 ' + pg.n + ' / ' + pg.N + ' 곡';
-    if (got) return cnt + ' — 리듬 보드를 받았습니다<br><small style="color:#b9a9c4;">' + (my.duetCase ? '탈것에 이미 있어 소지품 · 기타 칸에 「' + BOARD_CASE + '」 로 넣었습니다' : '옷장 · 악세 · 탈것') + '</small>';
-    if (my.duetHad) return cnt + '<br><small style="color:#b9a9c4;">리듬 보드는 한 계정에 하나만 받을 수 있습니다</small>';
-    const left = pg.left.map(function (k) { const x = SONGS.find(function (y) { return y.key === k; }); return x ? x.title : k; });
-    return cnt + (my.duetFirst ? ' <b style="color:#ffc1e3;">+1</b>' : ' · 이미 마친 곡') + '<br><small style="color:#b9a9c4;">지금 있는 곡을 전부 듀엣으로 마치면 리듬 보드'
-        + (left.length ? ' — 남은 곡: ' + left.map(esc).join(' · ') : '') + '</small>';
+    const left = pg.N - pg.n;
+    const pips = DUET_SONGS.map(function (k) {
+        const on = pg.left.indexOf(k) < 0, x = SONGS.find(function (y) { return y.key === k; });
+        const cur = k === my.song;
+        return '<i title="' + esc(x ? x.title : k) + '" style="display:inline-block;width:14px;height:6px;margin:0 2px;border-radius:3px;'
+            + (on ? 'background:#ffc1e3;box-shadow:0 0 6px rgba(255,193,227,.6);' : 'background:rgba(255,255,255,.14);')
+            + (cur ? 'outline:1px solid #fff;outline-offset:1px;' : '') + '"></i>';
+    }).join('');
+    return '<div style="display:flex;align-items:baseline;justify-content:center;gap:8px;">'
+        + '<span style="font-size:12px;color:#ffd9ee;">🛹 리듬 보드까지 남은 곡</span>'
+        + '<b style="font-family:Georgia,serif;font-size:26px;color:#ffc1e3;line-height:1;text-shadow:0 0 12px rgba(255,193,227,.5);">' + left + '</b>'
+        + (my.duetFirst ? '<span style="font-size:11px;color:#ffc1e3;">이 곡 +1</span>' : '<span style="font-size:11px;color:#9a8fa6;">이미 마친 곡</span>')
+        + '</div><div style="margin-top:4px;line-height:6px;">' + pips + '</div>';
 }
 function duelResultPaint() {
     const my = DUEL; if (!my || !UI || my.st !== 'result') return;
@@ -2613,7 +2625,7 @@ function duelResultPaint() {
         + '<div style="font-size:13px;color:#aab;">' + esc(s.title) + ' · <b style="color:' + d[3] + '">' + d[1] + ' ' + lv + '</b> · ' + (duet ? 'DUET' : 'DUEL') + '</div>'
         + '<div class="rg-vs">' + duelCol(myName(), a, v === 'WIN' || duet) + duelCol(my.oppName, b, v === 'LOSE' || duet) + '</div>'
         + '<div data-v="verdict" style="font-family:Georgia,serif;font-size:26px;font-weight:900;letter-spacing:6px;color:' + vc + ';text-shadow:0 0 18px ' + vc + ';min-height:32px;">' + v + '</div>'
-        + (duet ? '<div data-v="duet" style="font-size:12px;color:#ffd9ee;line-height:1.6;text-align:center;max-width:420px;">' + duetLine(my, got) + '</div>' : '')
+        + (duet && duetLine(my, got) ? '<div data-v="duet" style="font-size:12px;color:#ffd9ee;line-height:1.6;text-align:center;max-width:420px;">' + duetLine(my, got) + '</div>' : '')
         + (my.oppLost && !my.oppRes ? '<div style="font-size:11px;color:#889;">상대 기록이 닿지 않아 본 만큼으로 셈했습니다</div>' : '')
         + (my.djMsg ? '<div style="font-size:11px;color:#9fe7ff;">' + esc(my.djMsg) + '</div>' : '')
         + '<div style="display:flex;gap:10px;"><button class="rg-btn" data-k="re">한 번 더</button><button class="rg-btn" data-k="q">곡 고르기</button></div></div></div>';
