@@ -2644,12 +2644,25 @@ function makeOne(user, label, k, other) {
     try { const L = window.dotLook(user, null, !!other); one.leaf = !tiny && (L.tops || []).indexOf(LEAF.SHEET) >= 0; } catch (e) { one.leaf = false; }
     if (one.leaf) leafLoad();
     // 🛹 리듬 보드 — 칸 맨 아래 발바닥 줄에 깔고, 사람은 putOne 이 그 두께만큼 올린다. 🍍 작아져도 탄다 (보드도 같이 작아진다 · k 에 TINY 가 곱해져 있다)
-    try { const LB = window.dotLook(user, null, !!other); one.board = LB.ride === 'note'; } catch (e) { one.board = false; }
-    if (one.board) {
+    try { const LB = window.dotLook(user, null, !!other); one.ride = LB.ride || ''; } catch (e) { one.ride = ''; }
+    one.board = false;
+    if (one.ride === 'note') {
         const b = boardEl(k);
         b.el.style.top = Math.round(h - one.foot) + 'px';
         wrap.insertBefore(b.el, wrap.firstChild);                 // 몸 · 옷(치맛단)보다 뒤
-        one.boardEl = b.el; one.boardW = b.w; one.boardH = b.h; one.trail = [];
+        one.board = true; one.boardEl = b.el; one.boardW = b.w; one.boardH = b.h; one.trail = [];
+    } else if (one.ride === 'tet' && typeof window.tetRideEl === 'function') {
+        // 🧩 테트리스 탈것 (tet-ride.js) — 나는 가진 블록만큼(tetRideMine) · 남은 자리 기록에 실려 온 조합(tr)
+        const tr = other ? (user && user.tr) : (typeof window.tetRideMine === 'function' ? window.tetRideMine(user) : null);
+        const v = tr ? window.tetRideEl(tr, k) : null;
+        if (v) {
+            // 서는 줄의 윗면에 발이 오게 — 그 줄 가운데를 발밑에 맞추고, 탈것 아랫면은 원래 땅에 닿게 (사람은 lift 만큼 올라선다)
+            v.el.style.top = Math.round(h - one.foot + v.lift - v.h) + 'px';
+            v.el.style.marginLeft = (-v.standX) + 'px';
+            wrap.insertBefore(v.el, wrap.firstChild);
+            one.board = true; one.boardEl = v.el; one.boardW = v.w; one.boardH = v.lift; one.trail = [];
+            one.tet = { w: v.w, h: v.h, sx: v.standX, cells: v.cells, cell: v.cell, last: 0 };
+        }
     }
     setTag(one, (user && user.code) || '', label || '');
     return one;
@@ -2809,7 +2822,7 @@ function remakeFolk() {
         const lab = q.one.name || '';            // 칭호 말고 **이름만**
         try { q.one.actor.stop(); } catch (e) { }
         q.one.wrap.remove();
-        q.one = makeOne({ code: c, dot: d, tiny: q.sm ? 1 : 0, wf: q.wk || 0 }, lab, run.k, true);
+        q.one = makeOne({ code: c, dot: d, tiny: q.sm ? 1 : 0, wf: q.wk || 0, tr: q.tr || null }, lab, run.k, true);
         q.hid = false;                         // 새 칸은 보이는 채로 시작한다 (tick 이 다시 가린다)
         q.one.actor.face(q.face || 1);
         run.el.appendChild(q.one.wrap);
@@ -2888,7 +2901,7 @@ function jumpPaint() {
         if (b._bot !== want) { b.style.bottom = want; b._bot = want; }
     }
     if (on) {                                                   // 🛹 보드 탄 사람은 보드 그림으로
-        const ic = boardOn(run.me) ? '🛹' : '🍍';
+        const ic = boardOn(run.me) ? (run.me.tet ? '🧩' : '🛹') : '🍍';
         if (b._ic !== ic && b.firstChild && b.firstChild.nodeType === 3) { b.firstChild.nodeValue = ic + ' 점프'; b._ic = ic; }
     }
     if (jumpShown !== on) { b.classList.toggle('on', on); jumpShown = on; }
@@ -2963,7 +2976,8 @@ function ridePaint() {
         if (b._bot !== want) { b.style.bottom = want; b._bot = want; }
         const right = canJump() ? '136px' : '12px';
         if (b._r !== right) { b.style.right = right; b._r = right; }
-        const t = boardOff(run.me) ? '🛹 타기' : '🛹 내리기';
+        const ic = run.me.tet ? '🧩' : '🛹';
+        const t = boardOff(run.me) ? ic + ' 타기' : ic + ' 내리기';
         if (b._t !== t) { b.textContent = t; b._t = t; }
     }
     if (rideShown !== on) { b.classList.toggle('on', on); rideShown = on; }
@@ -2976,6 +2990,7 @@ function boardLift(one) {
 }
 // 지나온 자리 — 보드 가운데 x · 윗면 y (방 그림 px). 움직였을 때만 적는다
 function trailMark(one, x, y) {
+    if (one.tet) { tetTrailMark(one, x, y); return; }
     const tr = one.trail, last = tr[tr.length - 1];
     if (last && Math.abs(last.x - x) < 0.6 && Math.abs(last.y - y) < 0.6) return;
     tr.push({ x: x, y: y, t: performance.now() });
@@ -2991,14 +3006,33 @@ function hull(pts) {
     lo.pop(); up.pop();
     return lo.concat(up);
 }
+// 🧩 테트리스 탈것 잔상 — 움직이면 블록 빛깔의 작은 조각이 지나온 자리에 떨어져 남았다가 사라진다 (2026-11-15 사용자 「작은 블럭들이 잔상으로 남게」)
+//   x · y — 서는 자리 가운데 · 탈것 윗면(서는 줄) (방 그림 px). 칸 하나를 골라 그 자리에 칸의 0.3~0.5 배 조각을 떨군다.
+const TET_TRAIL = { MS: 700, GAP: 55, MAX: 36, MIN: 3, MAXS: 11 };
+function tetTrailMark(one, x, y) {
+    const T = one.tet, tr = one.trail, t = performance.now();
+    if (one._tx != null && Math.abs(one._tx - x) < 0.6 && Math.abs(one._ty - y) < 0.6) return;   // 안 움직였다
+    one._tx = x; one._ty = y;
+    if (t - T.last < TET_TRAIL.GAP || !T.cells.length) return;
+    T.last = t;
+    const ground = y + one.boardH, left = x - T.sx, top = ground - T.h;
+    for (let n = 0; n < 2; n++) {
+        const c = T.cells[Math.floor(Math.random() * T.cells.length)];
+        const s = Math.max(TET_TRAIL.MIN, Math.min(TET_TRAIL.MAXS, Math.round(T.cell * (0.3 + Math.random() * 0.2))));
+        tr.push({ x: left + c.x + Math.random() * Math.max(1, T.cell - s), y: top + c.y + Math.random() * Math.max(1, T.cell - s),
+                  s: s, c: c.c, t: t, vy: 4 + Math.random() * 8, gnd: ground });
+    }
+    while (tr.length > TET_TRAIL.MAX) tr.shift();
+}
 let trailCv = null;
 function trailPaint() {
     if (!run || !run.el) return false;
     const t = performance.now(), list = [];
     const take = function (one) {
         if (!one || !one.trail || !one.trail.length) return;
-        while (one.trail.length && t - one.trail[0].t > BOARD.TRAIL_MS) one.trail.shift();
-        if (one.trail.length >= 2) list.push(one);
+        const ms = one.tet ? TET_TRAIL.MS : BOARD.TRAIL_MS;
+        while (one.trail.length && t - one.trail[0].t > ms) one.trail.shift();
+        if (one.trail.length >= (one.tet ? 1 : 2)) list.push(one);
     };
     take(run.me);
     Object.keys(run.peers).forEach(function (c) { const q = run.peers[c]; if (q && !q.hid) take(q.one); });
@@ -3025,6 +3059,19 @@ function trailPaint() {
     g.clearRect(0, 0, trailCv.width, trailCv.height);
     g.setTransform(dpr, 0, 0, dpr, -ox * dpr, -oy * dpr);
     list.forEach(function (one) {
+        if (one.tet) {                                   // 🧩 떨어진 조각 — 조금 가라앉으며 작아지고 엷어진다
+            one.trail.forEach(function (b) {
+                const age = Math.min(1, (t - b.t) / TET_TRAIL.MS);
+                const s = b.s * (1 - 0.45 * age), yy = Math.min(b.gnd - s, b.y + b.vy * age);
+                g.globalAlpha = 0.85 * (1 - age);
+                g.fillStyle = b.c;
+                g.fillRect(b.x, yy, s, s);
+                g.fillStyle = 'rgba(255,255,255,0.35)';
+                g.fillRect(b.x, yy, s, Math.max(1, s * 0.22));
+            });
+            g.globalAlpha = 1;
+            return;
+        }
         const tr = one.trail, w2 = one.boardW / 2, h = one.boardH;
         const a = tr[0], b = tr[tr.length - 1];
         if (Math.hypot(b.x - a.x, b.y - a.y) < 1) return;
@@ -5901,6 +5948,7 @@ function send(moving) {
             fx: run.fx || null, ds: run.ds || null,
             jp: run.jumpAt || null,                 // 🍍 마지막으로 뛴 때
             bo: (run.me && run.me.board && u.boardOff) ? 1 : null,   // 🛹 보드에서 내려 있다
+            tr: (run.me && run.me.tet && typeof window.tetRideMine === 'function') ? window.tetRideMine(u) : null,   // 🧩 테트리스 탈것 조합
             dk: run.sDk ? 1 : null,                 // 🔦 탐사 중 (어둠 · K의 방 · EPIC · 이벤트 어둠 …)
             s: run.say || null, st: run.sayAt || 0, b: sbMine() || null, at: t,
             j: run.joinAt || t                     // 이 방에 들어온 때 — 넘치면 늦게 온 쪽이 옮긴다
@@ -6447,12 +6495,13 @@ function onSeat(code, v, fresh) {
     const key = JSON.stringify(v.d || {});
     const sm = v.sm ? 1 : 0;                                   // 🍍 작아졌나
     const wk = Number(v.w) || 0;                               // 🪄 소원권 물약 (1 시계 · 2 달)
-    if (q && (q.key !== key || (q.sm || 0) !== sm || (q.wk || 0) !== wk)) { dropPeer(code); q = null; }     // 옷이나 크기가 바뀌었다 — 다시 만든다
+    const trk = v.tr ? JSON.stringify(v.tr) : '';              // 🧩 테트리스 탈것 조합
+    if (q && (q.key !== key || (q.sm || 0) !== sm || (q.wk || 0) !== wk || (q.trk || '') !== trk)) { dropPeer(code); q = null; }     // 옷이나 크기가 바뀌었다 — 다시 만든다
     const isNew = !q;
     if (!q) {
-        const one = makeOne({ code: code, dot: v.d || {}, tiny: sm, wf: wk }, v.n || code, run.k, true);
+        const one = makeOne({ code: code, dot: v.d || {}, tiny: sm, wf: wk, tr: v.tr || null }, v.n || code, run.k, true);
         run.el.appendChild(one.wrap);
-        q = run.peers[code] = { one: one, key: key, sm: sm, wk: wk, x: v.x, y: v.y, tx: v.x, ty: v.y,
+        q = run.peers[code] = { one: one, key: key, sm: sm, wk: wk, trk: trk, tr: v.tr || null, x: v.x, y: v.y, tx: v.x, ty: v.y,
                                 face: v.f || 1, moving: !!v.m, seen: now(), sayAt: 0 };
         one.actor.face(v.f || 1);
         putOne(one, q.x, q.y);

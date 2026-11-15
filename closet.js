@@ -807,6 +807,10 @@ const DOT_SLOTS = [
             //   ★ 2026-11-15 사용자 「그리고 파인애플이 되어도 탈 수 있게 해주고 거래도 가능하게 해줘. 이름은 리듬 보드로 바꿔주고.」
             //     이름만 바꾼다 — 열쇠(note-board)는 그대로 (이미 받은 사람 것이 그대로 이어진다). 밀실 거래로 주고받는다 (noTrade 없음).
             { i: 'note-board', n: '리듬 보드', top: [], own: 'note-board', cat: '탈것', ride: 'note' },
+            // ★ 🧩 테트리스 탈것 (2026-11-15 사용자 「테트리스 블럭들로 조합해서 타고 다니는 형식의 탈것」 · tet-ride.js)
+            //   오락실 테트리스 솔로로 받는 블록(소지품 · 밀실 거래 됨)을 직접 조합한다. 블록을 하나라도 가지면 생긴다 (u.wardrobe['tet-ride']).
+            //   그림 장 없이 광장 · 옷장이 tet-ride.js 의 tetRideEl 로 그린다. 옷 거래 목록에는 안 나온다 (noTrade — 블록을 주고받는다).
+            { i: 'tet-ride', n: '테트리스 탈것', top: [], own: 'tet-ride', cat: '탈것', ride: 'tet', noTrade: true },
             // ★ 잎 우산 (2026-10-25 · 뉴비 세트) — 네 장이다. 물 웅덩이 · 빗물은 **이것을 달았을 때만** 내리고 고인다 (이 칸에만 적혀 있다).
             //     물 웅덩이(leaf-puddle)  몸 뒤 · 맨 아래 — 무조건 신발(과 발) 밑
             //     줄기(leaf-stem)         몸 뒤 — 무조건 등 뒤
@@ -2148,6 +2152,18 @@ function paintDoll() {
             stage.insertBefore(b.el, stage.firstChild);              // 몸 · 옷 뒤
             stage.style.transform = 'translateY(' + (-b.h) + 'px)';
         }
+        // 🧩 테트리스 탈것 — 서는 줄 윗면에 세운다 (광장과 같은 모양 · tet-ride.js tetRideEl)
+        if (L.ride === 'tet' && typeof window.tetRideEl === 'function' && typeof window.tetRideMine === 'function') {
+            const v = window.tetRideEl(window.tetRideMine(u_()), 1);
+            if (v) {
+                stage.style.position = 'relative';
+                stage.style.overflow = 'visible';
+                v.el.style.top = (D.H - D.FOOT + v.lift - v.h) + 'px';
+                v.el.style.marginLeft = (-v.standX) + 'px';
+                stage.insertBefore(v.el, stage.firstChild);
+                stage.style.transform = 'translateY(' + (-v.lift) + 'px)';
+            }
+        }
     } catch (e) { }
 }
 
@@ -2227,7 +2243,8 @@ function buildRows(u) {
                 if (!list.length) return;
                 acc += rowOf(c, list.map(function (x) {
                     return btn('acc', s.k, x.i, x.n, sel.indexOf(x.i) >= 0);
-                }).join(''));
+                }).join(''), (c === '탈것' && list.some(function (x) { return x.i === 'tet-ride'; }) && typeof window.tetRideOpen === 'function')
+                    ? '<button class="cl-b" data-kind="tetr" data-k="" data-v="">🧩 조합</button>' : '');     // 🧩 테트리스 탈것 조합 창 (tet-ride.js)
             });
         }
         html += '<div class="cl-h">악세 <i>' + max + '개까지</i></div>'
@@ -2335,7 +2352,7 @@ function markOn() {
     const col = p.col || {};
     Array.prototype.forEach.call(body.querySelectorAll('.cl-b'), function (b) {
         const kind = b.dataset.kind, k = b.dataset.k, v = b.dataset.v;
-        if (kind === 'set' || kind === 'sa') return;          // 코디 단추는 paintSets 가 칠한다
+        if (kind === 'set' || kind === 'sa' || kind === 'tetr') return;          // 코디 단추는 paintSets 가 칠한다 · 🧩 조합 단추는 켜고 끄는 것이 아니다
         // ★ 색 알은 고르는 단추가 아니다 — 물든 색만 보여 준다.
         //   ✗ 아래 일반 셈에 섞으면 ('' === '') 이라 전부 켜진 것으로 보인다.
         if (kind === 'col') {
@@ -2401,6 +2418,7 @@ window.closetDirty = function () { return dirty; };
 
 function tap(kind, k, v) {
     if (kind === 'set' || kind === 'sa') { setTap(kind, k); return; }
+    if (kind === 'tetr') { if (typeof window.tetRideOpen === 'function') window.tetRideOpen(); return; }   // 🧩 테트리스 탈것 조합
     const p = cur();
     // 색 알 — 고르는 것이 아니라 색고리를 띄운다
     if (kind === 'col') {
