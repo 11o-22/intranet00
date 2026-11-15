@@ -2424,7 +2424,12 @@ function duelCol(name, r, win) {
 //   ★ 2026-11-15 사용자 「그리고 한 명당 하나씩만 얻을 수 있게 해줘. 한 계정당.」
 //     듀엣으로 받는 것은 한 계정에 평생 한 번 — users/<사번>/rhythmBoardGot (처음 얻은 때). 거래로 넘겨도 다시 받지 못한다.
 //     이 표시가 생기기 전에 받은 사람(옷장에 있거나 · 기록에 「보드를 받았습니다」 가 남은 사람)도 받은 것으로 친다.
-//     한 계정이 둘을 갖는 일은 없다 — 옷장은 있다/없다 뿐이고 밀실 거래도 이미 가진 사람에게는 못 넘긴다 (p2p-wear.js).
+//   ★ 2026-11-15 사용자 「리듬 보드는 따로 두 개 가질 수 있게 해주고 받고서 리듬 게임으로 땄을 때에는 하나는 소지품 기타 칸에
+//     리듬 보드 케이스로 넣어주고 사용 시 탈것에 들어가게 해줘.」
+//     · 받은 표시(rhythmBoardGot · 또는 예전 기록)만 본다 — 거래로 받아 탈것에 들고 있어도 듀엣으로 한 번은 딴다.
+//     · 딸 때 탈것에 이미 있으면 소지품(기타 칸)에 「리듬 보드 케이스」 로 넣는다 → 그 자리에서 둘을 따로 가진다.
+//     · 케이스를 쓰면 탈것으로 들어간다. 탈것에 이미 있으면 쓰지 않고 그대로 둔다 (옷장은 있다/없다 뿐이라).
+//       케이스는 소지품이라 밀실에서 물건으로 주고받는다. 탈것의 보드는 이미 가진 사람에게는 못 넘긴다 (p2p-wear.js).
 const DUET_RANK = 90;                     // A 랭크 (RANKS)
 function duetOk(r) {
     if (!r) return false;
@@ -2432,10 +2437,42 @@ function duetOk(r) {
     return rankOf(r.s, ac)[1] >= DUET_RANK;
 }
 function duetOf(my) { return !!(my && my.diff === 'hard' && my.myRes && my.oppRes && duetOk(my.myRes) && duetOk(my.oppRes)); }
+// ── 🎵 리듬 보드 케이스 — 소지품 「기타」 칸 (invcat.js — 어디에도 안 걸리면 기타). 쓰면 탈것으로
+const BOARD_CASE = '리듬 보드 케이스';
+try {
+    if (typeof ITEM_CATALOG !== 'undefined' && !ITEM_CATALOG[BOARD_CASE]) {
+        ITEM_CATALOG[BOARD_CASE] = { price: 0, usable: true, targetable: false, effect: 'rhythm_board_case', noSell: true,
+            desc: '리듬 보드가 한 개 들어 있다. 쓰면 옷장 악세 「탈것」 에 들어간다.' };
+    }
+    if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(BOARD_CASE) < 0) NO_SELL_ITEMS.push(BOARD_CASE);
+} catch (e) { }
+(function caseUse() {
+    const _use = window.useInventoryItem;
+    if (typeof _use !== 'function' || _use._boardCase) return;
+    const w = function (itemName) {
+        if (itemName !== BOARD_CASE) return _use.apply(this, arguments);
+        const u = u_();
+        if (!u) return;
+        try { if (typeof isQuarantined === 'function' && isQuarantined(u)) { showCustomAlert('여우 상담실 격리 중에는 소지품을 사용할 수 없습니다.'); return; } } catch (e) { }
+        if ((u.inventory || []).indexOf(BOARD_CASE) < 0) return;
+        if (!u.wardrobe || typeof u.wardrobe !== 'object') u.wardrobe = {};
+        if (u.wardrobe['note-board']) {
+            try { showCustomAlert('탈것에 이미 리듬 보드가 있습니다.\n\n케이스는 그대로 두었습니다.'); } catch (e) { }
+            return;
+        }
+        try { removeItemFromInventory(u, BOARD_CASE, 1); } catch (e) { const i = u.inventory.indexOf(BOARD_CASE); if (i >= 0) u.inventory.splice(i, 1); }
+        u.wardrobe['note-board'] = 1;
+        try { if (typeof addHistoryLog === 'function') addHistoryLog(u, '[아이템 사용] ' + BOARD_CASE + ' — 리듬 보드를 탈것에 넣었습니다'); } catch (e) { }
+        try { if (typeof saveFields === 'function') saveFields({ inventory: 1, wardrobe: 1, history: 1 }); } catch (e) { }
+        try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+        try { showCustomAlert('🛹 리듬 보드를 꺼냈습니다.\n\n옷장 · 악세 · 탈것'); } catch (e) { }
+    };
+    w._boardCase = true;
+    window.useInventoryItem = w;
+})();
 function boardGot(u) {
     if (!u) return false;
     if (u.rhythmBoardGot) return true;
-    if (u.wardrobe && u.wardrobe['note-board']) return true;
     try {
         const h = u.history;
         const list = Array.isArray(h) ? h : (h && typeof h === 'object' ? Object.keys(h).map(function (k) { return h[k]; }) : []);
@@ -2454,12 +2491,16 @@ function duetGrant(my) {
         }
         return false;
     }
-    u.wardrobe['note-board'] = 1;
+    my.duetCase = !!u.wardrobe['note-board'];                  // 탈것에 이미 있다 — 케이스로 소지품에
+    if (my.duetCase) {
+        if (!Array.isArray(u.inventory)) u.inventory = [];
+        u.inventory.push(BOARD_CASE);
+    } else u.wardrobe['note-board'] = 1;
     u.rhythmBoardGot = Date.now();
     my.duetNew = true;
     const s = SONGS.find(function (x) { return x.key === my.song; }) || {};
-    try { if (typeof addHistoryLog === 'function') addHistoryLog(u, '[🎵 리듬 게임] 듀엣 「' + (s.title || my.song) + '」 HARD · ' + my.oppName + ' 님과 — 리듬 보드를 받았습니다'); } catch (e) { }
-    try { if (typeof saveFields === 'function') saveFields({ wardrobe: 1, history: 1, rhythmBoardGot: 1 }); } catch (e) { }
+    try { if (typeof addHistoryLog === 'function') addHistoryLog(u, '[🎵 리듬 게임] 듀엣 「' + (s.title || my.song) + '」 HARD · ' + my.oppName + ' 님과 — 리듬 보드를 받았습니다' + (my.duetCase ? ' (' + BOARD_CASE + ' · 소지품)' : '')); } catch (e) { }
+    try { if (typeof saveFields === 'function') saveFields({ wardrobe: 1, inventory: 1, history: 1, rhythmBoardGot: 1 }); } catch (e) { }
     try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
     return true;
 }
@@ -2476,7 +2517,7 @@ function duelResultPaint() {
         + '<div style="font-size:13px;color:#aab;">' + esc(s.title) + ' · <b style="color:' + d[3] + '">' + d[1] + ' ' + lv + '</b> · ' + (duet ? 'DUET' : 'DUEL') + '</div>'
         + '<div class="rg-vs">' + duelCol(myName(), a, v === 'WIN' || duet) + duelCol(my.oppName, b, v === 'LOSE' || duet) + '</div>'
         + '<div data-v="verdict" style="font-family:Georgia,serif;font-size:26px;font-weight:900;letter-spacing:6px;color:' + vc + ';text-shadow:0 0 18px ' + vc + ';min-height:32px;">' + v + '</div>'
-        + (duet ? '<div data-v="duet" style="font-size:12px;color:#ffd9ee;line-height:1.6;text-align:center;">' + (got ? '🎵 리듬 보드를 받았습니다<br><small style="color:#b9a9c4;">옷장 · 악세 · 탈것</small>' : '🎵 리듬 보드는 한 계정에 하나만 받을 수 있습니다') + '</div>' : '')
+        + (duet ? '<div data-v="duet" style="font-size:12px;color:#ffd9ee;line-height:1.6;text-align:center;">' + (got ? '🎵 리듬 보드를 받았습니다<br><small style="color:#b9a9c4;">' + (my.duetCase ? '탈것에 이미 있어 소지품 · 기타 칸에 「' + BOARD_CASE + '」 로 넣었습니다' : '옷장 · 악세 · 탈것') + '</small>' : '🎵 리듬 보드는 한 계정에 하나만 받을 수 있습니다') + '</div>' : '')
         + (my.oppLost && !my.oppRes ? '<div style="font-size:11px;color:#889;">상대 기록이 닿지 않아 본 만큼으로 셈했습니다</div>' : '')
         + '<div style="display:flex;gap:10px;"><button class="rg-btn" data-k="re">한 번 더</button><button class="rg-btn" data-k="q">곡 고르기</button></div></div></div>';
     UI.querySelector('[data-k="q"]').onclick = function () { duelDrop(); P = null; menu(); };

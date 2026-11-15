@@ -2905,7 +2905,7 @@ function jumpPaint() {
 //   크기는 칸 도트로 — 몸 폭이 100 도트(126 ~ 225)라 보드는 150 · 두께 16.
 //   ★ 2026-11-15 사용자 「그리고 탈 거 속도는 지금의 두 배로 해줘」 — 보드를 타면 걷는 빠르기의 두 배 (SPD · 남의 화면에서도).
 //     소원권 물약 · 숨바꼭질 술래의 두 배와는 곱해진다.
-const BOARD = { W: 150, H: 16, JX: 0.2, TRAIL_MS: 420, A0: 0.55, SPD: 2 };      // 잔상 — 밝은 바닥에서도 보이게 둘레에 푸른 빛을 조금 두른다
+const BOARD = { W: 150, H: 16, JX: 0.2, TRAIL_MS: 420, A0: 0.62, SPD: 2 };      // 잔상 — 밝은 바닥(광장 돌길)에서도 보이게 조금 푸르게 · 둘레에 푸른 빛
 function boardEl(k) {
     const w = Math.max(12, Math.round(BOARD.W * k)), h = Math.max(3, Math.round(BOARD.H * k));     // 🍍 작은 사람도 보이게 — 가장 작아도 12 × 3
     const el = document.createElement('div');
@@ -2997,11 +2997,11 @@ function trailPaint() {
         // 롱 노트 꼬리처럼 — 보드 쪽이 진하고 지나온 끝으로 갈수록 투명 (나이만큼 더 엷게)
         const age = Math.min(1, (t - b.t) / BOARD.TRAIL_MS);
         const gr = g.createLinearGradient(b.x, b.y + h / 2, a.x, a.y + h / 2);
-        gr.addColorStop(0, 'rgba(225,236,255,' + (BOARD.A0 * (1 - age)).toFixed(3) + ')');
-        gr.addColorStop(1, 'rgba(200,215,245,0)');
+        gr.addColorStop(0, 'rgba(185,208,255,' + (BOARD.A0 * (1 - age)).toFixed(3) + ')');
+        gr.addColorStop(1, 'rgba(160,190,250,0)');
         g.fillStyle = gr;
-        g.shadowColor = 'rgba(150,185,255,' + (0.6 * (1 - age)).toFixed(3) + ')';
-        g.shadowBlur = 6;
+        g.shadowColor = 'rgba(120,160,255,' + (0.7 * (1 - age)).toFixed(3) + ')';
+        g.shadowBlur = 8;
         g.fill('nonzero');
         g.shadowBlur = 0;
     });
