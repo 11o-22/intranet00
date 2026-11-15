@@ -1,5 +1,5 @@
 // ==========================================
-// ★ 오염도 동결 (두번째 재앙) — 재앙을 맞은 사원은 6 시간 동안 오염도가 95% 에 묶인다 (2026-11-15 사용자)
+// ★ 오염도 동결 (두번째 재앙) — 재앙을 맞은 사원은 6 시간 동안 오염도가 95% 아래로 내려가지 않는다 (2026-11-15 사용자)
 // bundles.json 마지막 묶음 맨 끝 (party-ghost.js 뒤)
 // ==========================================
 //
@@ -16,8 +16,9 @@
 //             내리는 길이 스무 군데가 넘어 하나씩 막지 않는다 — 무엇이 내렸든 **맞은 사원의 화면이** 다시 95% 로 올려 적는다
 //             (화면을 그리기 직전 · 0.3 초마다). 남이 내려 적는 것(updateUserFields)은 적기 전에 95% 로 맞춘다.
 //             격리에서 풀려 나올 때 · 상담사가 고쳐 적었을 때도 같다. 풀려면 calamFreezeLift.
-//   오름      물건의 「오염 동결」과 같은 규칙으로 오르지 않는다 — applyPollutionToUser · addPollution · 세 시간마다 3%.
-//             그 길을 건너뛰는 것(탐사 사망의 100% · 붉은 헤일로의 +15 처럼 「동결과 무관하게」 적는 것)은 그대로 오른다.
+//   오름      평소대로 오른다 — 공용시설 · 탐사 · 세 시간마다 3% … 100% 가 되면 평소처럼 격리 절차로 간다.
+//             ★ 2026-11-15 사용자 「그리고 두번째 재앙 맞은 사람은 오염도는 올라가게 해줘.」
+//               (처음에는 물건의 「오염 동결」처럼 오르는 것도 막아 두었다 — 걷어 냈다. 내려가는 것만 막는다)
 //   붉은 막   오염도 90% 부터 화면 가장자리에 뜨는 붉은 막(pollution-danger)과 어두워지는 것이 뜨지 않는다.
 //   글씨      화면 오른쪽 위(머리 단추 줄 바로 밑)에 붉은 글씨 「재앙에 걸렸습니다.」 — 글씨만. 눌리지 않는다 (밑의 것이 그대로 눌린다).
 //             로그인해 있는 동안 어느 화면에서나 떠 있다 (재앙 화면이 뜰 때만 그 밑에 깔린다).
@@ -110,33 +111,7 @@ const MAKERS = {
             return _f.apply(this, arguments);
         };
     },
-    // 2. 오름 — 물건의 오염 동결(poll-freeze.js)과 같은 세 길
-    applyPollutionToUser: function (_f) {
-        return function (user, amount) {
-            if (frozen(user) && (Number(amount) || 0) > 0) return;       // 오르는 몫만 버린다
-            return _f.apply(this, arguments);
-        };
-    },
-    addPollution: function (_f) {
-        return function (amount) {
-            if (frozen(u_()) && (Number(amount) || 0) > 0) return;
-            return _f.apply(this, arguments);
-        };
-    },
-    // 세 시간마다 3% — 동결 동안은 시간이 흐르지 않은 것으로 둔다 (poll-freeze.js 와 같은 방식)
-    checkPassivePollution: function (_f) {
-        return function (user) {
-            try { if (user && frozen(user)) user.lastPollutionTime = Date.now(); } catch (e) { }
-            return _f.apply(this, arguments);
-        };
-    },
-    // 「오르지 않는 중인가」 를 묻는 곳(pollWhy)에도 같은 답을 준다
-    isPollFrozen: function (_f) {
-        return function (u) {
-            if (frozen(u)) return true;
-            return _f.apply(this, arguments);
-        };
-    },
+    // (오르는 길은 감싸지 않는다 — 평소대로 오른다 · 2026-11-15 사용자)
     // 3. 붉은 막 — 동결 동안은 오염도 0 인 화면처럼 그린다 (막도 어두워지는 것도 없다)
     updateVisualDistortion: function (_f) {
         return function (p) {

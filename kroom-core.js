@@ -5192,7 +5192,7 @@ function calamSeal(u, n) {
     try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
     return u.calamSeal.until;
 }
-// 오염도 동결 — 6 시간 동안 95% 에 묶인다 (지키는 것은 calam-freeze.js)
+// 오염도 동결 — 6 시간 동안 95% 아래로 내려가지 않는다 · 오르는 것은 평소대로 (지키는 것은 calam-freeze.js)
 function calamFreeze(u, n) {
     const t = cNow();
     const was = (u.calamFreeze && Number(u.calamFreeze.until)) || 0;
@@ -5213,7 +5213,7 @@ function calamHitPopup(id, hit, preview) {
     cBusy = true;
     const sealNote = function (until) {
         const left = '<span style="font-size:10px;">남은 시간 ' + calamLeft(until - cNow()) + '</span>';
-        if (n === 2) return '오염도가 <b style="color:#ffb8a4;">6 시간</b> 동안 <b style="color:#ffb8a4;">' + C_FRZ_FLOOR + '%</b> 에 묶입니다 — 내려가지 않습니다.<br>' + left;
+        if (n === 2) return '오염도가 <b style="color:#ffb8a4;">6 시간</b> 동안 <b style="color:#ffb8a4;">' + C_FRZ_FLOOR + '%</b> 아래로 내려가지 않습니다.<br>' + left;
         return '가진 장비가 <b style="color:#ffb8a4;">3 시간</b> 동안 봉인됩니다 — 전용 장비 · 커스텀 장비 · 장착한 장비.<br>' + left;
     };
     const okBtn = function (ov) { return [{ t: '확인', cls: 'kcal-yes', fn: function () { calamEnd(ov, null, 0); } }]; };
