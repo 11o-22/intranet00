@@ -158,10 +158,10 @@ const DOT = {
         'sound-lp', 'sexy-pantsu', 'gochu', 'red-bikini', 'bunny-stk', 'sound-coat-in', 'pj-bottom', 'w-panty', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'sailor-shoes', 'pj-top', 'w-shirt', 'w-shirt-open', 'knit', 'gym-suit', 'm-shirt', 'han-inner',
         'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit', 'newbie-outfit', 'sailor-bubble', 'garaetteok',
         'school-m', 'sdress', 'devil-m', 'devil-f',         // 의상 1차 (2026-11-04)
-        'hip-m',                                            // 남성 힙 의상 (2026-11-15 · 의상 2차)
+        'hip-m-tee', 'hip-m-pants', 'hip-m-jacket',         // 남성 힙 의상 (2026-11-15 · 의상 2차) — 티 → 반바지 → 재킷
         'robe', 'nun-robe', 'han-duru', 'cape',            // 수녀복 (2026-11-12) — 장포 옆
         // 바니걸 (2026-11-08) — 뒤 털 → 의상 → 앞 털. 완전체 그림에서 털 한 장(옆으로 늘어진 털)은 의상 밑, 다른 한 장(걸을 때 감기는 털)은 의상 위였다
-        'bunny-fur-b', 'bunny-suit', 'lingerie', 'slave-tee', 'w-uniform2', 'office-look2', 'hip-w', 'bunny-fur-f',
+        'bunny-fur-b', 'bunny-suit', 'lingerie', 'slave-tee', 'w-uniform2', 'office-look2', 'hip-w-top', 'hip-w-skirt', 'hip-w-jacket', 'bunny-fur-f',
         'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in',
         'apron',                                            // 🧺 에이프런 (2026-11-11) — 모든 옷 위 · 장갑 밑
         'glove', 'bungeo'],
@@ -267,7 +267,7 @@ const DOT = {
                  // 란제리 · 금 목줄 (2026-11-08) — 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다
                  'lingerie': [0, 1, 2, 3, 4, 5], 'gold-leash': [0, 1, 2, 3, 4, 5], 'slave-tee': [0, 1, 2, 3, 4, 5], 'w-uniform2': [0, 1, 2, 3, 4, 5], 'office-look2': [0, 1, 2, 3, 4, 5],
                  // 여성 힙 의상 (2026-11-15) — 서기 줄 여섯 칸이 몸의 들썩임(0 · 2 · 4 · 2 · 0 · 2)을 따라 그려져 있다 (치마는 따라 내려 다시 깔았다)
-                 'hip-w': [0, 1, 2, 3, 4, 5],
+                 'hip-w-top': [0, 1, 2, 3, 4, 5], 'hip-w-skirt': [0, 1, 2, 3, 4, 5], 'hip-w-jacket': [0, 1, 2, 3, 4, 5],
                  // 모빌 (2026-11-15 · 악세 「등」) — 서기 · 걷기 줄 여섯 칸에 별이 흔들린다 · 서 있어도 여섯 칸을 돈다
                  'star-mobile': [0, 1, 2, 3, 4, 5],
                  // 셔츠 (여성 체형 · 2026-11-08) — 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다 · 몸과 같은 시계로 돈다
@@ -615,11 +615,14 @@ const DOT_SLOTS = [
             //   같은 날 지운 예전 오피스 룩(열쇠 office-look · i office)은 거두기(purge-wuniform.js)가 걷으니 열쇠 · i · 그림을 따로 쓴다.
             { i: 'office2', n: '오피스 룩', over: ['office-look2'], own: 'office-look2', fem: true, alone: true, keep: ['cape'] },
             // ★ 여성 힙 의상 (2026-11-15 사용자 「여성은 여성 힙 의상으로」 「의상들은 뽑기에」 「여성 옷은 들썩거리는 거에 맞춰줘 · 여성 몸에 맞게」)
-            //   주신 그림 셋(여자1 흰 재킷 · 여자2 검은 탑 · 여자3 빨간 체크 치마 · 1728x768 칸 288) → 칸마다 +30 으로 352 칸 · 탑 → 치마 → 재킷 차례로 한 장(hip-w).
+            //   주신 그림 셋(여자1 흰 재킷 · 여자2 검은 탑 · 여자3 빨간 체크 치마 · 1728x768 칸 288) → 칸마다 +30 으로 352 칸 · 탑 → 치마 → 재킷 차례.
+            //   ★ 같은 날 사용자 「따로 레이어 나눠서 준 파츠 별로 염색이 가능하도록」 — 한 장으로 합쳤던 것을 주신 대로 세 장(hip-w-top · hip-w-skirt · hip-w-jacket)으로
+            //     나눴다. 물들이기 줄에 「여성 힙 의상 · 탑 / 치마 / 재킷」 으로 따로 뜬다 (parts — wornParts).
             //   여성 체형(body-w) 몸에 대 보니 걷기 · 서기 열두 칸이 맞았다. 서기 줄은 재킷 · 탑이 몸의 들썩임(0 · 2 · 4 · 2 · 0 · 2)대로 그려져 있었고
             //   치마만 덜 따라가 있어(0 · 0 · 2 · 0 · 0 · 0) 첫 칸 치마를 칸마다 들썩임만큼 내려 다시 깔았다 (몸은 허리 · 엉덩이까지 같이 내려간다).
             //   여성 체형 의상 뽑기(gacha.js GACHA_FEM)로 — 뽑으면 dotGrant 에 적힌다 (owner · hasGrant). fem · alone · keep 은 다른 여성 체형 옷과 같다.
-            { i: 'hip-w', n: '여성 힙 의상', over: ['hip-w'], owner: true, fem: true, alone: true, keep: ['cape'] },
+            { i: 'hip-w', n: '여성 힙 의상', over: ['hip-w-top', 'hip-w-skirt', 'hip-w-jacket'], parts: { 'hip-w-top': '탑', 'hip-w-skirt': '치마', 'hip-w-jacket': '재킷' },
+              owner: true, fem: true, alone: true, keep: ['cape'] },
             // ★ 의상 뽑기 탈 세 벌 + 퐁실 의상 (2026-10-25) — 주신 그림은 432x192 (칸 72x96) 라
             //   네 배로 늘려 칸마다 가로 +30 으로 352 칸에 옮겼다 (다섯 벌 · 2026-10-23 과 같은 길).
             //   탈 셋은 머리까지 감싸고 얼굴만 뚫려 있어 **머리 위**(top)에 얹는다 — 늑대 잠옷 바깥과 같다.
@@ -636,9 +639,10 @@ const DOT_SLOTS = [
             { i: 'garaetteok', n: '가래떡 의상', over: ['garaetteok'], own: 'garaetteok' },
             // ★ 남성 힙 의상 (2026-11-15 사용자 「남자 의상은 한 세트로 겉옷에 넣어주고 이름은 남성 힙 의상」 「의상들은 뽑기에」)
             //   주신 그림 셋(남자1 회색 재킷 · 남자2 검은 티 · 남자3 빨간 체크 반바지 · 1728x768 칸 288) → 칸마다 +30 으로 352 칸 ·
-            //   티 → 반바지 → 재킷 차례로 한 장(hip-m). 보통 몸에 대 보니 걷기 · 서기 열두 칸이 맞았다 (서기 여섯 칸은 같은 그림).
+            //   티 → 반바지 → 재킷 차례. 보통 몸에 대 보니 걷기 · 서기 열두 칸이 맞았다 (서기 여섯 칸은 같은 그림).
+            //   ★ 같은 날 사용자 「파츠 별로 염색이 가능하도록」 — 세 장(hip-m-tee · hip-m-pants · hip-m-jacket)으로 나눠 물들이기 줄에 따로 뜬다 (parts).
             //   의상 뽑기(gacha.js GACHA_WEAR · A) — 뽑은 사람만 (own)
-            { i: 'hip-m', n: '남성 힙 의상', over: ['hip-m'], own: 'hip-m' }
+            { i: 'hip-m', n: '남성 힙 의상', over: ['hip-m-tee', 'hip-m-pants', 'hip-m-jacket'], parts: { 'hip-m-tee': '티', 'hip-m-pants': '반바지', 'hip-m-jacket': '재킷' }, own: 'hip-m' }
             // (룩키마트 의상 · 가을 니트 · 체육복은 2026-10-23 상의 칸으로 옮겼다)
             // ★ 가을 니트 (2026-10-23) — 주신 그림은 1728x768 (칸 288) 에 머리 · 손 · 다리까지 그려진 통짜.
             //   칸마다 가로 +30 으로 352 칸에 옮기니 몸 그림과 자리가 딱 맞아, 몸과 자리 · 색이 똑같은 칸을 빼고
@@ -1416,7 +1420,7 @@ function wornParts(user) {
                 if (order.indexOf(sh) < 0 || seen[sh]) return;
                 seen[sh] = 1;
                 out.push({
-                    sheet: sh, slot: s.n, name: x.n,
+                    sheet: sh, slot: s.n, name: x.n + ((x.parts && x.parts[sh]) ? ' · ' + x.parts[sh] : ''),   // parts — 한 벌을 장마다 따로 물들일 때 부분 이름 (힙 의상 · 2026-11-15)
                     keep: (typeof window.dotTintKeep === 'function' && window.dotTintKeep(sh)) || '',
                     hue: (L.col || {})[sh]
                 });
