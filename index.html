@@ -2268,11 +2268,18 @@ const EQUIP_AFFIL = {
             if (!currentUser) return;
 
             // 내가 속한 방 탐색
-            let found = null;
+            // ★ 구역이 안 적힌 뼈대(이미 지워진 방에 늦게 닿은 쓰기가 남긴 것)는 방이 아니다 (2026-11-15)
+            //   거기에 내 자리가 남아 있으면 번호가 앞선 그 뼈대가 먼저 잡혀, 새로 만든 방 대신 「사라진 구역입니다.」 만 떴다.
+            //   뼈대는 건너뛰고 (party-ghost.js 가 내 자리를 걷는다), 아는 구역의 방을 먼저 고른다.
+            let found = null, odd = null;
             for (let pid in darkParties) {
                 const p = darkParties[pid];
-                if (p.members && p.members[currentUser.code]) { found = pid; break; }
+                if (!p || !p.members || !p.members[currentUser.code]) continue;
+                if (!p.zone) continue;
+                if (DARK_ZONES[p.zone]) { found = pid; break; }
+                if (!odd) odd = pid;
             }
+            if (!found) found = odd;
             const prev = myPartyId;
             myPartyId = found;
 
@@ -3745,7 +3752,9 @@ setInterval(() => {
     const _focused = _prev && document.activeElement === _prev;
     const z = DARK_ZONES[p.zone];
     if (!z) {
-        body.innerHTML = `<div style="font-size:11px; color:#666; padding:20px 0; text-align:center;">사라진 구역입니다.</div>`;
+        // ★ 나갈 길을 둔다 (2026-11-15) — 전에는 단추가 없어 이 방에 묶인 채 새 파티를 만들 수도 없었다
+        body.innerHTML = `<div style="font-size:11px; color:#666; padding:20px 0; text-align:center;">사라진 구역입니다.</div>
+            <button class="game-btn" style="width:100%; margin:0 0 10px 0; padding:11px; background:linear-gradient(145deg,#555,#333);" onclick="leaveParty()">파티 나가기</button>`;
         return;
     }
         const members = Object.values(p.members || {});
