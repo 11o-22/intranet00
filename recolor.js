@@ -36,6 +36,7 @@
 //       'light'  밝은 칸은 그대로 — 턱시도(겉 0.11~0.28 · 셔츠 0.83/0.93)
 //       'grey'   색끼 없는 칸은 그대로 — 브라운 정장(겉 색끼 0.11~0.23 ·
 //                셔츠 0.00) · 노란 정장(겉 0.10~0.11 · 셔츠 0.03~0.04)
+//       'biscuit' 과자 막대 빛깔은 그대로 — 대왕 빼빼로 둘 (딸기 · 초코 입힌 부분만 물든다 · 2026-11-15)
 //       (없음)   통째로 물든다 — 드레스 · 하얀 망토 · 악세
 //
 //   ★ 한 가지 잣대로는 안 된다. 턱시도는 겉도 셔츠도 **둘 다 색끼 0** 이라
@@ -96,8 +97,23 @@ const KEEP = {
     'brown-suit': 'grey',    // 셔츠와 그 그늘이 색끼가 없다
     'agent1': 'grey',
     'agent2': 'grey',
-    'suit': 'grey'           // 노란 정장 — 색끼 없는 자리만 남긴다
+    'suit': 'grey',          // 노란 정장 — 색끼 없는 자리만 남긴다
+    // 대왕 빼빼로 둘 — 과자 막대는 그대로, 딸기 · 초코 입힌 부분만 물든다
+    //   (2026-11-15 사용자 「대왕 빼빼로 두 개 염색 될 때 딸기랑 초코 부분만 되게 하자.」)
+    //   두 장 다 다섯 빛깔뿐이다 — 막대 셋(232,203,167 · 211,185,152 · 196,172,141 · 두 장이 같다) + 입힌 것 둘
+    //   (초코 59,46,46 · 73,57,57 / 딸기 219,145,145 · 244,161,161). 막대 빛깔과 같은 칸만 남긴다.
+    'pepero-big-choco': 'biscuit',
+    'pepero-big-straw': 'biscuit'
 };
+// 'biscuit' — 남길 빛깔 (빼빼로 과자 막대)
+const BISCUIT = [[232, 203, 167], [211, 185, 152], [196, 172, 141]];
+function isBiscuit(r, g, b) {
+    for (let i = 0; i < BISCUIT.length; i++) {
+        const c = BISCUIT[i];
+        if (Math.abs(r - c[0]) <= 6 && Math.abs(g - c[1]) <= 6 && Math.abs(b - c[2]) <= 6) return true;
+    }
+    return false;
+}
 
 const cache = new Map();     // '장@색' → 그림 주소
 const busy = {};             // 만드는 중
@@ -165,6 +181,7 @@ function paint(img, sheet, hue) {
         const l = (mx + mn) / 510;
         if (keep === 'light' && l >= LIGHT) continue;
         if (keep === 'grey' && (mx - mn) / 255 <= FLAT) continue;
+        if (keep === 'biscuit' && isBiscuit(r, g, b)) continue;
         tally[Math.round(l * 100)]++; n++;
     }
     if (!n) return c.toDataURL('image/png');     // 남길 것뿐이면 그대로
@@ -204,6 +221,7 @@ function paint(img, sheet, hue) {
         const ch = (mx - mn) / 255;
         if (keep === 'light' && hls[1] >= LIGHT) continue;
         if (keep === 'grey' && ch <= FLAT) continue;
+        if (keep === 'biscuit' && isBiscuit(r, g, b)) continue;
         let L = k ? lo2 + (hls[1] - lo) * k : mid;
         if (L < 0) L = 0; else if (L > 1) L = 1;
         // 색을 통째로 골랐으면 그 채도를 그대로 쓴다 (0 이면 흰·검·잿빛이 된다).
