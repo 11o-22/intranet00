@@ -108,6 +108,8 @@ function leftMin(u) {
 // 지금으로 밀어 둔다. 그러면 diffMs 가 세 시간을 못 넘어 오르지 않는다.
 // 「동결 동안은 시간이 흐르지 않는다」와 같은 뜻이다.
 // (안대도 원래 흐른 시간을 버리므로 셈하는 방식이 같다)
+// ★ 2026-11-15 — 이것만으로는 꺼 둔 사이에 끝난 동결의 몫이 한꺼번에 올랐다 (자동 로그인의 첫 셈은 이 연결보다 먼저 돈다).
+//   얼어 있던 시간을 빼는 셈은 index.html 의 checkPassivePollution 안(pollClockHold)으로 옮겨 두었다. 여기는 그대로 둔다.
 (function hookPassive() {
     const iv = setInterval(function () {
         if (typeof checkPassivePollution !== 'function') return;

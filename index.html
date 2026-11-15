@@ -5229,6 +5229,32 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
         if (user.history.length > 10) user.history.pop();
     }
 
+    // ★ 오염 동결 — 세 시간마다 3% 를 셀 때 얼어 있던 시간은 빼고 센다 (2026-11-15 사용자 「오염 동결 아이템들이 안 먹혀서 한 번 봐줘.」)
+    //   전에는 poll-freeze.js 가 「지금 얼어 있으면 시계를 지금으로 민다」 만 했다. 그래서
+    //     · 동결을 걸고 화면을 끈 뒤 동결이 끝나고 들어오면, 얼어 있던 시간까지 통째로 세어 한꺼번에 올랐다
+    //       (공략집 2시간 → 3시간 뒤 들어오면 +3 · 출산품 5시간 → 6시간 뒤 +6)
+    //     · 자동 로그인의 첫 셈은 묶음 파일(poll-freeze.js)이 붙기 전에 돌아 공략집 · 설명서 · 여우 꼬리 · 나비 동결(pollFreezeUntil)과
+    //       오염 동결 버프(noPoll)를 아예 못 봤다
+    //     · 안대 칸(blindfoldUntil — 안대 · 출산품 동결)은 세 시간을 채워야만 시계를 밀어, 풀린 직후 얼어 있던 몫이 올랐다
+    //   그래서 이 셈 안에서 직접 — 지금 얼어 있으면 시계를 지금으로, 마지막으로 센 때 뒤에 끝난 동결이 있으면 그 끝난 때로 민다.
+    //   보는 것: pollFreezeUntil · blindfoldUntil(안대 · 혈욕조는 isBlindfolded) · 오염 동결 버프(itemBuffs noPoll — 시간짜리는 until, 1회짜리는 걸려 있는 동안)
+    function pollClockHold(user, now) {
+        try {
+            if (!user) return;
+            now = now || Date.now();
+            let end = Math.max(Number(user.pollFreezeUntil) || 0, Number(user.blindfoldUntil) || 0), live = false;
+            const bs = Array.isArray(user.itemBuffs) ? user.itemBuffs
+                : (user.itemBuffs && typeof user.itemBuffs === 'object') ? Object.keys(user.itemBuffs).map(function (k) { return user.itemBuffs[k]; }) : [];
+            bs.forEach(function (b) {
+                if (!b || b.k !== 'noPoll') return;
+                if (b.run) { live = true; return; }
+                end = Math.max(end, Number(b.until) || 0);
+            });
+            if (end > now || live || isBlindfolded(user)) { user.lastPollutionTime = now; return; }
+            const lpt = Number(user.lastPollutionTime) || 0;
+            if (lpt && end > lpt) user.lastPollutionTime = end;
+        } catch (e) { }
+    }
     function isBlindfolded(user) {
         if (wornHas(user, "혈욕조")) return true;
         return user.blindfoldUntil && Date.now() < user.blindfoldUntil;
@@ -5335,6 +5361,7 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
         if (user.code === 'kario0987') return; 
         const now = Date.now();
         let changed = false; // ★ 변화 감지용 플래그
+        pollClockHold(user, now);   // ★ 얼어 있던 시간은 흐르지 않은 것으로 — 끝난 안대 칸을 아래에서 비우기 전에 (2026-11-15 · pollClockHold)
 
         if (user === currentUser && mergeTimedEffects(user)) changed = true;
 
