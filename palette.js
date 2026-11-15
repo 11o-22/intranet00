@@ -411,7 +411,7 @@ function pickPart(sheet) {
     const c = toHsv(now);
     const p = parts().filter(function (x) { return x.sheet === sheet; })[0] || {};
     const k = document.getElementById('pal-keep');
-    if (k) k.innerText = p.keep === 'biscuit' ? '과자 막대는 그대로 둡니다 — 딸기 · 초코 부분만 물듭니다.'      // 대왕 빼빼로 (recolor.js · 2026-11-15)
+    if (k) k.innerText = p.keep === 'biscuit' ? '과자 막대는 그대로 둡니다 — 딸기 · 초코 부분만 물듭니다.'      // 빼빼로 넷 (recolor.js · 2026-11-15)
         : (p.keep ? '안쪽 하얀 셔츠는 그대로 둡니다 — 겉만 물듭니다.' : '');
     const off = document.getElementById('pal-off');
     if (off) off.disabled = (now == null);
