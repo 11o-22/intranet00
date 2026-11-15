@@ -485,16 +485,18 @@ function callRain() {
 }
 wrap('launchPartyRun', function (_l) { return function () { const out = _l.apply(this, arguments); try { callRain(); } catch (e) { } return out; }; });
 wrap('startDarkRun', function (_s) { return function () { const out = _s.apply(this, arguments); try { callRain(); } catch (e) { } return out; }; });
-// 탐사 중 — 비가 보이면 한 번 알리고 · 맞은 사원으로 적고 · 화면에 가늘게 내린다
+// 탐사 중 — 비가 내리면 한 번 알리고 · 맞은 사원으로 적는다
+// ★ 2026-11-15 사용자 「호갑투 비 오는 거 어둠에 들어간 사람들한테는 그 효과가 안 보이게 해줘」
+//   전에는 탐사 화면에 비를 가늘게 계속 내렸다 (FOXRAIN.steady — 빗줄기 · 흐린 빛 · 빗소리). 이제 어둠 안에서는 그리지 않는다.
+//   여우비 자체(죽음을 씻어 내는 것 · 판정 · 맞은 사원 기록)와 처음 한 번 뜨는 알림 글은 그대로다 — 그림과 소리만 뺐다.
 setInterval(function () {
     try {
         const me = u_(), r = run();
         const R = window.FOXRAIN;
-        if (!me || !plain(r)) { if (R && R.steadyOn()) R.steady(false); return; }
+        if (R && R.steadyOn()) R.steady(false);                                          // 남아 있던 것은 걷는다
+        if (!me || !plain(r)) return;
         if (!r._hgCalled && zeroOf(me) && !r._dead && !r._settled) callRain();           // 이어 하기로 돌아온 판 · 탐사 중에 걸린 금제
         const rain = rainOf(r);
-        const host = document.getElementById('dark-run-overlay');
-        if (R) R.steady(!!rain && !!host && host.style.display !== 'none', host);
         if (!rain || r._hgSeen) return;
         r._hgSeen = 1;
         const mine = rain.by === me.code;

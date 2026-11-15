@@ -35,8 +35,10 @@
 //     광장 음악 · 퀴즈쇼 효과음과 같은 단추(event-bgm.js eventBgmMuted) — 비가 내리는 가운데 끄면 바로 잦아들고, 다시 켜면 남은 비만큼 난다. 그림은 그대로
 //   🔇 foxRainMute(true) — 이 기기에서 소리만 끈다 (그림은 그대로 · 콘솔)
 //
-// ■ 어둠의 여우비 (hogaptu.js 제 零 금제)
-//   FOXRAIN.steady(true) — 탐사 화면에 가늘게 계속 내린다 · 소리는 어둠 음소거(🔇)를 따른다
+// ■ 어둠에 들어간 사람에게는 안 보인다 (2026-11-15 사용자 「호갑투 비 오는 거 어둠에 들어간 사람들한테는 그 효과가 안 보이게 해줘」)
+//   · 탐사 중인 화면(어둠 · K 의 방 · EPIC …)에서는 광장 비를 그리지도 소리 내지도 않는다 — 나오면 남은 만큼 본다
+//   · 어둠의 여우비(hogaptu.js 제 零 금제)를 탐사 화면에 가늘게 내리던 것(FOXRAIN.steady)도 이제 부르지 않는다 —
+//     여우비의 효력과 알림 글은 그대로, 그림 · 소리만 없다. steady 는 남겨 두었다 (부르는 곳이 없다).
 //
 // ■ 콘솔
 //   foxRainTest()      지금 방에 한 번 내려 본다 (내 화면만)
@@ -322,7 +324,7 @@ function tick() {
         ME.wore = wear;
         ST.seed = rainSeed();
         const t = ST.seed ? clock() - ST.seed : -1;
-        if (ST.seed && t >= 0 && t < R.TOTAL + R.DRY) pudPaint(st, ST.seed, t, levelAt(t)); else if (PUD.list.length) pudClear();
+        if (ST.seed && t >= 0 && t < R.TOTAL + R.DRY && !inRun()) pudPaint(st, ST.seed, t, levelAt(t)); else if (PUD.list.length) pudClear();   // 탐사 중인 화면에는 웅덩이도 안 놓는다
     } else { ME.key = ''; ME.fr = 0; ME.wore = false; ST.seed = 0; if (PUD.list.length) pudClear(); }
     const raining = (ST.seed && levelAt(clock() - ST.seed) > 0) || !!NOW.plaza || !!NOW.steady;
     if (raining && !ST.on) { ST.on = true; lastFrame = 0; requestAnimationFrame(loop); }
@@ -342,13 +344,13 @@ function loop(ts) {
     // ── 광장
     const st = ST.st;
     let lv = 0, drp = false;
-    if (st && ST.seed) { const t = clock() - ST.seed; lv = levelAt(t); drp = dripAt(t); }
+    if (st && ST.seed && !inRun()) { const t = clock() - ST.seed; lv = levelAt(t); drp = dripAt(t); }      // 탐사 중인 화면에는 안 내린다 (2026-11-15)
     if (lv > 0 && st) {
         if (!NOW.plaza || NOW.plaza.host !== st.view || NOW.plaza.dead) { if (NOW.plaza) NOW.plaza.kill(); NOW.plaza = new Scene(st.view, { z: 29 }); }
         NOW.plaza.size();
         NOW.plaza.frame(lv, drp, dt);
     } else if (NOW.plaza) {
-        if (st && NOW.plaza.host === st.view && (NOW.plaza.drops.length || NOW.plaza.splash.length)) NOW.plaza.frame(0, false, dt);      // 남은 빗줄기는 끝까지 떨어진다
+        if (st && !inRun() && NOW.plaza.host === st.view && (NOW.plaza.drops.length || NOW.plaza.splash.length)) NOW.plaza.frame(0, false, dt);      // 남은 빗줄기는 끝까지 떨어진다
         else { NOW.plaza.kill(); NOW.plaza = null; }
     }
     // ── 어둠 (가늘게 계속)
@@ -359,7 +361,7 @@ function loop(ts) {
         else { lvS = 0.34; NOW.steady.size(); NOW.steady.frame(lvS, Math.random() < 0.3, dt); }
     }
     // ── 소리 — 광장 비는 탐사 중이 아닐 때 · 광장 🔊 가 켜져 있을 때 · 어둠 비는 어둠 음소거를 따른다
-    const plazaSnd = (lv > 0 && !inRun() && !plazaOff()) ? lv : 0;
+    const plazaSnd = (lv > 0 && !plazaOff()) ? lv : 0;                     // (탐사 중이면 위에서 lv 가 0 이다)
     let darkMute = false;
     try { darkMute = (typeof darkAudio !== 'undefined' && darkAudio && !!darkAudio.muted); } catch (e) { }
     const steadySnd = (lvS > 0 && !darkMute) ? lvS * 0.8 : 0;
