@@ -414,7 +414,9 @@ function css() {
         '#hr-ov.edit .hr-one{visibility:hidden;}',
         '.hr-tag{position:absolute;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:11px;font-weight:bold;color:#fff;text-shadow:0 0 3px #000,0 0 6px #000;}',
         '.hr-tag.me{color:#ffe08a;}',
-        '.hr-bub{position:absolute;left:50%;transform:translateX(-50%);max-width:180px;white-space:normal;word-break:break-all;background:#fff;color:#111;font-size:12px;line-height:1.35;padding:4px 8px;border-radius:9px;box-shadow:0 2px 6px rgba(0,0,0,.5);text-align:center;}',
+        // ★ 말풍선이 세로로 길어지던 것 (2026-11-15 사용자 「사택 말풍선이 세로로 길어지는데 옆으로 늘려」) — 절대 자리 잡은 칸은 담은 칸(사람 칸)
+        //   너비까지만 늘어나 한두 글자마다 줄이 바뀌었다. 광장 말풍선(plaza.js .plaza-say)처럼 글만큼 벌리고 화면 폭으로만 자른다.
+        '.hr-bub{position:absolute;left:50%;transform:translateX(-50%);width:max-content;max-width:min(62vw,230px);white-space:normal;word-break:keep-all;overflow-wrap:anywhere;background:#fff;color:#111;font-size:12px;line-height:1.35;padding:4px 8px;border-radius:9px;box-shadow:0 2px 6px rgba(0,0,0,.5);text-align:center;}',
         '#hr-top{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:8px;padding:8px 10px;padding-top:max(8px,env(safe-area-inset-top));background:linear-gradient(#000c,#0000);z-index:5;pointer-events:none;}',
         '#hr-top>*{pointer-events:auto;}',
         '#hr-title{font-size:14px;font-weight:bold;text-shadow:0 0 4px #000;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
