@@ -1176,7 +1176,9 @@ function spec() {
 //   크기가 바뀌면 나는 refreshTags(3초)가, 남은 onSeat 가 그 사람을 다시 만든다.
 const TINY = 1 / 5;
 const TINY_FX = '파인애플맛 물약';
-function fullRoom() { return !!(run && run.room && (run.room === 'event' || (R[run.room] && R[run.room].full))); }
+// ★ 2026-11-15 사용자 「이제 이벤트 맵에서도 파인애플이 통하게 해줘.」 — 이벤트 맵은 뺐다 (작은 채로 들어가고 · 들기 · 올라가기도 된다).
+//   남은 것은 R[방].full 인 방 — 📺 화요 퀴즈쇼 · 🛋 심야 토크쇼 (단상 · 책상 뒤에 서면 안 보인다).
+function fullRoom() { return !!(run && run.room && R[run.room] && R[run.room].full); }
 function tinyOf(u) {
     if (!u) return false;
     if (u.tiny != null) return !!u.tiny;                 // 남 — 실려 온 표시
@@ -1184,6 +1186,7 @@ function tinyOf(u) {
     const hsT = hsCall('tiny');                          // 🫣 숨바꼭질 — 술래는 보통 크기 · 나머지는 파인애플 크기
     if (hsT != null) return !!hsT;
     // 🎉 이벤트 맵 안에서는 파인애플이 잠시 풀린다 — 보통 크기로 선다 (2026-11-09 사용자 「이벤트 맵 들어갈 때에는 파인애플이 일시적으로 풀리게」)
+    //   ★ 2026-11-15 — 이벤트 맵에서도 통한다 (fullRoom 에서 뺐다). 지금 풀리는 곳은 퀴즈쇼 · 토크쇼 무대뿐이다.
     //   물약(timedEffects)은 그대로 두므로 나오면 도로 작아진다. 내 자리 기록의 sm 도 이 값으로 나가 남의 화면에서도 보통 크기다.
     if (fullRoom()) return false;                        // 📺 화요 퀴즈쇼도 같은 길 (R.quiz.full)
     const t = now();
@@ -1928,6 +1931,7 @@ function askLocked() {
 //   · 문지기는 goRoom — 어느 길로 오든(따라가기 · 끌려가기 · 동료 목록 · 콘솔) 초대가 없으면 못 든다. 상담사는 늘 든다.
 //   · 📱 모바일(pointer: coarse)에서만 든다 — PC 는 목록에도 안 보이고 goRoom 에서도 막힌다. 상담사는 PC 에서도 든다 (시험용).
 //   · 🍍 파인애플(작아진 사람)은 이 방 안에서는 보통 크기다 (tinyOf) — 물약은 그대로라 나오면 도로 작아진다.
+//     ★ 2026-11-15 사용자 「이제 이벤트 맵에서도 파인애플이 통하게 해줘.」 — 이제 작은 채로 들어가고 들기 · 올라가기도 된다 (fullRoom).
 //   · [📍 고정] — 무대 중앙(EV.STAGE)에 선다. 이미 선 사람이 있으면 그 옆 빈자리(EV.SLOTS 차례)에 선다.
 //     서 있는 동안은 걸음 · 바닥 짚기가 안 먹는다 — [내려오기] 를 눌러야 덱으로 내려온다 (사용자 「내려오기 버튼 누르기 전까지는 못 내려오게」).
 const EV = { ROOM: 'event', PATH: 'plazaEvent', STAGE: { x: 940, y: 1196 }, SLOTS: [-90, 90, -180, 180, 0, -270, 270], NEAR: 40 };   // 가운데 단추 양옆부터
@@ -3225,6 +3229,8 @@ function carryCheck() {
         });
         if (keep.length !== mine.length) { run.carry = keep.length ? keep : null; resend(); m = remap(); }
     }
+    // 🎉 무대에 「고정」 해 둔 채 누가 들어 올렸다 — 고정을 푼다 (안 풀면 내려놓을 때 무대로 도로 붙는다 · 2026-11-15 이벤트 맵에서도 파인애플)
+    if (run.evFix && !run.evFix.pin && m.of[me]) { try { evRelease(); } catch (e) { run.evFix = null; } sysLine('🍍 들려서 무대 고정이 풀렸습니다.'); }
     if (run.on) {
         const w = m.of[me];
         if (!w || w.by !== run.on.by) {
