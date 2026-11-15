@@ -1010,6 +1010,13 @@ function stampSafe(ov) {
         '#plaza-jump.on{display:block;}',
         '#plaza-jump:active{background:rgba(217,160,90,.35);}',
         '#plaza-jump .pc{font-size:9px;font-weight:normal;color:#9a9284;margin-left:4px;}',
+        // 🛹 리듬 보드 타기 / 내리기 (2026-11-15) — 보드를 단 사람에게만 · 점프 단추 왼쪽 (점프가 없으면 그 자리)
+        '#plaza-ride{position:absolute;z-index:19;display:none;width:96px;padding:9px 0;border-radius:13px;',
+        '  border:1px solid rgba(120,170,230,.45);background:rgba(12,14,22,.7);color:#d8e8ff;font-size:12px;font-weight:bold;',
+        '  cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none;',
+        '  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}',
+        '#plaza-ride.on{display:block;}',
+        '#plaza-ride:active{background:rgba(110,160,230,.35);}',
         '#plaza-map .mp-n{font-size:10px;font-weight:bold;color:#ffe9bd;margin-bottom:5px;',
         '  text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
         '#plaza-map .mp-g{display:grid;gap:3px;}',
@@ -2885,6 +2892,7 @@ function jumpPaint() {
         if (b._ic !== ic && b.firstChild && b.firstChild.nodeType === 3) { b.firstChild.nodeValue = ic + ' 점프'; b._ic = ic; }
     }
     if (jumpShown !== on) { b.classList.toggle('on', on); jumpShown = on; }
+    ridePaint();
 }
 
 // ==========================================
@@ -2918,12 +2926,47 @@ function boardEl(k) {
 window.plazaBoardEl = boardEl;                                  // 옷장 미리 보기도 같은 모양 (closet.js paintDoll)
 function boardOn(one) {
     if (!one || !one.board || fullRoom()) return false;
+    if (boardOff(one)) return false;                              // 🛹 내려 있다 (타기 / 내리기)
     if (one.tiny && one.code) {                                   // 🍍 손 위 · 냄비 속에서는 보드를 감춘다
         if (potted(one.code)) return false;
         const c = carrierOf(one.code);
         if (c && c.k === 'hand') return false;
     }
     return true;
+}
+// ★ 2026-11-15 사용자 「리듬 보드 탔다가 내렸다가 하는 식으로 하게 해주고」
+//   광장에 [🛹 내리기] / [🛹 타기] 단추 — 보드를 단 채로 내려 걷는다. 내려 있으면 보드 · 잔상 · 두 배 빠르기 · 보드 점프가 없다.
+//   나는 u.boardOff (저장 · 다시 들어와도 그대로) · 남은 자리 기록의 bo 로 본다. 옷장에서 보드를 떼고 다는 것과는 따로다.
+function boardOff(one) {
+    if (run && one === run.me) { const u = u_(); return !!(u && u.boardOff); }
+    return !!one.boff;
+}
+function rideToggle() {
+    const u = u_();
+    if (!u || !run || !run.me || !run.me.board) return;
+    u.boardOff = !u.boardOff;
+    try { if (typeof saveFields === 'function') saveFields({ boardOff: 1 }); } catch (e) { }
+    run.sent = 0;                                                 // 남의 화면에도 바로
+    ridePaint();
+    jumpPaint();
+    wake();
+}
+window.plazaRide = rideToggle;
+let rideShown = null;
+function ridePaint() {
+    const b = document.getElementById('plaza-ride'); if (!b) return;
+    const map = document.getElementById('plaza-map');
+    const on = !!(run && run.me && run.me.board && !fullRoom() && map && !map.classList.contains('off'));
+    if (on) {
+        const bot = map.offsetHeight + 8;
+        const want = 'calc(var(--plaza-safe-bot,env(safe-area-inset-bottom,0px)) + ' + (74 + bot) + 'px)';
+        if (b._bot !== want) { b.style.bottom = want; b._bot = want; }
+        const right = canJump() ? '136px' : '12px';
+        if (b._r !== right) { b.style.right = right; b._r = right; }
+        const t = boardOff(run.me) ? '🛹 타기' : '🛹 내리기';
+        if (b._t !== t) { b.textContent = t; b._t = t; }
+    }
+    if (rideShown !== on) { b.classList.toggle('on', on); rideShown = on; }
 }
 function boardLift(one) {
     if (!one || !one.board) return 0;
@@ -5857,6 +5900,7 @@ function send(moving) {
             // 🎵 둘레 효과 장 · 🪩 디스코 조명 (LP 판 · lp.js)
             fx: run.fx || null, ds: run.ds || null,
             jp: run.jumpAt || null,                 // 🍍 마지막으로 뛴 때
+            bo: (run.me && run.me.board && u.boardOff) ? 1 : null,   // 🛹 보드에서 내려 있다
             dk: run.sDk ? 1 : null,                 // 🔦 탐사 중 (어둠 · K의 방 · EPIC · 이벤트 어둠 …)
             s: run.say || null, st: run.sayAt || 0, b: sbMine() || null, at: t,
             j: run.joinAt || t                     // 이 방에 들어온 때 — 넘치면 늦게 온 쪽이 옮긴다
@@ -6426,6 +6470,7 @@ function onSeat(code, v, fresh) {
     q.ds = (v.ds && Array.isArray(v.ds.c) && v.ds.c.length) ? v.ds : null;   // 🪩 디스코 조명
     q.fr = Number(v.fr) || 0;                         // 🌧 여우비 — 🦊 호갑투를 찬 사람이 이 방에 들어온 때 (foxrain.js)
     q.fs = v.fs ? 1 : 0;                              // ❄ 그때 기온이 0도 밑이었다 — 비 대신 눈 (foxrain.js)
+    q.one.boff = v.bo ? 1 : 0;                        // 🛹 보드에서 내려 있다
     q.j = v.j || 0;                        // 옛 판(j 없음)은 먼저 온 사람으로 친다
     // 🍍 뛰었다 — 새 때(jp)가 오면 받은 순간부터 포물선 (처음 본 사람의 묵은 jp 는 따라 뛰지 않는다)
     if (v.jp && v.jp !== q.jp) { if (!isNew && now() - v.jp < 3000 && (q.sm || boardOn(q.one))) q.jumpT0 = performance.now(); q.jp = v.jp; }   // 🍍 · 🛹
@@ -8005,6 +8050,7 @@ function open() {
         + '<div id="plaza-feed"></div>'
         + '<div id="plaza-map"><div class="mp-n"></div><div class="mp-g"></div></div>'
         + '<button id="plaza-jump" type="button">🍍 점프<span class="pc">스페이스</span></button>'
+        + '<button id="plaza-ride" type="button">🛹 내리기</button>'
         + '<div id="plaza-bottom">'
         + '<button class="plaza-ico plaza-keep" id="plaza-emo">🙂</button>'
         + '<div id="plaza-bar" class="plaza-keep"><span class="dot"></span>'
@@ -8266,6 +8312,11 @@ function open() {
         if (!jb) return;
         jb.addEventListener('pointerdown', function (e) { e.stopPropagation(); e.preventDefault(); jump(); });
         jb.addEventListener('click', function (e) { e.stopPropagation(); e.preventDefault(); });
+        const rb = document.getElementById('plaza-ride');     // 🛹 타기 / 내리기 — 같은 까닭으로 누르는 순간
+        if (rb) {
+            rb.addEventListener('pointerdown', function (e) { e.stopPropagation(); e.preventDefault(); rideToggle(); });
+            rb.addEventListener('click', function (e) { e.stopPropagation(); e.preventDefault(); });
+        }
     })();
     document.getElementById('plaza-emo').onclick = function () {
         if (typeof window.emoOpen === 'function') window.emoOpen('plaza', sayEmo);
