@@ -808,6 +808,7 @@ let triesDepth = 0;
 // ==========================================
 const SHOP_NAME = { alien: '우주 쇼핑몰' };
 function alienMax() {
+    try { if (typeof alienMaxOf === 'function') return alienMaxOf(u_()); } catch (e) { }       // ☄ 세번째 재앙 — 줄어든 기회 (2026-11-15)
     try { if (typeof ALIEN_DAILY_MAX !== 'undefined') return ALIEN_DAILY_MAX; } catch (e) { }
     return 4;
 }
