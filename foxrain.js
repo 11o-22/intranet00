@@ -40,9 +40,18 @@
 //   · 어둠의 여우비(hogaptu.js 제 零 금제)를 탐사 화면에 가늘게 내리던 것(FOXRAIN.steady)도 이제 부르지 않는다 —
 //     여우비의 효력과 알림 글은 그대로, 그림 · 소리만 없다. steady 는 남겨 두었다 (부르는 곳이 없다).
 //
+// ■ ❄ 눈 (2026-11-15 사용자 「현재 날씨에 따라서 0도 밑으로 내려가면 비 대신 눈이 오는 효과도 가능한가?」 「무료 그거로 하자.」)
+//   지금 기온이 0도 밑이면 비 대신 눈이 온다 — 눈송이가 살랑살랑 내리고, 웅덩이 대신 눈이 쌓였다 녹는다. 소리는 없다 (눈은 조용하다).
+//   기온   서울의 지금 기온 (WX.PLACE) — api/weather.js 가 Open-Meteo(무료 공개 날씨 자료 · 열쇠 없음 · CC BY 4.0)에서 받아 10분 묵혀 돌려준다.
+//          받는 것은 🦊 호갑투를 찬 사람의 화면뿐이다 (15분마다 · 30분까지 묵혀 쓴다 · 못 받았거나 묵었으면 비).
+//   누가   비냐 눈이냐는 **찬 사람이 들어오는 순간** 정해 자리 기록에 싣는다 (fs: 1) — 보는 사람은 그대로 따른다.
+//          그래서 같은 방에서는 누구 화면에서나 같은 것이 내린다 (새로고침 안 한 예전 화면은 비로 본다).
+//   출처 표기는 광장 목록 맨 아래에 한 줄 (plaza.js menuSheet) — Open-Meteo 자료를 쓰는 조건이다.
+//
 // ■ 콘솔
-//   foxRainTest()      지금 방에 한 번 내려 본다 (내 화면만)
+//   foxRainTest()      지금 방에 한 번 내려 본다 (내 화면만) · foxRainTest(true) 는 눈
 //   foxRainState()
+//   foxWeather()       지금 알고 있는 기온 · foxWeatherTest(-3) 이 기기에서만 기온을 정해 본다 (null 로 되돌린다)
 
 (function foxRain() {
 'use strict';
@@ -91,6 +100,11 @@ function css() {
         '  box-shadow:inset 0 1px 1px rgba(255,255,255,.4);}',
         '.fxr-pud i{position:absolute;left:50%;top:50%;width:26%;height:26%;margin:-13% 0 0 -13%;border-radius:50%;border:1px solid rgba(225,240,255,.75);opacity:0;}',
         '.fxr-pud i.go{animation:fxrRing .9s ease-out 1;}',
+        // ❄ 눈 — 흐린 빛은 옅고 희게 · 웅덩이 자리에는 눈이 쌓인다 (물결 없음)
+        '.fxr-wrap.snow .fxr-dim{background:linear-gradient(180deg,rgba(196,210,234,.36),rgba(150,170,206,.24));}',
+        '.fxr-pud.snow{background:radial-gradient(ellipse at 50% 42%,rgba(255,255,255,.95) 0%,rgba(238,245,255,.85) 48%,rgba(214,228,248,.42) 76%,rgba(214,228,248,0) 100%);',
+        '  box-shadow:inset 0 -1px 2px rgba(150,175,215,.35);}',
+        '.fxr-pud.snow i{display:none;}',
         '@keyframes fxrRing{0%{transform:scale(.3);opacity:.9}100%{transform:scale(3.4);opacity:0}}'
     ].join('\n');
     document.head.appendChild(s);
@@ -116,7 +130,13 @@ Scene.prototype.size = function () {
     if (this.w === w && this.h === h) return;
     this.w = w; this.h = h; this.cv.width = w; this.cv.height = h;
 };
-Scene.prototype.frame = function (lv, drip, dt) {
+Scene.prototype.frame = function (lv, drip, dt, snow) {
+    snow = !!snow;
+    if (this.snow !== snow) {                                               // 비 ↔ 눈이 바뀌었다 — 떨어지던 것은 걷고 새로
+        this.snow = snow; this.drops = []; this.splash = [];
+        this.wrap.classList.toggle('snow', snow);
+    }
+    if (snow) { this.frameSnow(lv, drip, dt); return; }
     const g = this.g, w = this.w, h = this.h;
     this.lv = lv;
     const dimTo = String(Math.round(Math.min(1, lv * (this.opt.dim != null ? this.opt.dim : 0.5)) * 100) / 100);
@@ -152,6 +172,39 @@ Scene.prototype.frame = function (lv, drip, dt) {
         g.beginPath(); g.ellipse(s.x, s.y, s.r * (0.3 + s.t), s.r * (0.3 + s.t) * 0.36, 0, 0, Math.PI * 2); g.stroke();
     }
 };
+// ❄ 눈 — 작은 송이가 천천히 · 살랑살랑 (왼쪽으로 조금 밀린다) · 땅에 닿기 직전에 옅어진다
+Scene.prototype.frameSnow = function (lv, drip, dt) {
+    const g = this.g, w = this.w, h = this.h;
+    this.lv = lv;
+    const dimTo = String(Math.round(Math.min(1, lv * (this.opt.dim != null ? this.opt.dim : 0.5)) * 100) / 100);
+    if (this.dim.style.opacity !== dimTo) this.dim.style.opacity = dimTo;
+    g.clearRect(0, 0, w, h);
+    const want = Math.min(R.MAX, Math.round((w * h) / 1700 * lv * (this.opt.dense || 1)));
+    while (this.drops.length < want) this.drops.push(this.newFlake(true));
+    for (let i = this.drops.length - 1; i >= 0; i--) {
+        const d = this.drops[i];
+        d.y += d.v * dt; d.ph += d.sw * dt;
+        if (d.y >= d.end) {
+            if (i >= want) { this.drops.splice(i, 1); continue; }           // 잦아드는 중 — 다시 내리지 않는다
+            this.drops[i] = this.newFlake(false);
+            continue;
+        }
+        const x = d.x + Math.sin(d.ph) * d.amp - d.y * 0.12;
+        const fade = Math.max(0, Math.min(1, (d.end - d.y) / 28));
+        g.fillStyle = 'rgba(255,255,255,' + (Math.round(d.a * fade * 100) / 100) + ')';
+        g.beginPath(); g.arc(x, d.y, d.r, 0, 6.2832); g.fill();
+    }
+    // 끝물 — 큰 송이가 드문드문
+    if (drip && Math.random() < dt * 1.6) { const b = this.newFlake(false); b.r = 3.2 + Math.random() * 1.4; b.v *= 0.8; b.a = 0.95; this.drops.push(b); }
+};
+Scene.prototype.newFlake = function (anywhere) {
+    const w = this.w, h = this.h;
+    const end = h * (0.42 + Math.random() * 0.58);                          // 닿는 자리 — 비와 같다
+    const r = Math.random() < 0.18 ? 2.3 + Math.random() * 1.2 : 1 + Math.random() * 1.3;
+    return { x: Math.random() * (w + h * 0.14), y: anywhere ? Math.random() * end : -8 - Math.random() * 40, end: end,
+             v: 52 + Math.random() * 70 + r * 14, r: r, a: 0.55 + Math.random() * 0.4,
+             ph: Math.random() * 6.2832, sw: 0.8 + Math.random() * 1.4, amp: 6 + Math.random() * 14 };
+};
 Scene.prototype.newDrop = function (anywhere) {
     const w = this.w, h = this.h;
     const end = h * (0.42 + Math.random() * 0.58);                          // 닿는 자리 — 화면 아래 절반 남짓
@@ -168,7 +221,7 @@ Scene.prototype.kill = function () {
 // ==========================================
 const PUD = { list: [], key: '', at: 0, ringAt: 0 };
 function pudClear() { PUD.list.forEach(function (e) { try { e.remove(); } catch (x) { } }); PUD.list = []; PUD.key = ''; }
-function pudBuild(st, seed) {
+function pudBuild(st, seed, snow) {
     pudClear();
     let fl = null;
     try { fl = (typeof window.plazaFloor === 'function') ? window.plazaFloor() : null; } catch (e) { fl = null; }
@@ -181,27 +234,27 @@ function pudBuild(st, seed) {
         const y = y0 - 6 + rnd() * (y1 - y0 + 26);
         const pw = (84 + rnd() * 104) * z, ph = pw * (0.21 + rnd() * 0.08);
         const e = document.createElement('div');
-        e.className = 'fxr-pud';
+        e.className = 'fxr-pud' + (snow ? ' snow' : '');
         e.style.cssText = 'left:' + Math.round(x * z - pw / 2) + 'px;top:' + Math.round(y * z - ph / 2) + 'px;width:' + Math.round(pw) + 'px;height:' + Math.round(ph) + 'px;';
         e.innerHTML = '<i></i>';
         st.el.appendChild(e);
         PUD.list.push(e);
     }
-    PUD.key = (st.seat || st.room) + ':' + seed;
+    PUD.key = (st.seat || st.room) + ':' + seed + (snow ? ':s' : '');
 }
 function pudLevel(t) {
     if (t < 0) return 0;
     if (t < R.TOTAL) return Math.min(1, t / 7000);                           // 비가 오는 동안 차오른다
     return Math.max(0, 1 - (t - R.TOTAL) / R.DRY);                           // 그친 뒤 마른다
 }
-function pudPaint(st, seed, t, raining) {
-    const key = (st.seat || st.room) + ':' + seed;
-    if (PUD.key !== key || (PUD.list[0] && PUD.list[0].parentNode !== st.el)) pudBuild(st, seed);
+function pudPaint(st, seed, t, raining, snow) {
+    const key = (st.seat || st.room) + ':' + seed + (snow ? ':s' : '');
+    if (PUD.key !== key || (PUD.list[0] && PUD.list[0].parentNode !== st.el)) pudBuild(st, seed, snow);
     const op = String(Math.round(pudLevel(t) * 100) / 100);
     PUD.list.forEach(function (e) { if (e.style.opacity !== op) e.style.opacity = op; });
     // 빗방울이 떨어진 자리 — 동그란 물결
     const nowT = performance.now();
-    if (raining > 0 && PUD.list.length && nowT - PUD.ringAt > 260 - 170 * raining) {
+    if (!snow && raining > 0 && PUD.list.length && nowT - PUD.ringAt > 260 - 170 * raining) {
         PUD.ringAt = nowT;
         const i = PUD.list[Math.floor(Math.random() * PUD.list.length)].firstChild;
         if (i) { i.classList.remove('go'); void i.offsetWidth; i.classList.add('go'); i.style.left = (25 + Math.random() * 50) + '%'; }
@@ -280,8 +333,42 @@ document.addEventListener('visibilitychange', function () { if (document.hidden)
 // ==========================================
 // 광장 — 찬 사람이 들어온 때를 실어 보내고 · 본다
 // ==========================================
-const ME = { key: '', fr: 0, wore: false };
-const NOW = { plaza: null, steady: null, t0: 0, test: 0 };       // plaza — 광장 장면 · steady — 어둠 장면
+const ME = { key: '', fr: 0, wore: false, sn: 0, snAt: 0 };       // sn — 들어온 때 기온이 0도 밑이었다 (눈)
+const NOW = { plaza: null, steady: null, t0: 0, test: 0, testSnow: 0 };       // plaza — 광장 장면 · steady — 어둠 장면
+
+// ==========================================
+// ❄ 지금 기온 — 0도 밑이면 눈 (머리말)
+// ==========================================
+const WX = { PLACE: '서울', URL: '/api/weather', KEY: 'foxWx', EVERY: 15 * 60000, LIFE: 30 * 60000, RETRY: 60000,
+             temp: null, at: 0, wait: false, tried: 0, fail: 0, test: null };
+(function wxRestore() {
+    try {
+        const v = JSON.parse(localStorage.getItem(WX.KEY) || 'null');
+        if (v && isFinite(Number(v.t)) && Date.now() - (Number(v.at) || 0) < WX.LIFE) { WX.temp = Number(v.t); WX.at = Number(v.at); }
+    } catch (e) { }
+})();
+function wxFetch() {
+    if (WX.wait || Date.now() - WX.tried < WX.RETRY) return;
+    WX.wait = true; WX.tried = Date.now();
+    let pr;
+    try { pr = fetch(WX.URL, { cache: 'no-store' }); } catch (e) { WX.wait = false; WX.fail++; return; }
+    pr.then(function (r) { if (!r.ok) throw new Error('날씨 ' + r.status); return r.json(); })
+      .then(function (j) {
+          WX.wait = false;
+          const t = (j && typeof j.temp === 'number') ? j.temp : NaN;      // 비어 있는 값을 0 도로 읽지 않는다
+          if (!j || !j.ok || !isFinite(t)) { WX.fail++; return; }
+          WX.temp = t; WX.at = Date.now(); WX.fail = 0;
+          try { localStorage.setItem(WX.KEY, JSON.stringify({ t: t, at: WX.at })); } catch (e) { }
+      })
+      .catch(function () { WX.wait = false; WX.fail++; });
+}
+// 받아 둘 때가 됐으면 받는다 — 🦊 호갑투를 찬 사람만 부른다
+function wxNeed() { if (Date.now() - WX.at >= WX.EVERY) wxFetch(); }
+// 지금 눈이 올 날씨인가 — 모르거나 묵었으면 비
+function wxSnow() {
+    if (WX.test != null) return WX.test < 0;
+    return WX.temp != null && Date.now() - WX.at < WX.LIFE && WX.temp < 0;
+}
 function wearsMe() { try { return !!(window.HG && typeof window.HG.wears === 'function' && window.HG.wears(u_())); } catch (e) { return false; } }
 
 // 내 자리 기록에 덧붙인다 (doll-walk.js 의 plazaExtra 를 감싼다 — 그쪽이 늦게 붙어도 다시 감싼다)
@@ -291,41 +378,49 @@ setInterval(function () {
     const w = function () {
         let o = null;
         try { o = (typeof f === 'function') ? f.apply(this, arguments) : null; } catch (e) { o = null; }
-        if (ME.fr && wearsMe()) { o = Object.assign({}, o || {}); o.fr = ME.fr; }
+        if (ME.fr && wearsMe()) { o = Object.assign({}, o || {}); o.fr = ME.fr; if (ME.sn) o.fs = 1; }      // fs — ❄ 눈
         return o;
     };
     w._fxr = true;
     window.plazaExtra = w;
 }, 800);
 
-function rainSeed() {
-    let best = 0;
-    if (NOW.test) best = NOW.test;
-    if (ME.fr && wearsMe()) best = Math.max(best, ME.fr);
+// 지금 이 방에 내리는 것 — 가장 늦게 들어온 찬 사람의 것 · 그 사람이 정한 대로 비 또는 눈
+function rainPick() {
+    let best = 0, snow = false;
+    if (NOW.test) { best = NOW.test; snow = !!NOW.testSnow; }
+    if (ME.fr && wearsMe() && ME.fr >= best) { best = ME.fr; snow = !!ME.sn; }
     try {
         (typeof window.plazaPeerCodes === 'function' ? window.plazaPeerCodes() : []).forEach(function (c) {
             const q = window.plazaPeerPos(c);
-            if (q && q.fr) best = Math.max(best, Number(q.fr) || 0);
+            const fr = q ? (Number(q.fr) || 0) : 0;
+            if (fr && fr > best) { best = fr; snow = !!q.fs; }
         });
     } catch (e) { }
-    return best;
+    return { seed: best, snow: snow };
 }
+function rainSeed() { return rainPick().seed; }
 
 // 무엇이 내리는지는 1초에 네 번만 본다 (ST) — 그리는 고리(loop)는 비가 올 때만 돈다
-const ST = { st: null, seed: 0, on: false };
+const ST = { st: null, seed: 0, on: false, snow: false };
 function tick() {
     const st = stage();
     ST.st = (st && st.view) ? st : null;
     if (ST.st) {
         const key = st.seat || st.room;
         const wear = wearsMe();
-        if (key !== ME.key || (wear && !ME.wore)) { ME.key = key; ME.fr = wear ? clock() : 0; }    // 방에 들어왔다 · 방 안에서 찼다
-        if (!wear) ME.fr = 0;
+        if (wear) wxNeed();                                                                          // ❄ 찬 사람만 기온을 받아 둔다
+        if (key !== ME.key || (wear && !ME.wore)) {                                                   // 방에 들어왔다 · 방 안에서 찼다
+            ME.key = key; ME.fr = wear ? clock() : 0;
+            ME.sn = (wear && wxSnow()) ? 1 : 0; ME.snAt = Date.now();                                 // ❄ 들어오는 순간의 기온으로 정한다
+        } else if (wear && ME.fr && Date.now() - ME.snAt < 3000) ME.sn = wxSnow() ? 1 : 0;           // 막 들어왔는데 기온이 방금 도착했다 — 3초 안에는 맞춘다
+        if (!wear) { ME.fr = 0; ME.sn = 0; }
         ME.wore = wear;
-        ST.seed = rainSeed();
+        const pick = rainPick();
+        ST.seed = pick.seed; ST.snow = pick.snow;
         const t = ST.seed ? clock() - ST.seed : -1;
-        if (ST.seed && t >= 0 && t < R.TOTAL + R.DRY && !inRun()) pudPaint(st, ST.seed, t, levelAt(t)); else if (PUD.list.length) pudClear();   // 탐사 중인 화면에는 웅덩이도 안 놓는다
-    } else { ME.key = ''; ME.fr = 0; ME.wore = false; ST.seed = 0; if (PUD.list.length) pudClear(); }
+        if (ST.seed && t >= 0 && t < R.TOTAL + R.DRY && !inRun()) pudPaint(st, ST.seed, t, levelAt(t), ST.snow); else if (PUD.list.length) pudClear();   // 탐사 중인 화면에는 웅덩이도 안 놓는다
+    } else { ME.key = ''; ME.fr = 0; ME.sn = 0; ME.wore = false; ST.seed = 0; ST.snow = false; if (PUD.list.length) pudClear(); }
     const raining = (ST.seed && levelAt(clock() - ST.seed) > 0) || !!NOW.plaza || !!NOW.steady;
     if (raining && !ST.on) { ST.on = true; lastFrame = 0; requestAnimationFrame(loop); }
     if (!raining && A.on) audioStop();
@@ -348,9 +443,9 @@ function loop(ts) {
     if (lv > 0 && st) {
         if (!NOW.plaza || NOW.plaza.host !== st.view || NOW.plaza.dead) { if (NOW.plaza) NOW.plaza.kill(); NOW.plaza = new Scene(st.view, { z: 29 }); }
         NOW.plaza.size();
-        NOW.plaza.frame(lv, drp, dt);
+        NOW.plaza.frame(lv, drp, dt, ST.snow);
     } else if (NOW.plaza) {
-        if (st && !inRun() && NOW.plaza.host === st.view && (NOW.plaza.drops.length || NOW.plaza.splash.length)) NOW.plaza.frame(0, false, dt);      // 남은 빗줄기는 끝까지 떨어진다
+        if (st && !inRun() && NOW.plaza.host === st.view && (NOW.plaza.drops.length || NOW.plaza.splash.length)) NOW.plaza.frame(0, false, dt, NOW.plaza.snow);      // 남은 빗줄기 · 눈송이는 끝까지 떨어진다
         else { NOW.plaza.kill(); NOW.plaza = null; }
     }
     // ── 어둠 (가늘게 계속)
@@ -361,7 +456,7 @@ function loop(ts) {
         else { lvS = 0.34; NOW.steady.size(); NOW.steady.frame(lvS, Math.random() < 0.3, dt); }
     }
     // ── 소리 — 광장 비는 탐사 중이 아닐 때 · 광장 🔊 가 켜져 있을 때 · 어둠 비는 어둠 음소거를 따른다
-    const plazaSnd = (lv > 0 && !plazaOff()) ? lv : 0;                     // (탐사 중이면 위에서 lv 가 0 이다)
+    const plazaSnd = (lv > 0 && !plazaOff() && !ST.snow) ? lv : 0;         // (탐사 중이면 위에서 lv 가 0 이다) · ❄ 눈은 소리가 없다
     let darkMute = false;
     try { darkMute = (typeof darkAudio !== 'undefined' && darkAudio && !!darkAudio.muted); } catch (e) { }
     const steadySnd = (lvS > 0 && !darkMute) ? lvS * 0.8 : 0;
@@ -389,15 +484,24 @@ window.FOXRAIN = {
     steadyOn: function () { return !!NOW.steady; },
     level: function () { const s = rainSeed(); return s ? levelAt(clock() - s) : 0; },
     seed: rainSeed,
+    snow: function () { return !!rainPick().snow; },                         // ❄ 지금 이 방에 내리는 것이 눈인가
+    weather: function () { return { temp: WX.temp, at: WX.at, snow: wxSnow(), test: WX.test, fail: WX.fail }; },
     levelAt: levelAt,
     mine: function () { return ME.fr; },
     audio: function () { return { on: A.on, buf: A.buf ? A.buf.duration : 0, loop: A.bed ? [A.bed.loop, A.bed.loopStart, A.bed.loopEnd] : null, gain: A.master ? A.master.gain.value : null, fail: A.fail }; }      // 시험 · 콘솔
 };
 window.foxRainMute = function (on) { try { if (on) localStorage.setItem(MUTE_KEY, '1'); else localStorage.removeItem(MUTE_KEY); } catch (e) { } return muted(); };
-window.foxRainTest = function () { NOW.test = clock(); setTimeout(function () { NOW.test = 0; }, R.TOTAL + R.DRY + 500); try { tick(); } catch (e) { } return '🌧 ' + Math.round(R.TOTAL / 1000) + '초 동안 내립니다 (내 화면만)'; };
+window.foxRainTest = function (snow) { NOW.test = clock(); NOW.testSnow = snow ? 1 : 0; setTimeout(function () { NOW.test = 0; NOW.testSnow = 0; }, R.TOTAL + R.DRY + 500); try { tick(); } catch (e) { } return (snow ? '❄ ' : '🌧 ') + Math.round(R.TOTAL / 1000) + '초 동안 내립니다 (내 화면만)'; };
+// ❄ 지금 알고 있는 기온 · 이 기기에서만 기온을 정해 보기 (null 로 되돌린다)
+window.foxWeather = function () {
+    const o = { 곳: WX.PLACE, 기온: WX.temp, 받은지_분: WX.at ? Math.round((Date.now() - WX.at) / 6000) / 10 : null, 지금_눈: wxSnow(), 시험값: WX.test, 못받은횟수: WX.fail, 출처: 'Open-Meteo.com (CC BY 4.0)' };
+    console.log(o);
+    return o;
+};
+window.foxWeatherTest = function (t) { WX.test = (t == null || t === '') ? null : Number(t); return window.foxWeather(); };
 window.foxRainState = function () {
     const s = rainSeed(), t = s ? clock() - s : -1;
-    const out = { 방: ME.key, 내가찼나: wearsMe(), 내들어온때: ME.fr, 씨앗: s, 흐른초: t >= 0 ? Math.round(t / 100) / 10 : null, 굵기: Math.round(levelAt(t) * 100) / 100,
+    const out = { 방: ME.key, 내가찼나: wearsMe(), 내들어온때: ME.fr, 눈: !!rainPick().snow, 씨앗: s, 흐른초: t >= 0 ? Math.round(t / 100) / 10 : null, 굵기: Math.round(levelAt(t) * 100) / 100,
                   빗줄기: NOW.plaza ? NOW.plaza.drops.length : 0, 웅덩이: PUD.list.length, 소리: A.on, 빗소리: A.buf ? Math.round(A.buf.duration * 10) / 10 + '초' : (A.wait ? '받는 중' : '아직'), 소리장치: A.ctx ? A.ctx.state : '없음', 음소거: muted(), 광장소리끔: plazaOff(), 어둠비: !!NOW.steady };
     console.log(out);
     return out;
