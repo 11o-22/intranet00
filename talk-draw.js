@@ -41,7 +41,7 @@
 
 const TD = {
     PATH: 'talkDraw',
-    ROOM: 'quiz',
+    ROOM: 'talk',             // 🛋 심야 토크쇼 무대 (plaza.js R.talk · 2026-11-15 — 전에는 퀴즈쇼 방 'quiz' 를 같이 썼다)
     MAX_PTS: 400,             // 한 획에 적는 점 수 (넘으면 솎는다)
     MAX_STROKES: 500,         // 한 쇼에 남겨 두는 획
     STEP: 2,                  // 화면에서 이만큼 움직여야 점을 하나 더 찍는다

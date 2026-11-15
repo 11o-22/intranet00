@@ -72,6 +72,12 @@
 
 const SHOW = '📺 브라운의 심야 토크 쇼';
 const ROOM = 'quiz';
+// 🛋 심야 토크쇼는 따로 그린 무대로 든다 (2026-11-15 사용자 「심야 토크쇼는 이걸로 해주고.」 — plaza.js 의 R.talk)
+//   방 이름이 둘이다. 「무대에 있나」 는 둘 다 센다 (onStage · stageRoom). 들어갈 방은 쇼마다 고른다 (roomFor).
+const ROOM_T = 'talk';
+function stageRoom(r) { return r === ROOM || r === ROOM_T; }
+function roomFor(s) { return isTalk(s) ? ROOM_T : ROOM; }
+function onStage() { return stageRoom(roomNow()); }
 const START = 'plaza';
 const PATH = 'quizShow', WIN = 'quizWin', DAY = 'quizDay';
 const DIR = 'plaza/';
@@ -80,6 +86,7 @@ const DIR = 'plaza/';
 const T1_IMG = 'quiz3-t1.webp', T2_IMG = 'quiz3-t2.webp';                 // 단상 (기본 · 인원 추가)
 const CUR = ['quiz3-cur1.webp', 'quiz3-cur2.webp', 'quiz3-cur3.webp', 'quiz3-cur4.webp', 'quiz3-cur5.webp'];   // 커튼 프레임 1 (닫힘) ~ 5
 const CUR_END = 'quiz3-cur6.webp';                                         // 커튼 프레임 종료(유지) — 다 열린 뒤에도 남는다
+const TALK_FG = 'talk-fg.webp';                                            // 🛋 심야 토크쇼 — 사람 앞에 놓는 탁자 · 책상 (무대 그림과 같은 자리 · 같은 크기)
 const ADMIN = 'kario0987';
 
 const Q = {
@@ -122,6 +129,24 @@ const Q = {
     Z1: 1360, Z2: 1450, ZCUR_LOW: 60, ZCUR: 3000, CUR_SPLIT: 1120, ZTOP: 4200
 };
 
+// 🛋 심야 토크쇼의 자리 (방 그림 좌표 · 발끝 — R.talk 그림 한 점이 2.25) — 그림에서 쟀다 (2026-11-15)
+//   탁자(커피 테이블) 376 ~ 592 · 윗면 540 · 다리 끝 626 / 왼쪽 소파 173 ~ 443 · 오른쪽 소파 466 ~ 709 (다리 끝 630) / 사회자 책상 945 ~ 1454 · 윗면 484 · 아래 623 · 의자 가운데 1233
+//   손님은 소파 앞에 선다 — 앞의 둘(s1 · s2)은 탁자 뒤라 허리 아래가 탁자에 가린다. 사회자는 책상 뒤 (머리 · 어깨 · 가슴만 보인다).
+//   머리(머리카락 포함)가 140 쯤이라 손님은 150 씩 띄운다. 넷째부터는 오른쪽 소파 끝 · 왼쪽 안락의자 · 난간 앞.
+//   층 — 사람은 100 + 발끝. 책상 뒤 사회자(690) · 탁자 뒤 손님(721) < 탁자 · 책상(ZFG 730) < 소파 앞 손님(739) · 무대 앞을 걷는 사회자(744 ~)
+const TQ = {
+    HOST: { x: 1233, y: 590, f: 1 },
+    SEAT: {
+        s1: { x: 410, y: 621, f: -1 }, s2: { x: 560, y: 621, f: -1 }, s3: { x: 260, y: 639, f: -1 },
+        s4: { x: 710, y: 639, f: -1 }, s5: { x: 110, y: 639, f: -1 }, s6: { x: 860, y: 639, f: -1 }
+    },
+    FILL: ['s1', 's2', 's3', 's4', 's5', 's6'],
+    WALK: { x: 1130, y: 656 },     // 사회자가 책상에서 나와 설 자리 (책상 앞 무대 바닥 — 걷는 띠는 R.talk.floor · x1)
+    ZFG: 730,
+    NICK: 252                      // 이름표 — 발끝에서 머리 위까지 (사람 1배일 때)
+};
+function LY(s) { return isTalk(s) ? TQ : Q; }
+
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function db_() { return (typeof database !== 'undefined' && database) ? database : null; }
 function users() { return (typeof db !== 'undefined' && db && db.users) ? db.users : {}; }
@@ -144,7 +169,7 @@ function live(s) { return !!(s && s.host && s.at && !s.end && now() - Number(s.a
 function invOf(s) { return (s && s.inv && typeof s.inv === 'object') ? s.inv : {}; }
 function seatsOf(s) { return (s && s.seat && typeof s.seat === 'object') ? s.seat : {}; }
 function wide(s) { return Object.keys(invOf(s)).length > 3; }                       // 앞줄 단상까지 (6인용)
-function seatKeys(s) { return wide(s) ? Q.FILL6 : Q.FILL3; }                        // 앉히는 차례 (앞에서부터 빈 명패)
+function seatKeys(s) { return isTalk(s) ? TQ.FILL : (wide(s) ? Q.FILL6 : Q.FILL3); }       // 🛋 토크쇼는 탁자 뒤 둘부터 (TQ.FILL)                        // 앉히는 차례 (앞에서부터 빈 명패)
 function outOf(s, code) { const v = invOf(s)[code]; return !!(v && v.st === 'x'); }  // 사회자가 내보냈다 (🚪)
 function activeN(s) { const inv = invOf(s); return Object.keys(inv).filter(function (c) { return !(inv[c] && inv[c].st === 'x'); }).length; }   // 초대 자리 — 내보낸 사람은 빼고 센다
 // ★ 🛋 심야 토크쇼인가 (머리말) — 문제 · 채점 · 상 · 가두리 없이 무대만 쓰고, 다 같이 그림을 그린다 (talk-draw.js)
@@ -182,7 +207,7 @@ window.quizShowGate = function () { const s = curShow(); return s ? (Number(s.in
 window.quizShowNow = function () {
     const me = u_(), s = curShow();
     if (!me || !s) return null;
-    return { host: s.host, id: s.id, mode: isTalk(s) ? 'talk' : 'quiz', inRoom: roomNow() === ROOM, isHost: s.host === me.code, seated: !!(seatOf(s, me.code) && !outOf(s, me.code)) };
+    return { host: s.host, id: s.id, mode: isTalk(s) ? 'talk' : 'quiz', inRoom: onStage(), isHost: s.host === me.code, seated: !!(seatOf(s, me.code) && !outOf(s, me.code)) };
 };
 
 (function listen() {
@@ -297,7 +322,7 @@ function kick(code) {
         return d.ref(PATH + '/' + me.code).update(up).then(function () {
             try { addHistoryLog(me, '[토크쇼] 🎤 ' + titleOf(s) + ' — ' + nameOf(code) + ' 사원을 ' + (k ? '무대에서 내보냈습니다.' : '초대에서 뺐습니다.')); saveFields({ history: 1 }); } catch (e) { }
             if (isTalk(s)) drawCall('talkDrawDrop', me.code, code);          // 🖌 내보낸 사람이 그린 것은 지운다 (그 사람 화면이 꺼져 있어도)
-            if (roomNow() === ROOM) { sys('🚪 ' + nick + ' — ' + (k ? '무대에서 내려갔습니다.' : '초대를 거뒀습니다.')); paintStage(); paintHost(); }
+            if (onStage()) { sys('🚪 ' + nick + ' — ' + (k ? '무대에서 내려갔습니다.' : '초대를 거뒀습니다.')); paintStage(); paintHost(); }
             return true;
         });
     };
@@ -362,7 +387,7 @@ function verdictOf(t) {
         try { if (typeof m0 === 'function') m0.apply(this, arguments); } catch (e) { }
         try {
             const s = myHost();
-            if (!s || isTalk(s) || roomNow() !== ROOM) return;       // 🛋 심야 토크쇼에는 채점이 없다
+            if (!s || isTalk(s) || !onStage()) return;       // 🛋 심야 토크쇼에는 채점이 없다
             const v = verdictOf(text);
             if (!v) return;
             if (!sel || !seatOf(s, sel)) {
@@ -383,7 +408,7 @@ function pick(code) {                        // 지목 — 같은 사람을 다�
 function doneAll(s, code) { return markList(s, code).every(function (v) { return v; }); }
 function judge(code, v) {
     const s = myHost(), d = db_(), me = u_();
-    if (!s || isTalk(s) || !d || !me || roomNow() !== ROOM || (v !== 1 && v !== 2) || !seatOf(s, code)) return false;
+    if (!s || isTalk(s) || !d || !me || !onStage() || (v !== 1 && v !== 2) || !seatOf(s, code)) return false;
     const list = markList(s, code);
     let k = -1;
     for (let i = 0; i < Q.PER; i++) if (!list[i]) { k = i; break; }
@@ -489,7 +514,7 @@ function cageTry() {
     const me = u_(), d = db_();
     const ids = Object.keys(cageWait);
     if (!me || !d || !ids.length || caging) return;
-    if (roomNow() === ROOM || document.getElementById('qz-intro')) return;
+    if (onStage() || document.getElementById('qz-intro')) return;
     caging = true;
     const id = ids[0], w = cageWait[id];
     cageMe(w.min).then(function (res) {
@@ -645,7 +670,7 @@ function pickGuests(more, mode) {
 // ── 진행 (사회자) · 현황 (손님)
 function statusRows(s) {
     const st = seatsOf(s), inv = invOf(s), me = u_(), talk = isTalk(s);
-    const canPick = !!(!talk && me && s.host === me.code && roomNow() === ROOM);      // 사회자 — 무대의 작은 사람을 누르기 어려울 때 여기서 지목한다
+    const canPick = !!(!talk && me && s.host === me.code && onStage());      // 사회자 — 무대의 작은 사람을 누르기 어려울 때 여기서 지목한다
     const canKick = !!(me && s.host === me.code);                              // 사회자 — 🚪 내보내기 (무대 밖에서도)
     const kickBtn = function (c) { return canKick ? '<button class="game-btn qz-kick" data-c="' + esc(c) + '" style="flex:0 0 auto; margin:0; padding:6px 8px; font-size:10.5px; background:linear-gradient(145deg,#5a1a1a,#220a0a) !important; border-color:#a85a5a !important; color:#f3d2d2 !important;">내보내기</button>' : ''; };
     const seated = {};
@@ -680,7 +705,7 @@ function statusRows(s) {
 function manage() {
     const me = u_(), s = curShow();
     if (!me || !s) { shut(); return; }
-    const host = s.host === me.code, inRoom = roomNow() === ROOM, talk = isTalk(s);
+    const host = s.host === me.code, inRoom = onStage(), talk = isTalk(s);
     const left = Q.MAX - activeN(s);
     const w = box('<div style="font-size:13px; color:#f3e6d2; font-weight:bold; margin-bottom:4px;">' + iconOf(s) + ' ' + titleOf(s) + (host ? ' — 진행' : '') + '</div>'
         + (talk ? '<div style="font-size:10px; color:#a88d6a; margin-bottom:8px; line-height:1.6;">' + (host ? '' : esc(s.name || nameOf(s.host)) + ' 사회자의 무대 — ')
@@ -817,10 +842,10 @@ function chip() {
     let el = document.getElementById('qz-chip');
     let label = '', fn = null;
     const pend = pendingShow(), cur = curShow();
-    if (roomNow() === ROOM && cur) { label = ''; }
+    if (onStage() && cur) { label = ''; }
     else if (pend && later[pend.id]) { label = '💌 ' + titleOf(pend) + ' 초대장'; fn = function () { inviteCard(pend); }; }
-    else if (cur && me && cur.host !== me.code && roomNow() !== ROOM) { label = '📺 ' + titleOf(cur) + ' — 무대로'; fn = function () { enter(cur.host); }; }
-    else if (cur && me && cur.host === me.code && roomNow() !== ROOM) { label = '📺 ' + titleOf(cur) + ' — 진행 중'; fn = manage; }
+    else if (cur && me && cur.host !== me.code && !onStage()) { label = '📺 ' + titleOf(cur) + ' — 무대로'; fn = function () { enter(cur.host); }; }
+    else if (cur && me && cur.host === me.code && !onStage()) { label = '📺 ' + titleOf(cur) + ' — 진행 중'; fn = manage; }
     if (!label || document.getElementById('qz-intro') || inDark()) { if (el) el.remove(); return; }
     if (!el) {
         el = document.createElement('button');
@@ -906,7 +931,7 @@ function bgmTick(inRoom) {
 }
 ['pointerdown', 'keydown', 'touchend'].forEach(function (t) {     // 브라우저가 막았다가 풀린 때 — 누를 때 한 번 더 청한다
     document.addEventListener(t, function () {
-        if (!bgmWant || !bgm || !bgm.paused || roomNow() !== ROOM || !bgmOk()) return;
+        if (!bgmWant || !bgm || !bgm.paused || !onStage() || !bgmOk()) return;
         try { if (bgm.currentTime < BGM.LOOP_AT) bgm.currentTime = BGM.LOOP_AT; const p = bgm.play(); if (p && p.catch) p.catch(function () { }); } catch (e) { }
     }, true);
 });
@@ -929,8 +954,8 @@ function enter(host) {
     const first = seenIntro() !== String(s.id);
     intro(first, function () {
         // 막 뒤에서 방을 옮긴다
-        try { window.plazaGo(ROOM); } catch (e) { }
-        if (roomNow() !== ROOM) { going = ''; alert_('지금은 무대에 들어갈 수 없습니다. (가두리 · 냄비에 갇혀 있으면 못 듭니다)'); return false; }
+        try { window.plazaGo(roomFor(s)); } catch (e) { }       // 🛋 토크쇼는 R.talk · 퀴즈쇼는 R.quiz
+        if (!onStage()) { going = ''; alert_('지금은 무대에 들어갈 수 없습니다. (가두리 · 냄비에 갇혀 있으면 못 듭니다)'); return false; }
         seat(); paintStage();
         markIntro(s.id);
         return true;
@@ -943,7 +968,7 @@ function leave() {
     hostDown = false; sel = ''; closeShow = null;
     bgmStop();
     try { if (typeof window.plazaPin === 'function') window.plazaPin(null); } catch (e) { }
-    try { if (roomNow() === ROOM) window.plazaGo(START); } catch (e) { }
+    try { if (onStage()) window.plazaGo(START); } catch (e) { }
     clearStage();
     chip();
 }
@@ -952,17 +977,18 @@ function markIntro(id) { try { sessionStorage.setItem('qzIntro', String(id)); } 
 let hostDown = false;                        // 사회자가 단상에서 내려와 있다 (걸어 다닌다 · 2026-11-13 사용자 「장착자는 단상에서 내려와서 움직일 수 있게」)
 function mySpot(s) {
     const me = u_(); if (!me || !s) return null;
-    if (s.host === me.code) return Q.HOST;
+    const L = LY(s);
+    if (s.host === me.code) return L.HOST;
     const k = seatOf(s, me.code);
-    return k ? Q.SEAT[k] : null;
+    return k ? L.SEAT[k] : null;
 }
 function seat() {
     const s = curShow(), sp = mySpot(s), me = u_();
-    if (!sp || roomNow() !== ROOM || typeof window.plazaPin !== 'function') return;
+    if (!sp || !onStage() || typeof window.plazaPin !== 'function') return;
     let p = null;
     try { p = window.plazaPinned(); } catch (e) { }
     if (s.host === me.code && hostDown) {                      // 내려와 있다 — 붙박이를 풀고 무대 바닥에 세운다 (그 뒤로는 제 발로 걷는다)
-        if (p) window.plazaPin(null, Q.WALK);
+        if (p) window.plazaPin(null, LY(s).WALK);
         return;
     }
     if (p && Math.abs(p.x - sp.x) < 1 && Math.abs(p.y - sp.y) < 1) return;
@@ -970,10 +996,11 @@ function seat() {
 }
 function hostWalk(down) {
     const s = myHost();
-    if (!s || roomNow() !== ROOM) return;
+    if (!s || !onStage()) return;
     hostDown = (down == null) ? !hostDown : !!down;
     seat(); paintHost();
-    sys(hostDown ? '🚶 단상에서 내려왔습니다 — 무대 바닥을 걸어 다닐 수 있습니다.' : '🎤 단상으로 돌아왔습니다.');
+    const dsk = isTalk(s) ? '책상' : '단상';                    // 🛋 토크쇼 무대는 사회자 책상
+    sys(hostDown ? '🚶 ' + dsk + '에서 내려왔습니다 — 무대 바닥을 걸어 다닐 수 있습니다.' : '🎤 ' + dsk + '으로 돌아왔습니다.');
 }
 
 // ==========================================
@@ -995,6 +1022,8 @@ function hostWalk(down) {
         '.qz-pop.x i:first-child{transform:translate(-50%,-50%) rotate(45deg);}',
         '.qz-pop.x i:last-child{transform:translate(-50%,-50%) rotate(-45deg);}',
         '@keyframes qzPop{0%{transform:scale(.2);opacity:0}12%{transform:scale(1.25);opacity:1}22%{transform:scale(1)}80%{transform:scale(1);opacity:1}100%{transform:scale(1.1) translateY(-18%);opacity:0}}',
+        '.qz-nick{position:absolute;transform:translate(-50%,-100%);pointer-events:none;white-space:nowrap;padding:2px 7px;border-radius:9px;line-height:1.25;',
+        '  background:rgba(24,12,10,.82);border:1px solid rgba(214,170,98,.75);color:#f6e2b8;font-weight:bold;box-shadow:0 2px 6px rgba(0,0,0,.5);}',     /* 🛋 심야 토크쇼 — 머리 위 닉네임 */
         '#plaza-ov.qz-on #plaza-who{display:none !important;}',                    /* 「같이 있는 사람」 줄이 간판을 덮는다 — 이 방은 명패가 그 몫을 한다 */
         '#plaza-ov.qz-on .plaza-tag{display:none !important;}',                     /* 머리 위 이름표 — 앞줄 것이 뒷줄 얼굴을 덮는다. 누구인지는 명패(닉네임)와 📺 현황이 알려 준다 */
         '#qz-ctl{position:absolute;right:12px;top:62px;z-index:60;padding:8px 14px;border-radius:14px;border:1px solid #c79a5b;background:rgba(42,27,14,.9);color:#f3e6d2;font-size:12px;font-weight:bold;box-shadow:0 3px 12px rgba(0,0,0,.5);}',
@@ -1022,13 +1051,13 @@ let popKey = '';                             // 마지막으로 띄운 O · X (�
 function lastKey(s) { const l = s && s.last; return l ? [s.id, l.c, l.k, l.v, l.at].join('|') : ''; }
 function stage() { try { return (typeof window.plazaStage === 'function') ? window.plazaStage() : null; } catch (e) { return null; } }
 function clearStage() {
-    Array.prototype.forEach.call(document.querySelectorAll('.qz-layer, .qz-plate, .qz-pips, .qz-pop, #qz-ctl, #qz-scr, .qz-hit, .qz-sel, #qz-bar, .qz-hbtn'), function (e) { e.remove(); });     // 커튼 층(#qz-curplay)도 .qz-layer 다
+    Array.prototype.forEach.call(document.querySelectorAll('.qz-layer, .qz-plate, .qz-pips, .qz-pop, #qz-ctl, #qz-scr, .qz-hit, .qz-sel, #qz-bar, .qz-hbtn, .qz-nick'), function (e) { e.remove(); });     // 커튼 층(#qz-curplay)도 .qz-layer 다
     const ov = document.getElementById('plaza-ov'); if (ov) ov.classList.remove('qz-on');
 }
 function px(v, z) { return Math.round(v * z) + 'px'; }
 function paintStage() {
     const sg = stage();
-    if (!sg || sg.room !== ROOM) { if (document.querySelector('.qz-layer, #qz-ctl')) clearStage(); return; }
+    if (!sg || !stageRoom(sg.room)) { if (document.querySelector('.qz-layer, #qz-ctl')) clearStage(); return; }
     const s = curShow() || (closing ? closeShow : null);
     const el = sg.el, z = sg.z;
     // ── 단상 · 커튼 그림
@@ -1043,11 +1072,14 @@ function paintStage() {
         }
         im.style.zIndex = String(zi);
     };
-    need('qz-t1', T1_IMG, Q.Z1, true);
-    need('qz-t2', T2_IMG, Q.Z2, !!(s && wide(s)));
-    // 걷힌 커튼 — 끝 프레임은 늘 남는다 (2026-11-13 사용자 「마지막 프레임을 유지」)
-    need('qz-cur', CUR_END, Q.ZCUR_LOW, true);
-    need('qz-cur-f', CUR_END, Q.ZCUR, true, 'inset(' + (Q.CUR_SPLIT / sg.h * 100).toFixed(3) + '% 0 0 0)');
+    // 🛋 심야 토크쇼 무대 (R.talk) — 단상 · 커튼 · 명패 대신 탁자 · 책상 한 장과 머리 위 이름표 (2026-11-15)
+    const talkRoom = sg.room === ROOM_T;
+    need('qz-t1', T1_IMG, Q.Z1, !talkRoom);
+    need('qz-t2', T2_IMG, Q.Z2, !talkRoom && !!(s && wide(s)));
+    need('qz-tfg', TALK_FG, TQ.ZFG, talkRoom);
+    // 걷힌 커튼 — 끝 프레임은 늘 남는다 (2026-11-13 사용자 「마지막 프레임을 유지」) · 토크쇼 무대는 그림에 커튼이 그려져 있다
+    need('qz-cur', CUR_END, Q.ZCUR_LOW, !talkRoom);
+    need('qz-cur-f', CUR_END, Q.ZCUR, !talkRoom, 'inset(' + (Q.CUR_SPLIT / sg.h * 100).toFixed(3) + '% 0 0 0)');
     // ── 명패
     const st = seatsOf(s);
     // 앞줄에 선 사람 — 뒷줄 명패의 양 끝이 그 머리에 가린다 (앞단상은 뒷단상에 겹쳐 놓여 있다). 그 명패는 **보이는 틈**에만 적는다.
@@ -1098,10 +1130,11 @@ function paintStage() {
         p.textContent = text;
     };
     ['s1', 's2', 's3', 's4', 's5', 's6'].forEach(function (k) {
-        const on = s && seatKeys(s).indexOf(k) >= 0 && st[k] && st[k].c;
+        const on = !talkRoom && s && seatKeys(s).indexOf(k) >= 0 && st[k] && st[k].c;
         plate(k, on ? String(st[k].nick || nameOf(st[k].c)) : '', (k > 's3' ? Q.Z2 : Q.Z1) + 1);
     });
-    plate('host', s ? String(s.name || nameOf(s.host)) : '', Q.Z1 + 1);
+    plate('host', (!talkRoom && s) ? String(s.name || nameOf(s.host)) : '', Q.Z1 + 1);
+    paintNicks(sg, s, talkRoom);
     paintMarks();
     // ── 오른쪽 위 단추
     const ov = sg.ov;
@@ -1116,6 +1149,32 @@ function paintStage() {
     if (ov) { const cb = ov.querySelector('#qz-ctl'), ct = '📺 ' + titleOf(s); if (cb && cb.textContent !== ct) cb.textContent = ct; }
     paintScreen(sg, s);
     paintHost();
+}
+// 🛋 심야 토크쇼 — 손님 머리 위 이름표 (명패가 없으니 초대장에 적은 닉네임을 여기에). 손님은 제자리에 붙박이라 자리에 띄운다.
+//   사회자는 책상에서 나와 걸어 다닐 수 있어 (남의 화면에서는 그 자리를 모른다) 이름표를 달지 않는다 — 책상 뒤가 사회자 자리다.
+function paintNicks(sg, s, on) {
+    const el = sg.el, z = sg.z, kk = sg.k || z, st = seatsOf(s), want = {};
+    if (on && s) {
+        Object.keys(TQ.SEAT).forEach(function (k) {
+            if (seatKeys(s).indexOf(k) >= 0 && st[k] && st[k].c && !outOf(s, st[k].c)) want[k] = { p: TQ.SEAT[k], t: String(st[k].nick || nameOf(st[k].c)) };
+        });
+    }
+    Array.prototype.forEach.call(el.querySelectorAll('.qz-nick'), function (e) { if (!want[e.dataset.k]) e.remove(); });
+    Object.keys(want).forEach(function (k) {
+        const w = want[k];
+        let e = el.querySelector('.qz-nick[data-k="' + k + '"]');
+        if (!e) { e = document.createElement('div'); e.className = 'qz-nick'; e.dataset.k = k; el.appendChild(e); }
+        const fs = Math.max(8, Math.min(13, Math.round(30 * z)));
+        e.style.padding = z < 0.45 ? '1px 4px' : '';              // 세로 손전화 — 이웃 이름표와 덜 겹치게
+        const sig = w.t + '|' + z + '|' + kk;
+        if (e._sig === sig) return;
+        e._sig = sig;
+        e.textContent = w.t;
+        e.style.fontSize = fs + 'px';
+        e.style.left = Math.round(w.p.x * z) + 'px';
+        e.style.top = Math.round(w.p.y * z - TQ.NICK * kk) + 'px';
+        e.style.zIndex = String(Q.ZTOP - 20);
+    });
 }
 // 가운데 화면 — 사회자가 낸 문제 (2026-11-13 사용자 「토크쇼 중앙 빈 화면에 장비 장착자가 쓴 문제가 뜨게」). 모두 다 풀면 「끝」.
 function paintScreen(sg, s) {
@@ -1145,7 +1204,7 @@ function paintScreen(sg, s) {
 // 사회자 화면에만 — 문제 내기 · 내려가기 단추 / 참가자를 누르는 자리 / 지목 표(▼) · 채점 띠
 function paintHost() {
     const sg = stage(), me = u_(), s = curShow();
-    const host = !!(sg && sg.room === ROOM && s && me && s.host === me.code);
+    const host = !!(sg && stageRoom(sg.room) && s && me && s.host === me.code);
     const ov = (sg && sg.ov) || document.getElementById('plaza-ov');
     const drop = function (q) { Array.prototype.forEach.call(document.querySelectorAll(q), function (e) { e.remove(); }); };
     if (!host) { drop('.qz-hit, .qz-sel, #qz-bar, .qz-hbtn'); return; }
@@ -1163,7 +1222,7 @@ function paintHost() {
         if (b.textContent !== label) b.textContent = label;
     };
     if (talk) drop('#qz-ask'); else hbtn('qz-ask', '✏️ 문제 내기', askBox);
-    hbtn('qz-walk', hostDown ? '🎤 단상으로' : '🚶 내려가기', function () { hostWalk(); });
+    hbtn('qz-walk', hostDown ? (talk ? '🎤 책상으로' : '🎤 단상으로') : '🚶 내려가기', function () { hostWalk(); });
     if (talk) { sel = ''; drop('.qz-hit, .qz-sel, #qz-bar'); return; }       // 🛋 심야 토크쇼 — 지목 · 채점이 없다
     // ── 누르는 자리 — 머리(몸)와 명패. 앞줄 것이 뒷줄 것 위에 온다 (보이는 대로)
     const st = seatsOf(s), keep = {};
@@ -1242,7 +1301,7 @@ const finSaid = {};
 // 명패 아래 세 칸 — 푼 문제 (O 초록 · X 빨강)
 function paintMarks() {
     const sg = stage();
-    if (!sg || sg.room !== ROOM) return;
+    if (!sg || !stageRoom(sg.room)) return;
     const s = curShow() || (closing ? closeShow : null), el = sg.el, z = sg.z, st = seatsOf(s);
     ['s1', 's2', 's3', 's4', 's5', 's6'].forEach(function (k) {
         const id = 'qz-pp-' + k, r = Q.PLATE[k];
@@ -1265,7 +1324,8 @@ function paintMarks() {
 //   다 걷히면 방의 층으로 깔려 있는 끝 프레임(qz-cur)만 남는다.
 function curtainShut() {
     const sg = stage();
-    if (!sg || sg.room !== ROOM) return null;
+    if (!sg || !stageRoom(sg.room)) return null;
+    if (sg.room === ROOM_T) return null;                       // 🛋 토크쇼 무대 — 커튼 그림(퀴즈쇼 방에 맞춘 것)을 깔지 않는다. 검은 막이 걷히며 바로 열린다
     const old = sg.el.querySelector('#qz-curplay'); if (old) old.remove();
     const box = document.createElement('div');
     box.id = 'qz-curplay'; box.className = 'qz-layer';
@@ -1303,8 +1363,18 @@ function curtainOpen(box) {
 //   프레임 5 → 4 → 3 → 2 → 1 차례로 **나타난다** (덜 닫힌 장부터 · 더 닫힌 장이 위). 다 닫히면 프레임 1 이 무대를 다 가린다.
 function curtainClose() {
     const sg = stage();
-    if (!sg || sg.room !== ROOM) return Promise.resolve();
+    if (!sg || !stageRoom(sg.room)) return Promise.resolve();
     const old = sg.el.querySelector('#qz-curplay'); if (old) old.remove();
+    if (sg.room === ROOM_T) {                                  // 🛋 토크쇼 무대 — 커튼 그림 대신 무대가 어두워진다
+        const dk = document.createElement('div');
+        dk.id = 'qz-curplay'; dk.className = 'qz-layer';
+        dk.style.zIndex = String(Q.ZTOP + 30); dk.style.background = '#000'; dk.style.opacity = '0';
+        sg.el.appendChild(dk);
+        return wait(30).then(function () {
+            dk.style.transition = 'opacity ' + (IN.CURTAIN * 3) + 'ms ease-in-out'; dk.style.opacity = '1';
+            return wait(IN.CURTAIN * 3 + 60);
+        });
+    }
     const box = document.createElement('div');
     box.id = 'qz-curplay'; box.className = 'qz-layer';
     box.style.zIndex = String(Q.ZTOP + 30);                    // 채점 표 · 누르는 자리까지 다 덮는다
@@ -1342,14 +1412,14 @@ function endLeave(old) {
     sys(old && old.end ? '📺 ' + T0 + '의 막이 내립니다.' : '📺 ' + T0 + '가 끝나 막이 내립니다.');
     curtainClose().then(function () { return wait(IN.SHUT + 250); }).catch(function () { }).then(function () {
         closing = false; closeShow = null;
-        if (roomNow() === ROOM && !curShow()) { sys('광장으로 돌아갑니다.'); leave(); }
+        if (onStage() && !curShow()) { sys('광장으로 돌아갑니다.'); leave(); }
         else { const b = document.getElementById('qz-curplay'); if (b) b.remove(); }      // 그 사이 새 쇼가 열렸다 (드문 일) — 막만 걷는다
     });
 }
 // 머리 위에 크게 — O (초록) · X (빨강)
 function pop(last) {
     const sg = stage();
-    if (!sg || sg.room !== ROOM || !last || !last.c) return;
+    if (!sg || !stageRoom(sg.room) || !last || !last.c) return;
     const s = curShow(); if (!s) return;
     const key = [s.id, last.c, last.k, last.v, last.at].join('|');
     if (key === popKey) return;
@@ -1494,7 +1564,7 @@ function sfxVerdict(v) {
 window.plazaOnPaint = (function (prev) {
     return function (room) {
         try { if (typeof prev === 'function') prev.apply(this, arguments); } catch (e) { }
-        try { if (room === ROOM) paintStage(); else clearStage(); } catch (e) { }     // 자리(seat)는 여기서 안 잡는다 — 이때는 아직 내 사람이 서기 전이다
+        try { if (stageRoom(room)) paintStage(); else clearStage(); } catch (e) { }     // 자리(seat)는 여기서 안 잡는다 — 이때는 아직 내 사람이 서기 전이다
     };
 })(window.plazaOnPaint);
 
@@ -1505,7 +1575,7 @@ function onShows(was) {
     const me = u_(); if (!me) return;
     // 새 채점 — 방 안이면 머리 위에 띄운다
     const s = curShow();
-    if (s && roomNow() === ROOM) {
+    if (s && onStage()) {
         // ★ 「방금 채점됐다」는 **앞서 본 것과 달라졌는지**로 안다 — 사회자 기기의 시계로 적힌 때를 내 시계와 견주면, 시계가 어긋난 기기에서는 O · X 가 안 뜬다.
         //   처음 받은 것(들어오자마자)은 지난 채점이라 띄우지 않는다.
         const prev = was && was[s.host];
@@ -1528,7 +1598,7 @@ function onShows(was) {
         kickedOut(s2, !!seatOf(p, me.code));
     });
     // 남이 내려갔다 — 방 안이면 한 줄
-    if (s && roomNow() === ROOM && s.host !== me.code) {
+    if (s && onStage() && s.host !== me.code) {
         const p = was && was[s.host];
         if (p && p.id === s.id) Object.keys(seatsOf(p)).forEach(function (k) {
             const c = seatsOf(p)[k] && seatsOf(p)[k].c;
@@ -1536,18 +1606,18 @@ function onShows(was) {
         });
     }
     // 내가 들어 있던 쇼가 끝났다 — 커튼이 닫힌 뒤 광장으로
-    if (roomNow() === ROOM && !s) endLeave((going && (SHOWS[going] || (was && was[going]))) || null);
+    if (onStage() && !s) endLeave((going && (SHOWS[going] || (was && was[going]))) || null);
     if (document.getElementById('qz-status') && s) { try { document.getElementById('qz-status').innerHTML = statusRows(s); } catch (e) { } }
     chip();
 }
 // 🚪 내보내졌다 — 무대에 서 있었으면 막 없이 바로 광장으로 (쇼는 이어진다). 초대장만 보고 있었으면 초대장을 닫는다.
 function kickedOut(s, wasSeated) {
     const me = u_(), d = db_();
-    const onStage = roomNow() === ROOM && going === s.host;
+    const here = onStage() && going === s.host;
     // 같은 순간에 앉았으면 명패가 남는다 — 내 손으로 비운다
     try { const k = me && seatOf(s, me.code); if (k && d) d.ref(PATH + '/' + s.host + '/seat/' + k).transaction(function (v) { return (v && v.c === me.code) ? null : undefined; }); } catch (e) { }
-    if (document.getElementById('qz-nick') || onStage) shut();
-    if (onStage) { sys('🚪 사회자가 무대에서 내보냈습니다 — 광장으로 돌아갑니다.'); leave(); }
+    if (document.getElementById('qz-nick') || here) shut();
+    if (here) { sys('🚪 사회자가 무대에서 내보냈습니다 — 광장으로 돌아갑니다.'); leave(); }
     else if (going === s.host) going = '';
     if (isTalk(s)) drawCall('talkDrawLeave', s.host);          // 🖌 내가 그린 것은 지운다 (사회자 쪽에서도 지운다 — 내 화면이 꺼져 있었을 때를 위해)
     if (wasSeated) alert_('📺 ' + titleOf(s) + ' — 사회자가 무대에서 내보냈습니다.');
@@ -1556,7 +1626,7 @@ function kickedOut(s, wasSeated) {
 setInterval(function () {
     try {
         const me = u_(); if (!me || !heard) return;
-        const inRoom = roomNow() === ROOM;
+        const inRoom = onStage();
         if (inRoom) {
             const s = curShow();
             // 🚪 내보내진 채로 무대에 남아 있다 (바뀐 것을 놓쳤다) — 막을 내리지 않고 나간다
@@ -1565,7 +1635,7 @@ setInterval(function () {
             paintStage(); seat();
         } else if (document.querySelector('.qz-layer, #qz-ctl')) clearStage();
         finCheck();                                             // 사회자 — 모두 다 풀었으면 막을 내린다
-        bgmTick(roomNow() === ROOM && !!curShow());
+        bgmTick(onStage() && !!curShow());
         cageTry();                                              // 무대에서 내려왔으면 오답 가두리를 건다
         // 초대장 — 한가할 때 띄운다
         const pend = pendingShow();
@@ -1710,7 +1780,7 @@ function noise() {
 // 그림을 미리 받아 둔다 — 연출 도중에 빈 칸이 뜨지 않게
 const pre = {};
 function preload() {
-    [WORDS_IMG, 'quiz-burst.webp', 'quiz-show3.webp', T1_IMG, T2_IMG, CUR_END].concat(CUR).forEach(function (f) {
+    [WORDS_IMG, 'quiz-burst.webp', 'quiz-show3.webp', T1_IMG, T2_IMG, CUR_END, 'talk-show.webp', TALK_FG].concat(CUR).forEach(function (f) {
         if (pre[f]) return;
         const im = new Image();
         pre[f] = new Promise(function (res) { im.onload = im.onerror = function () { res(); }; });
