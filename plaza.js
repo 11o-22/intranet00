@@ -1934,7 +1934,10 @@ const EV = { ROOM: 'event', PATH: 'plazaEvent', STAGE: { x: 940, y: 1196 }, SLOT
 let evInv = null, evRef = null, evKnown = null;
 function evInvited(u) { u = u || u_(); if (!u) return false; if (isAdm(u)) return true; return !!(evInv && evInv[u.code]); }
 // 📱 모바일인가 — 손가락 화면(pointer: coarse) · 상담사는 PC 에서도 든다
-function evMobileOk(u) { u = u || u_(); if (isAdm(u)) return true; return touchy(); }
+//   ★ 2026-11-15 사용자 「이벤트 맵 이제 PC로도 들어가기 가능하게 해줘」 — 누구나 PC 에서도 든다 (초대받은 사람만인 것은 그대로).
+//     막던 자리(메뉴 · plazaEventGo · 방 옮기기)는 이 함수만 보므로 여기서 연다. 다시 막으려면 EV_PC 를 false 로.
+const EV_PC = true;
+function evMobileOk(u) { u = u || u_(); if (EV_PC || isAdm(u)) return true; return touchy(); }
 window.plazaEventMobileOk = evMobileOk;
 function evFixed() { return !!(run && run.evFix); }
 window.plazaEventOk = function () { return evInvited(u_()) && evMobileOk(u_()); };
@@ -5263,6 +5266,7 @@ function goRoom(key, way, lv) {
         key = P.START; way = null; lv = 0;
     }
     // 📱 이벤트 맵은 모바일(손가락 화면)에서만 — PC 는 못 든다 (상담사는 시험을 위해 예외 · 2026-11-09 사용자 「PC로는 못 들어가게 · 모바일로만」)
+    //   ★ 2026-11-15 — PC 에서도 든다 (evMobileOk · EV_PC)
     if (R[key].invite && !evMobileOk()) {
         sysLine('🎉 이벤트 맵은 모바일에서만 들어갈 수 있습니다.');
         if (run.room && run.me) return;
