@@ -12,6 +12,9 @@
 //            dollTrade/<열쇠> = { at, ac, bc, a:{code,name,doll,ready,ok}, b:{…}, state, exec }
 //              state  ask 신청 · open 여는 중 · done 끝 · cancel 그만
 //            바꾸는 순간은 **한 번의 여러 칸 쓰기**로 두 사람 것을 같이 옮긴다 (복제 · 소실 막기)
+//            ★ 양도 (2026-11-16 사용자 「봉제인형 교환소에서 봉제인형 양도도 가능하게 해줘」) — 한쪽이 그냥 준다.
+//              보내는 쪽이 인형 → 받을 사람을 고르면 신청 (dollTrade/<열쇠> · gift: 1 · a.doll) → 받는 쪽이 「받는다」 하면 그 자리에서 옮긴다.
+//              state  ask → moving(옮기는 중) → done · 거절 · 거두기 · 못 받음은 cancel (아래 「양도」)
 // ■ 보관소   펫 박스 — 4 × 3 칸 · 10 칸(보관함) · 아래에 동행 셋. 누르면 상세 · 즐겨찾기 · 놓아주기 · 동행/보관,
 //            길게 눌러 끌면 순서를 바꾸거나 동행 칸으로 옮긴다. ① 일괄 먹이 ② 펫 선택(여럿) ③ 자동 정렬 · 검색 · ★만
 // ■ 도감     가운데 계산대 — 봉제인형 도감 25 · 어둠 · 재난 도감 14
@@ -159,7 +162,7 @@ const TRADE_TALK = [
     ['김서방, 세상에 공짜가 어디 있겠소?', '인형 하나를 받으려면 인형 하나를 내놓아야지! 그게 우리 교환소의 규칙이오.', '……뭐, 가끔은 내놓은 쪽이 훨씬 아까운 것 같기도 하지만.', '그건 당사자들끼리 알아서 할 일이겠지!'],
     ['내가 여기서 일하는 이유가 뭔지 아시오?', '온갖 봉제인형을 구경할 수 있기 때문이오!', '똑같이 생긴 녀석들도 자세히 보면 다르거든. 성격도 다르고, 하는 짓도 다르고!', '……가끔은 주인보다 인형이 더 점잖더이다.'],
     ['교환이란 게 참 재미있지 않소?', '내게는 별것 아닌 물건이 남에게는 천하의 보물이 될 수도 있으니 말이오!', '그러니 남들이 뭐라 하든, 김서방 마음에 드는 인형을 고르시오.', '어차피 데리고 다닐 사람은 김서방 아니겠소?'],
-    ['인형을 그냥 주면 안 되느냐고?', '안 되오! 안 돼! 여긴 교환소지, 나눔 장터가 아니란 말이오!', '인형이 없으면 나가서 한 마리 잡아오쇼.', '……아니, 그렇다고 아무 녀석이나 막 잡아오라는 뜻은 아니고!'],
+    ['인형을 그냥 주면 안 되느냐고?', '원래는 안 됐소! 여긴 교환소지, 나눔 장터가 아니라고 그렇게 말했건만…….', '요즘은 양도도 받아 주오. 대신 받는 쪽이 「받는다」 해야 넘어가니, 미리 말해 두쇼.', '……주고 나서 아깝다고 찾아와도 물러주진 않소!'],
     ['요즘 탐사자들 사이에서 어떤 인형이 인기인지 아시오?', '나도 모르오!', '인기라는 게 어찌나 빨리 바뀌는지, 어제는 다들 찾던 녀석을 오늘은 아무도 안 찾더이다.', '그러니 유행 따라다니느라 고생하지 마쇼!'],
     ['어제는 똑같이 생긴 인형 둘을 교환한 손님이 있었소.', '내가 보기엔 도무지 뭐가 달라졌는지 모르겠더군.', '그런데 둘 다 아주 만족스러운 얼굴로 돌아갔소!', '……참으로 알다가도 모를 일이오.'],
     ['가끔은 인형들도 서로 마음에 드는 상대가 있는 모양이오.', '어떤 녀석은 다른 인형을 보자마자 팔을 벌리고, 어떤 녀석은 뒤로 숨더이다.', '물론 교환할지 말지는 주인이 결정하는 거지만…….', '……그래도 싫다는 녀석을 억지로 붙여놓으면 좀 미안하지 않겠소?'],
@@ -169,7 +172,7 @@ const TRADE_TALK = [
     ['내가 보기엔 저 인형이 참 괜찮은데…….', '응? 어떤 인형이냐고?', '아, 그냥 하는 말이오!', '장사꾼이 손님 물건에 함부로 참견하면 안 되는 법이지. 암!'],
     ['인형 이름을 지을 땐 신중해야 하오.', '한번은 어떤 손님이 자기 인형 이름을 ‘교환 안 함’이라고 지어놨더이다.', '그런데 그 인형을 교환하러 왔지 뭡니까!', '……아직도 무슨 뜻이었는지 모르겠소.'],
     ['김서방, 인형 잡는 솜씨는 좀 느셨소?', '요 녀석들이 보기보다 잽싸서 말이지!', '그래도 잡을 때의 그 짜릿함이 있지 않소?', '……나는 허리가 아파서 직접 잡으러 다니지는 않지만.'],
-    ['이 교환소에선 누구나 똑같이 인형 하나씩 내놓아야 하오.', '귀한 인형이든 흔한 인형이든, 그건 상관없소.', '서로 좋다고 하면 그만이지!', '……물론 나중에 후회한다고 찾아와도 물러주진 않소. 명심하쇼!'],
+    ['교환할 때는 누구나 똑같이 인형 하나씩 내놓아야 하오.', '귀한 인형이든 흔한 인형이든, 그건 상관없소.', '서로 좋다고 하면 그만이지!', '……물론 나중에 후회한다고 찾아와도 물러주진 않소. 명심하쇼!'],
     ['인형이 도망갔다고 너무 상심하지 마쇼.', '그 녀석들도 나름대로 바깥세상이 궁금한 게지.', '다만 한번 야생으로 돌아가면 예전 모습은 온데간데없어진다니…….', '……쯧, 있을 때 잘해주라는 말이 괜히 있는 게 아니오.'],
     ['가끔 교환소에 인형이 잔뜩 모이면 아주 시끄럽소.', '이쪽에서 삑삑, 저쪽에서 바스락, 또 어디선가는 끼익끼익!', '아주 자기들끼리 무슨 회의라도 하는 것 같단 말이지.', '……혹시 내 흉을 보는 건 아니겠지?'],
     ['여기 매일같이 찾아오는 손님이 하나 있소.', '오늘은 토끼를 가져왔다가 곰을 데려가고, 내일은 곰을 가져왔다가 여우를 데려가지.', '그렇게 몇 번을 바꾸더니…….', '결국 처음에 데리고 있던 토끼를 다시 데려갔소! 허허허!'],
@@ -915,11 +918,12 @@ async function trade(S) {
     const WHO = '교환소 도깨비';
     if (needTut(S)) return;
     for (let n = 0; ; n++) {
-        const i = await greetAsk(S, 'trade', WHO, ['어서 오쇼, 김서방! 인형을 바꾸러 오셨소?', '여기선 인형 하나에 인형 하나요. 하나를 받으려면 하나를 내놓아야지!', '그냥 주고 싶다고? 에이, 그러지 마쇼! 직접 잡는 재미도 있어야 하지 않겠소?'],
-            ['또 무슨 볼일이 있소?', '다른 건 없소?'], ['교환 신청하기', '그냥 대화하기', '돌아가기', '보낸 신청 보기 (' + Object.keys(TR.out).length + ')'], n === 0);
+        const i = await greetAsk(S, 'trade', WHO, ['어서 오쇼, 김서방! 인형을 바꾸러 오셨소?', '교환은 인형 하나에 인형 하나요. 하나를 받으려면 하나를 내놓아야지!', '그냥 주고 싶다고? 그럼 「양도하기」로 하쇼. 받는 쪽이 받겠다고 해야 넘어가오!'],
+            ['또 무슨 볼일이 있소?', '다른 건 없소?'], ['교환 신청하기', '양도하기', '그냥 대화하기', '돌아가기', '보낸 신청 보기 (' + Object.keys(TR.out).length + ')'], n === 0);
         if (i === 0) { tradeAsk(); return; }
-        if (i === 1) { await aiTalk(S, 'trade', WHO, TRADE_TALK); continue; }
-        if (i === 3) { tradeMine(); return; }
+        if (i === 1) { giftAsk(); return; }                    // 🎁 양도 (2026-11-16)
+        if (i === 2) { await aiTalk(S, 'trade', WHO, TRADE_TALK); continue; }
+        if (i === 4) { tradeMine(); return; }
         return;
     }
 }
@@ -957,13 +961,21 @@ function tradeSend(code) {
 function tradeMine() {
     const keys = Object.keys(TR.out);
     const html = '<h3>🔁 보낸 신청</h3><div class="sub">상대가 아직 받지 않은 신청입니다.</div>'
-        + (keys.length ? keys.map(function (k) { const o = TR.out[k]; return '<div class="gb-row"><div class="tx"><b>' + esc(o.b && o.b.name) + '</b><div>' + new Date(Number(o.at) || 0).toLocaleString('ko-KR') + '</div></div><button class="gb-btn" data-k="' + esc(k) + '">거두기</button></div>'; }).join('')
+        + (keys.length ? keys.map(function (k) { const o = TR.out[k]; return '<div class="gb-row"><div class="tx"><b>' + esc(o.b && o.b.name) + '</b><div>' + (o.gift ? '🎁 양도 — ' + esc(o.a && o.a.doll ? D().nickOf(o.a.doll) : '') : '🔁 교환') + ' · ' + new Date(Number(o.at) || 0).toLocaleString('ko-KR') + '</div></div><button class="gb-btn" data-k="' + esc(k) + '">거두기</button></div>'; }).join('')
                      : '<div class="sub">기다리는 신청이 없습니다.</div>')
         + '<div class="gb-btns"><button class="gb-btn" data-x="1">닫는다</button></div>';
     const dim = panel(html);
     dim.querySelector('[data-x]').onclick = function () { dim._close(); };
     Array.prototype.forEach.call(dim.querySelectorAll('[data-k]'), function (b) {
-        b.onclick = function () { db_().ref(TRADE + '/' + b.dataset.k).update({ state: 'cancel', why: '신청한 쪽이 거둠' }); delete TR.out[b.dataset.k]; dim._close(); tradeMine(); };
+        b.onclick = function () {
+            // 상대가 막 받는 중(open · moving)이면 거두지 않는다 — 받기 전(ask)일 때만 (양도가 넘어가는 순간과 겹치지 않게 · 2026-11-16)
+            const k = b.dataset.k;
+            db_().ref(TRADE + '/' + k + '/state').transaction(function (c) { return c === 'ask' ? 'cancel' : undefined; }).then(function (r) {
+                if (r && r.committed) db_().ref(TRADE + '/' + k).update({ why: '신청한 쪽이 거둠' });
+                else alert_('상대가 이미 받았거나 받는 중입니다.');
+            });
+            delete TR.out[k]; dim._close(); tradeMine();
+        };
     });
 }
 // 교환 창이 비면 기다리던 것을 차례로
@@ -979,6 +991,7 @@ function tradeNext() {
     });
 }
 function askOne(k, v) {
+    if (v && v.gift) { giftAskOne(k, v); return; }          // 🎁 양도 신청
     const d = db_();
     const yes = confirm('🔁 ' + (v.a && v.a.name) + ' 사원이 봉제인형 교환을 신청했습니다.\n\n교환 창을 열까요? (서로 한 마리씩 올리고, 둘 다 승인해야 바뀝니다)');
     if (!yes) { d.ref(TRADE + '/' + k).update({ state: 'cancel', why: '거절' }); setTimeout(tradeNext, 200); return; }
@@ -1002,9 +1015,10 @@ function tradeBind() {
     const onMine = function (s) {
         const v = s.val();
         if (!v || v.ac !== me.code) return;
-        if (v.state === 'ask') { TR.out[s.key] = v; return; }
+        if (v.state === 'ask' || v.state === 'moving') { TR.out[s.key] = v; return; }
         const was = TR.out[s.key];
         delete TR.out[s.key];
+        if (v.gift) { giftMineEnd(v, was); return; }           // 🎁 내가 보낸 양도 — 끝 · 취소
         if (v.state === 'open' && TR.id !== s.key) {
             if (TR.id) { if (TR.queue.indexOf(s.key) < 0) TR.queue.push(s.key); }
             else tradeWatch(s.key, 'a');
@@ -1149,7 +1163,161 @@ function tradeTry() {
         });
     }).catch(function (e) { console.warn('[🔁] 교환 실패', e); });
 }
-window.dollTradeState = function () { console.log({ 교환: TR.id, 쪽: TR.side, 상태: TR.v && TR.v.state, 값: TR.v }); };
+// ==========================================
+// 🎁 양도 — 한쪽이 그냥 준다 (2026-11-16 사용자 「봉제인형 교환소에서 봉제인형 양도도 가능하게 해줘」)
+// ==========================================
+//   ① 보내는 쪽 — 교환소 도깨비 「양도하기」 → 인형 고르기(즐겨찾기 ★ 는 못 고른다) → 받을 사람 고르기 → 확인
+//      dollTrade/<열쇠> = { at, ac, bc, state:'ask', gift:1, a:{code,name,doll(올린 인형)}, b:{code,name} }  · 여럿에게 따로 보내도 된다
+//   ② 받는 쪽 — 「받을까요?」 → 받는다: state 를 ask → moving 으로 잡은 쪽만 옮긴다 (거두기와 겹치지 않게)
+//      한 번의 여러 칸 쓰기 — 보낸 쪽 pets 에서 빼고 · 받는 쪽 pets 에 넣고 · 보낸 쪽 동행(petShow) 정리 · state done (교환과 같은 길)
+//      주인이 바뀌면 교감 · 즐겨찾기 · 나가 있던 일은 비우고 등급 · Lv · 이름 · 장비 · 체력은 그대로 (교환과 같다)
+//   ③ 못 넘어가는 때 — 거절 · 보낸 쪽이 거둠(받기 전) · 보낸 인형이 이미 없음 · 그새 즐겨찾기함 · 받는 쪽 보관함과 동행이 모두 가득
+function dollSnap(d) {
+    const M = D(), st = M.stats(d);
+    const snap = { id: d.id, sp: d.sp, g: st.g, lv: st.lv, xp: d.xp || 0, hp: M.hpOf(d), at: d.at || 0 };
+    if (d.nick) snap.nick = d.nick;
+    return snap;
+}
+function giftLine(d) {
+    const M = D();
+    if (!d) return '봉제인형';
+    return M.nickOf(d) + ' (' + M.spName(d.sp) + ' · ' + (d.g || '') + ' · Lv.' + (d.lv || 1) + ')';
+}
+function giftAsk() {
+    const M = D(), u = u_(), ds = M.dolls(u);
+    const ids = M.withList(u).concat(M.boxList(u)).filter(function (id) { return ds[id]; });
+    if (!ids.length) { alert_('양도할 봉제인형이 없습니다.'); return; }
+    const html = '<h3>🎁 양도할 인형</h3><div class="sub">고른 인형을 동료에게 그냥 줍니다. 받는 사람이 「받는다」를 눌러야 넘어가고, 그 전에는 「보낸 신청 보기」에서 거둘 수 있습니다.<br>즐겨찾기(★)한 인형은 해제해야 보낼 수 있습니다.</div>'
+        + ids.map(function (id) { const d = ds[id]; return '<div class="gb-row" style="' + (d.fav ? 'opacity:.45' : '') + '">' + icon(d.sp, 36) + '<div class="tx">' + dollLine(d) + '</div><button class="gb-btn" data-id="' + id + '"' + (d.fav ? ' disabled' : '') + '>고른다</button></div>'; }).join('')
+        + '<div class="gb-btns"><button class="gb-btn" data-k="x">닫는다</button></div>';
+    const dim = panel(html);
+    dim.querySelector('[data-k=x]').onclick = function () { dim._close(); };
+    Array.prototype.forEach.call(dim.querySelectorAll('[data-id]'), function (b) {
+        b.onclick = function () { dim._close(); giftTo(b.dataset.id); };
+    });
+}
+function giftTo(id) {
+    const M = D(), me = u_(), d0 = M.dolls(me)[id];
+    if (!d0) return;
+    const list = Object.keys(users()).filter(function (c) { const x = users()[c]; return c !== me.code && x && x.name && !x.deleted; })
+        .sort(function (a, b) { return String(users()[a].name).localeCompare(String(users()[b].name), 'ko'); });
+    let dim = null, q = '';
+    const paint = function () {
+        const rows = list.filter(function (c) { return !q || String(users()[c].name).indexOf(q) >= 0; }).slice(0, 60);
+        const html = '<h3>🎁 받을 사람</h3><div class="sub">' + esc(M.nickOf(d0)) + M.josa(M.nickOf(d0), '을') + ' 줄 동료를 고르세요.</div>'
+            + '<input id="gb-gq" placeholder="이름 검색" value="' + esc(q) + '" style="width:100%;box-sizing:border-box;padding:7px;border-radius:7px;border:1px solid #6d5aa0;background:#2b2140;color:#fff;margin-bottom:6px">'
+            + rows.map(function (c) { const x = users()[c]; return '<div class="gb-row"><div class="tx"><b>' + esc(x.name) + '</b><div>' + esc((x.affiliation || '') + ' · ' + (x.team || '')) + '</div></div><button class="gb-btn" data-c="' + esc(c) + '">보낸다</button></div>'; }).join('')
+            + '<div class="gb-btns"><button class="gb-btn" data-k="x">닫는다</button></div>';
+        if (!dim) dim = panel(html); else dim.firstChild.innerHTML = html;
+        const inp = dim.querySelector('#gb-gq');
+        inp.oninput = function () { q = inp.value; const p = inp.selectionStart; paint(); const n = dim.querySelector('#gb-gq'); n.focus(); try { n.setSelectionRange(p, p); } catch (e) { } };
+        dim.querySelector('[data-k=x]').onclick = function () { dim._close(); };
+        Array.prototype.forEach.call(dim.querySelectorAll('[data-c]'), function (b) {
+            b.onclick = function () {
+                const who = users()[b.dataset.c];
+                if (!confirm('🎁 ' + giftLine(dollSnap(d0)) + '\n\n' + (who && who.name) + ' 사원에게 양도할까요?\n(상대가 받으면 되돌릴 수 없습니다)')) return;
+                dim._close();
+                giftSend(b.dataset.c, id);
+            };
+        });
+    };
+    paint();
+}
+function giftSend(code, id) {
+    const d = db_(), me = u_(), you = users()[code], M = D();
+    const dl = M.dolls(me)[id];
+    if (!d || !me || !you || !dl) return;
+    if (dl.fav) { alert_('즐겨찾기(★)한 인형은 해제해야 보낼 수 있습니다.'); return; }
+    const ref = d.ref(TRADE).push();
+    const v = { at: M.now(), ac: me.code, bc: code, state: 'ask', gift: 1, a: { code: me.code, name: me.name, doll: dollSnap(dl) }, b: { code: code, name: you.name } };
+    ref.set(v).then(function () {
+        TR.out[ref.key] = v;
+        alert_('🎁 ' + you.name + ' 사원에게 「' + M.nickOf(dl) + '」 양도를 신청했습니다.\n상대가 받으면 넘어갑니다.');
+    });
+}
+function giftAskOne(k, v) {
+    const d = db_(), M = D(), u = u_();
+    const line = giftLine(v.a && v.a.doll);
+    let full = false;
+    try { full = M.boxList(u).length >= M.BOX_MAX && M.withList(u).length >= M.PARTY_MAX; } catch (e) { }
+    if (full) {
+        d.ref(TRADE + '/' + k + '/state').transaction(function (c) { return c === 'ask' ? 'cancel' : undefined; }).then(function (r) {
+            if (r && r.committed) d.ref(TRADE + '/' + k).update({ why: '받는 쪽 보관함과 동행이 모두 가득 참' });
+        });
+        alert_('🎁 ' + (v.a && v.a.name) + ' 사원이 「' + line + '」 양도를 보냈지만, 보관함과 동행이 모두 가득 차 받을 수 없었습니다.');
+        setTimeout(tradeNext, 200);
+        return;
+    }
+    const yes = confirm('🎁 ' + (v.a && v.a.name) + ' 사원이 봉제인형을 양도하려 합니다.\n\n「' + line + '」\n\n받을까요?');
+    if (!yes) {
+        d.ref(TRADE + '/' + k + '/state').transaction(function (c) { return c === 'ask' ? 'cancel' : undefined; }).then(function (r) {
+            if (r && r.committed) d.ref(TRADE + '/' + k).update({ why: '거절' });
+        });
+        setTimeout(tradeNext, 200);
+        return;
+    }
+    giftExec(k, v);
+}
+function giftExec(k, v) {
+    const d = db_(), me = u_(), M = D(), PT = window.PET;
+    const tref = d.ref(TRADE + '/' + k);
+    const stop = function (why, msg) {
+        tref.update({ state: 'cancel', why: why });
+        alert_('🎁 ' + msg);
+        setTimeout(tradeNext, 300);
+    };
+    // 받기 전(ask)일 때만 잡는다 — 그새 보낸 쪽이 거뒀으면 못 받는다
+    tref.child('state').transaction(function (c) { return c === 'ask' ? 'moving' : undefined; }).then(function (r) {
+        if (!r || !r.committed) { alert_('🎁 이미 거둔 신청입니다.'); setTimeout(tradeNext, 300); return; }
+        const A = v.ac, Bc = me.code, xa = String(v.a && v.a.doll && v.a.doll.id);
+        return Promise.all([
+            d.ref('users/' + A + '/pets').once('value'), d.ref('users/' + Bc + '/pets').once('value'), d.ref('users/' + A + '/petShow').once('value')
+        ]).then(function (ss) {
+            const pa = M.objOf(ss[0].val()), pb = M.objOf(ss[1].val());
+            const da = pa[xa];
+            if (!da) { stop('보낸 인형이 이미 없습니다', '보낸 인형이 이미 없어 받을 수 없습니다.'); return; }
+            if (da.fav) { stop('보낸 쪽이 즐겨찾기한 인형', '보낸 쪽이 그 인형을 즐겨찾기(★)해 두어 받을 수 없습니다.'); return; }
+            const sp = PT.sp(xa);
+            let kb = String(sp + 6000);
+            for (let n = 0; n < 60; n++) { const c = String(sp + 100 * n); if (!pb[c]) { kb = c; break; } }
+            const arr = function (x) { return Array.isArray(x) ? x : ((x && typeof x === 'object') ? Object.keys(x).sort().map(function (q) { return x[q]; }) : []); };
+            const wa = arr(ss[2].val()).map(String).filter(function (x) { return x && x !== xa; });
+            const t = M.now();
+            const rec = Object.assign({}, da, { ord: t, fedAt: t, at: t, bond: 0 });
+            ['fav', 'bd', 'with', 'out', 'rest', 'jsleep', 'hurt', 'stv', 'doll', 'pet'].forEach(function (q) { delete rec[q]; });
+            const p = {};
+            p['users/' + A + '/pets/' + xa] = null;
+            p['users/' + Bc + '/pets/' + kb] = rec;
+            p['users/' + A + '/petShow'] = wa.length ? wa.map(Number) : null;
+            p['users/' + A + '/petShowSet'] = 1;
+            p['petFed/' + A + '/' + xa] = null;
+            p[TRADE + '/' + k + '/state'] = 'done';
+            p[TRADE + '/' + k + '/doneAt'] = t;
+            p[TRADE + '/' + k + '/keys'] = { b: kb };
+            return d.ref().update(p).then(function () {
+                const nick = da.nick || M.spName(sp);
+                try { M.log('[🎁 교환소] ' + nick + ' — ' + (v.a && v.a.name) + ' 사원에게서 양도받음', me); M.saveHist(); } catch (e) { }
+                try { M.dexCaught(sp); } catch (e) { }
+                alert_('🎁 양도를 받았습니다!\n\n' + nick + M.josa(nick, '이') + ' 새 식구가 되었습니다.\n\n교환소 도깨비: 「' + pick(['허허, 좋은 동료를 두셨구먼!', '받은 녀석도 잘 돌봐주쇼. 보낸 사람 성의가 있지 않소!']) + '」');
+                setTimeout(tradeNext, 300);
+            });
+        });
+    }).catch(function (e) { console.warn('[🎁] 양도 실패', e); try { tref.child('state').transaction(function (c) { return c === 'moving' ? 'ask' : undefined; }); } catch (e2) { } });
+}
+// 내가 보낸 양도 — 끝났거나 취소됐을 때 (이번에 지켜본 것만 알린다)
+function giftMineEnd(v, was) {
+    if (!was) return;
+    const M = D(), me = u_();
+    const nick = v.a && v.a.doll ? M.nickOf(v.a.doll) : '봉제인형';
+    if (v.state === 'done') {
+        try { M.log('[🎁 교환소] ' + nick + ' — ' + (v.b && v.b.name) + ' 사원에게 양도', me); M.saveHist(); } catch (e) { }
+        alert_('🎁 ' + (v.b && v.b.name) + ' 사원이 「' + nick + '」' + M.josa(nick, '을') + ' 받았습니다.\n양도가 끝났습니다.');
+    } else if (v.state === 'cancel' && v.why !== '신청한 쪽이 거둠') {
+        alert_('🎁 ' + (v.b && v.b.name) + ' 사원에게 보낸 「' + nick + '」 양도가 취소되었습니다.' + (v.why ? ' (' + v.why + ')' : ''));
+    }
+}
+window.dollGiftAsk = giftAsk;
+window.dollTradeState = function () { console.log({ 교환: TR.id, 쪽: TR.side, 상태: TR.v && TR.v.state, 값: TR.v, 보낸것: TR.out }); };
 
 // ==========================================
 // 나머지 도깨비
