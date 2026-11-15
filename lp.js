@@ -234,7 +234,15 @@ function play(midi, vol) {
 // ==========================================
 //   위의 play 는 한 번 치면 정해진 대로 울리다 사라진다 (손가락 · 마우스 · 자판). 이쪽은 음마다 「소리 한 줄」을 쥐고 있다가
 //   건반을 떼거나 페달을 떼는 순간에 잦아들게 한다. 가운데 음역 · 보통 세기에서는 play 와 같은 음색이다.
-const SND = { MAX: 40, LOW: 21, HIGH: 108, voices: [], who: {}, bus: null, busCtx: null, hits: 0 };
+// ★ 2026-11-15 사용자 「이거 피아노 연결해서 하면 소리가 중간에 계속 끊겨. 봐줘.」
+//   ① 겹치는 음이 40 을 넘으면 **아직 울리는 가장 오래된 음**을 0.04초 만에 걷었다. 페달을 밟고 치면(음마다 2 ~ 11초 울린다)
+//      몇 초 만에 40 이 차서 — 깔아 둔 베이스 · 화음이 치는 동안 뚝뚝 끊겼다.
+//   ② 음 하나에 발진기 셋 ~ 다섯 (+ 저마다 음량 마디) — 겹치는 음이 많으면 소리 장치가 제때 못 만들어 끊김 · 지직거림이 난다.
+//   그래서 — 음 하나를 **발진기 하나**로 만든다 (같은 배음을 한 파형에 담는다 · PeriodicWave · 소리는 같다).
+//      겹치는 음은 64 까지 · 넘치면 이미 뗀(잦아드는) 음 → 가장 작아진 음 차례로 걷는다.
+//   ③ 반쯤 밟는 페달(값이 0 ~ 127 로 이어 오는 페달)은 64 언저리에서 값이 흔들리면 밟음 · 뗌이 되풀이되어 울리던 음이 끊겼다 —
+//      밟음은 64 부터, 뗌은 40 밑으로 내려가야 (midiFeed).
+const SND = { MAX: 64, LOW: 21, HIGH: 108, voices: [], who: {}, bus: null, busCtx: null, hits: 0, waves: {}, wavesCtx: null, steal: 0, stealLoud: 0 };
 // 여러 음이 겹쳐도 깨지지 않게 한데 모아 눌러 준다
 function busOut(c) {
     if (SND.bus && SND.busCtx === c) return SND.bus;
@@ -249,6 +257,24 @@ function busOut(c) {
     tail.connect(c.destination);
     SND.bus = g; SND.busCtx = c;
     return g;
+}
+// 음 m 의 파형 — 기본음의 절반(f/2)을 바탕으로 배음을 한 장에 담는다.
+//   (예전 소리: 세모파 f · 사인 2f · 3f · 4f(낮은 음) · f/2(C2 위) — 세모파는 홀수 배음 8/(π²k²) · 부호가 번갈아.)
+//   f/2 를 바탕으로 하면 f/2 · f · 2f … 가 모두 바탕의 정수배라 한 장에 들어간다. 크기는 그대로 (정규화하지 않는다).
+function waveOf(c, m) {
+    if (SND.wavesCtx !== c) { SND.waves = {}; SND.wavesCtx = c; }
+    if (SND.waves[m]) return SND.waves[m];
+    const low = Math.max(0, Math.min(1, (60 - m) / 36));
+    const N = 66, re = new Float32Array(N), im = new Float32Array(N);
+    for (let k = 1; 2 * k < N; k += 2) im[2 * k] += (8 / (Math.PI * Math.PI)) / (k * k) * (((k - 1) / 2) % 2 ? -1 : 1);   // 세모파 f
+    im[4] += 0.35 + low * 0.35;                                 // 2f
+    im[6] += 0.12 + low * 0.3;                                  // 3f
+    if (low > 0) im[8] += low * 0.18;                           // 4f
+    if (m >= 36) im[1] += 0.08;                                 // f/2
+    let w = null;
+    try { w = c.createPeriodicWave(re, im, { disableNormalization: true }); } catch (e) { w = null; }
+    SND.waves[m] = w;
+    return w;
 }
 function ringTime(m) { return Math.max(1.8, Math.min(11, 11 - (m - 21) * 0.105)); }      // 누르고 있을 때 울리는 길이 — 낮을수록 길다 (A0 11초 … C8 2초)
 function dampTime(m) { return Math.max(0.09, Math.min(0.32, 0.32 - (m - 21) * 0.0027)); }  // 뗐을 때 잦아드는 길이
@@ -272,25 +298,59 @@ function voiceOn(m, vel) {
     lp.frequency.setValueAtTime(bright, t);
     lp.frequency.exponentialRampToValueAtTime(Math.max(350, Math.min(bright, f * 2.5)), t + T * 0.7);   // 울리면서 어두워진다
     lp.connect(out); out.connect(busOut(c));
-    const parts = [[1, 'triangle', 1], [2, 'sine', 0.35 + low * 0.35], [3, 'sine', 0.12 + low * 0.3]];
-    if (low > 0) parts.push([4, 'sine', low * 0.18]);
-    if (m >= 36) parts.push([0.5, 'sine', 0.08]);
     const osc = [];
-    parts.forEach(function (h) {
-        if (f * h[0] > 18000) return;
-        const o = c.createOscillator(), g = c.createGain();
-        o.type = h[1]; o.frequency.value = f * h[0];
-        g.gain.value = h[2];
-        o.connect(g); g.connect(lp);
+    const wave = waveOf(c, m);
+    if (wave) {
+        // ★ 발진기 하나 — 배음은 파형에 다 들어 있다 (위 waveOf)
+        const o = c.createOscillator();
+        o.setPeriodicWave(wave); o.frequency.value = f / 2;
+        o.connect(lp);
         o.start(t); o.stop(t + T + 0.1);
         osc.push(o);
-    });
-    const v = { m: m, out: out, osc: osc, end: t + T, off: false };
+    } else {
+        // 파형을 못 만드는 브라우저 — 예전처럼 배음마다 발진기
+        const parts = [[1, 'triangle', 1], [2, 'sine', 0.35 + low * 0.35], [3, 'sine', 0.12 + low * 0.3]];
+        if (low > 0) parts.push([4, 'sine', low * 0.18]);
+        if (m >= 36) parts.push([0.5, 'sine', 0.08]);
+        parts.forEach(function (h) {
+            if (f * h[0] > 18000) return;
+            const o = c.createOscillator(), g = c.createGain();
+            o.type = h[1]; o.frequency.value = f * h[0];
+            g.gain.value = h[2];
+            o.connect(g); g.connect(lp);
+            o.start(t); o.stop(t + T + 0.1);
+            osc.push(o);
+        });
+    }
+    const v = { m: m, out: out, osc: osc, end: t + T, off: false, t0: t, peak: peak, T: T };
     SND.voices = SND.voices.filter(function (q) { return q.end > t; });      // 다 울린 것은 치운다
     SND.voices.push(v);
-    while (SND.voices.length > SND.MAX) voiceOff(SND.voices.shift(), 0.04);   // 너무 많이 겹치면 가장 오래된 것부터 걷는다
+    while (SND.voices.length > SND.MAX) steal(t, v);            // 너무 많이 겹치면 — 이미 뗀 것 · 가장 작아진 것부터 걷는다
     SND.hits++;
     return v;
+}
+// 지금 크기 (어림) — 세게 친 처음 0.3초 → 0.42 배 → T 에서 거의 0 (voiceOn 의 곡선과 같다)
+function levelOf(v, t) {
+    if (v.off) return 0;
+    const a = t - (v.t0 || 0);
+    if (a < 0.3) return v.peak;
+    const r = Math.min(1, (a - 0.3) / Math.max(0.01, v.T - 0.3));
+    return v.peak * 0.42 * Math.pow(0.0001 / (v.peak * 0.42), r);
+}
+function steal(t, keep) {
+    let at = -1, lv = Infinity;
+    for (let i = 0; i < SND.voices.length; i++) {
+        const q = SND.voices[i];
+        if (q === keep) continue;
+        const l = levelOf(q, t);
+        if (l < lv) { lv = l; at = i; }
+        if (l === 0) break;                                     // 이미 뗀(잦아드는) 것 — 가장 오래된 것부터
+    }
+    if (at < 0) at = 0;
+    const q = SND.voices.splice(at, 1)[0];
+    SND.steal++;
+    if (lv > 0.02) SND.stealLoud++;
+    voiceOff(q, 0.06);
 }
 function voiceOff(v, rel) {
     if (!v || v.off) return;
@@ -846,7 +906,7 @@ function midiFeed(st, d1, d2) {
     d1 = Number(d1) || 0; d2 = Number(d2) || 0;
     if (cmd === 0x90 && d2 > 0) midiOn(d1, d2);
     else if (cmd === 0x80 || cmd === 0x90) midiUp(d1);          // 세기 0 인 누름은 뗌이다
-    else if (cmd === 0xb0 && d1 === 64) midiPed(d2 >= 64);
+    else if (cmd === 0xb0 && d1 === 64) midiPed(MIDI.ped ? d2 >= 40 : d2 >= 64);     // 반쯤 밟는 페달 — 64 언저리에서 흔들려도 끊기지 않게 (밟음 64 · 뗌 40 밑)
     else if (cmd === 0xb0 && (d1 === 120 || d1 === 123)) midiHush();
 }
 function midiMsg(e) {
@@ -1038,6 +1098,7 @@ window.lpSnd = function () {
         who[id] = { 페달: w.ped, 누름: Object.keys(w.held).map(Number), 붙듦: w.sus.filter(function (v) { return !v.off && v.end > t; }).map(function (v) { return v.m; }) };
     });
     return { 울림: SND.voices.filter(function (v) { return v.end > t; }).length, 친수: SND.hits, 사람: who,
+             걷음: SND.steal, '울리던 것을 걷음': SND.stealLoud, 겹침한도: SND.MAX, 한발진기: !!(S.ctx && waveOf(S.ctx, 60)),
              MIDI: { 지원: MIDI.ok, 상태: MIDI.state, 건반: MIDI.names.slice(), 페달: MIDI.ped, 누름: Object.keys(MIDI.down).map(Number) } };
 };
 
