@@ -2430,6 +2430,12 @@ function duelCol(name, r, win) {
 //     · 딸 때 탈것에 이미 있으면 소지품(기타 칸)에 「리듬 보드 케이스」 로 넣는다 → 그 자리에서 둘을 따로 가진다.
 //     · 케이스를 쓰면 탈것으로 들어간다. 탈것에 이미 있으면 쓰지 않고 그대로 둔다 (옷장은 있다/없다 뿐이라).
 //       케이스는 소지품이라 밀실에서 물건으로 주고받는다. 탈것의 보드는 이미 가진 사람에게는 못 넘긴다 (p2p-wear.js).
+//   ★ 2026-11-15 사용자 「그리고 리듬 보드 지금 있는 곡들 전부 다 듀얼로 A 이상을 해야 받을 수 있게 수정해 줘. 빨리.」
+//     · 듀엣(하드 · 둘 다 A 이상)으로 마친 곡을 users/<사번>/rhythmDuet { <곡>: 때 } 에 모은다.
+//     · 지금 있는 곡(DUET_SONGS — 13곡 · 이날 기준으로 고정)을 전부 모으면 그때 리듬 보드를 준다. 나중에 넣는 곡은 세지 않는다.
+//     · 이미 받은 사람(rhythmBoardGot)은 그대로 둔다.
+const DUET_SONGS = ['airplane', 'client', 'devotion', 'evilhigh', 'returnhome', 'winterfloat', 'whitexmas', 'showtime', 'cheonjiin', 'handicap', 'genesis', 'sangun', 'legacy'];
+function duetDone(u) { const o = (u && u.rhythmDuet && typeof u.rhythmDuet === 'object') ? u.rhythmDuet : {}; return DUET_SONGS.filter(function (k) { return !!o[k]; }); }
 const DUET_RANK = 90;                     // A 랭크 (RANKS)
 function duetOk(r) {
     if (!r) return false;
@@ -2484,13 +2490,26 @@ function duetGrant(my) {
     my.duetDone = true; my.duetNew = false;
     const u = u_(); if (!u) return false;
     if (!u.wardrobe || typeof u.wardrobe !== 'object') u.wardrobe = {};
+    // 이 곡을 듀엣으로 마쳤다 — 모은다
+    if (DUET_SONGS.indexOf(my.song) >= 0) {
+        if (!u.rhythmDuet || typeof u.rhythmDuet !== 'object') u.rhythmDuet = {};
+        if (!u.rhythmDuet[my.song]) {
+            u.rhythmDuet[my.song] = Date.now();
+            my.duetFirst = true;
+            try { if (typeof saveFields === 'function') saveFields({ rhythmDuet: 1 }); } catch (e) { }
+        }
+    }
+    const done = duetDone(u);
+    my.duetProg = { n: done.length, N: DUET_SONGS.length, left: DUET_SONGS.filter(function (k) { return done.indexOf(k) < 0; }) };
     if (boardGot(u)) {
+        my.duetHad = true;
         if (!u.rhythmBoardGot) {                                   // 전에 받은 사람 — 표시만 남긴다
             u.rhythmBoardGot = Date.now();
             try { if (typeof saveFields === 'function') saveFields({ rhythmBoardGot: 1 }); } catch (e) { }
         }
         return false;
     }
+    if (done.length < DUET_SONGS.length) return false;            // 아직 다 모으지 못했다
     my.duetCase = !!u.wardrobe['note-board'];                  // 탈것에 이미 있다 — 케이스로 소지품에
     if (my.duetCase) {
         if (!Array.isArray(u.inventory)) u.inventory = [];
@@ -2499,10 +2518,20 @@ function duetGrant(my) {
     u.rhythmBoardGot = Date.now();
     my.duetNew = true;
     const s = SONGS.find(function (x) { return x.key === my.song; }) || {};
-    try { if (typeof addHistoryLog === 'function') addHistoryLog(u, '[🎵 리듬 게임] 듀엣 「' + (s.title || my.song) + '」 HARD · ' + my.oppName + ' 님과 — 리듬 보드를 받았습니다' + (my.duetCase ? ' (' + BOARD_CASE + ' · 소지품)' : '')); } catch (e) { }
+    try { if (typeof addHistoryLog === 'function') addHistoryLog(u, '[🎵 리듬 게임] 듀엣 「' + (s.title || my.song) + '」 HARD · ' + my.oppName + ' 님과 — 모든 곡 듀엣 ' + DUET_SONGS.length + '곡 · 리듬 보드를 받았습니다' + (my.duetCase ? ' (' + BOARD_CASE + ' · 소지품)' : '')); } catch (e) { }
     try { if (typeof saveFields === 'function') saveFields({ wardrobe: 1, inventory: 1, history: 1, rhythmBoardGot: 1 }); } catch (e) { }
     try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
     return true;
+}
+// 듀엣 결과 줄 — 모은 곡 · 받았나
+function duetLine(my, got) {
+    const pg = my.duetProg || { n: 0, N: DUET_SONGS.length, left: DUET_SONGS };
+    const cnt = '🎵 듀엣 ' + pg.n + ' / ' + pg.N + ' 곡';
+    if (got) return cnt + ' — 리듬 보드를 받았습니다<br><small style="color:#b9a9c4;">' + (my.duetCase ? '탈것에 이미 있어 소지품 · 기타 칸에 「' + BOARD_CASE + '」 로 넣었습니다' : '옷장 · 악세 · 탈것') + '</small>';
+    if (my.duetHad) return cnt + '<br><small style="color:#b9a9c4;">리듬 보드는 한 계정에 하나만 받을 수 있습니다</small>';
+    const left = pg.left.map(function (k) { const x = SONGS.find(function (y) { return y.key === k; }); return x ? x.title : k; });
+    return cnt + (my.duetFirst ? ' <b style="color:#ffc1e3;">+1</b>' : ' · 이미 마친 곡') + '<br><small style="color:#b9a9c4;">지금 있는 곡을 전부 듀엣으로 마치면 리듬 보드'
+        + (left.length ? ' — 남은 곡: ' + left.map(esc).join(' · ') : '') + '</small>';
 }
 function duelResultPaint() {
     const my = DUEL; if (!my || !UI || my.st !== 'result') return;
@@ -2517,7 +2546,7 @@ function duelResultPaint() {
         + '<div style="font-size:13px;color:#aab;">' + esc(s.title) + ' · <b style="color:' + d[3] + '">' + d[1] + ' ' + lv + '</b> · ' + (duet ? 'DUET' : 'DUEL') + '</div>'
         + '<div class="rg-vs">' + duelCol(myName(), a, v === 'WIN' || duet) + duelCol(my.oppName, b, v === 'LOSE' || duet) + '</div>'
         + '<div data-v="verdict" style="font-family:Georgia,serif;font-size:26px;font-weight:900;letter-spacing:6px;color:' + vc + ';text-shadow:0 0 18px ' + vc + ';min-height:32px;">' + v + '</div>'
-        + (duet ? '<div data-v="duet" style="font-size:12px;color:#ffd9ee;line-height:1.6;text-align:center;">' + (got ? '🎵 리듬 보드를 받았습니다<br><small style="color:#b9a9c4;">' + (my.duetCase ? '탈것에 이미 있어 소지품 · 기타 칸에 「' + BOARD_CASE + '」 로 넣었습니다' : '옷장 · 악세 · 탈것') + '</small>' : '🎵 리듬 보드는 한 계정에 하나만 받을 수 있습니다') + '</div>' : '')
+        + (duet ? '<div data-v="duet" style="font-size:12px;color:#ffd9ee;line-height:1.6;text-align:center;max-width:420px;">' + duetLine(my, got) + '</div>' : '')
         + (my.oppLost && !my.oppRes ? '<div style="font-size:11px;color:#889;">상대 기록이 닿지 않아 본 만큼으로 셈했습니다</div>' : '')
         + '<div style="display:flex;gap:10px;"><button class="rg-btn" data-k="re">한 번 더</button><button class="rg-btn" data-k="q">곡 고르기</button></div></div></div>';
     UI.querySelector('[data-k="q"]').onclick = function () { duelDrop(); P = null; menu(); };
