@@ -781,6 +781,12 @@ const DOT_SLOTS = [
             //   받은 그림은 1728x768 (칸 288) · 덩어리마다 주인 칸을 가려 +30 으로 옮겼다 (칸 밖으로 나간 조각 끝은 잘랐다).
             //   서기 줄 여섯 칸에 판이 돈다. 옷 밑(over · Z 맨 앞)에 깔고, 몸(다리 · 발) 자리는 그림에서 비워 발밑에 깔린 것처럼 보인다.
             { i: 'sound-lp', n: 'LP 판', over: ['sound-lp'], own: 'sound-lp', cat: '그 밖' },   // 밀실 거래 됨 (2026-10-24)
+            // ★ 노트 보드 (2026-11-15 사용자 「리듬게임 듀얼 보상으로 하고, 조건은 곡 전체 다 하드 모드로 두명이 A 랭크 이상일 경우 …
+            //   입는 칸은 따로 악세에 탈것으로 두고, 발 밑에 스케이트보드 처럼 미끄러지게 하자. 대신 기존의 위치에서 발 밑에 두는 게 아니라
+            //   그 만큼 캐릭터가 위로 올라가는 식으로. 그리고 움직이면 롱 노트 꼬리처럼 반투명한 잔상이 끌리게 하고 점프 키를 누르면 낮게 점프도」)
+            //   리듬 게임의 하얀 노트(바)를 탈것으로. 그림 장이 없다 — 광장(plaza.js 「🛹 노트 보드」)이 발밑에 코드로 그리고 그 두께만큼 사람을 올려 세운다.
+            //   ride — look() 이 돌려주는 탈것 이름. 리듬 게임 듀엣으로만 받는다 (rhythm.js) · 거래하지 않는다.
+            { i: 'note-board', n: '노트 보드', top: [], own: 'note-board', noTrade: true, cat: '탈것', ride: 'note' },
             // ★ 잎 우산 (2026-10-25 · 뉴비 세트) — 네 장이다. 물 웅덩이 · 빗물은 **이것을 달았을 때만** 내리고 고인다 (이 칸에만 적혀 있다).
             //     물 웅덩이(leaf-puddle)  몸 뒤 · 맨 아래 — 무조건 신발(과 발) 밑
             //     줄기(leaf-stem)         몸 뒤 — 무조건 등 뒤
@@ -1057,6 +1063,7 @@ function look(user, override, all) {
     const fol = {};                      // 몸이 들썩일 때 같이 내릴 장 (D.BOB) — 악세 · 머리 · 뒷머리
     const femAcc = [];                   // 여성 체형에서만 다는 악세 (fem · 2026-11-08 바니걸) — 다른 몸이면 아래에서 뗀다
     let legsImg = null, bodyImg = null;  // 신으면 몸판을 갈아 끼우는 악세 (legs · 바니걸 스타킹)
+    let ride = '';                       // 탈것 (ride · 노트 보드 — 그림 장 없이 광장이 그린다 · 2026-11-15)
     // ★ 불투명도 (2026-11-09 사용자 「여성 체형 의상 불투명도도 조절할 수 있는 기능 넣어줘」) — d.op = { 옷 열쇠: 10~100 }
     //   여성 체형 옷(fem)에만 · 장 이름 → 0.1~1 로 L.op 에 실어 sprite · actor 가 그 층에 opacity 를 건다
     const opIn = (d.op && typeof d.op === 'object') ? d.op : {};
@@ -1083,6 +1090,7 @@ function look(user, override, all) {
                 if (x.fem) femAcc.push(x);
                 opTake(x);
                 if (x.legs) legsImg = x.legs;
+                if (x.ride) ride = x.ride;
                 (x.back || []).concat(x.over || [], x.top || []).forEach(function (o) { fol[o] = 1; });
                 (x.back || []).forEach(function (o) { backs.push(o); });
                 (x.over || []).forEach(function (o) { over.push(o); });
@@ -1262,7 +1270,7 @@ function look(user, override, all) {
             Object.defineProperty(colFin, o, { value: c, enumerable: false });
         });
     });
-    return { head: head, headPick: headPick, body: bodySheet, bodyImg: bodyImg, op: opMap, layers: over, tops: tops, backs: backs, pick: pick, col: colFin, nw: Object.keys(nw).length ? nw : null, follow: fol };
+    return { head: head, headPick: headPick, body: bodySheet, bodyImg: bodyImg, op: opMap, layers: over, tops: tops, backs: backs, pick: pick, col: colFin, nw: Object.keys(nw).length ? nw : null, follow: fol, ride: ride || null };
 }
 window.dotLook = look;
 // ★ 까기 (2026-11-08) — 이 사람이 지금 깔 수 있는 것을 입었나 (그 장을 그리고 있나) · 있으면 그 D.PEEL 칸
@@ -2101,6 +2109,18 @@ function paintDoll() {
     if (stage) { stop(stage); stage.remove(); stage = null; }
     stage = sprite(u_(), { pose: 'stand', scale: 1, dot: cur() });
     host.insertBefore(stage, host.firstChild);
+    // 🛹 노트 보드 — 옷장에서도 발밑에 깔고 그 두께만큼 올려 세운다 (광장과 같은 모양 · plaza.js plazaBoardEl)
+    try {
+        const L = look(Object.assign({}, u_() || {}, { dot: cur() }));
+        if (L.ride === 'note' && typeof window.plazaBoardEl === 'function') {
+            const b = window.plazaBoardEl(1);
+            stage.style.position = 'relative';
+            stage.style.overflow = 'visible';
+            b.el.style.top = (D.H - D.FOOT) + 'px';                 // 발바닥 줄 — 칸을 보드 두께만큼 올리니 보드는 원래 땅에 닿는다
+            stage.insertBefore(b.el, stage.firstChild);              // 몸 · 옷 뒤
+            stage.style.transform = 'translateY(' + (-b.h) + 'px)';
+        }
+    } catch (e) { }
 }
 
 // ==========================================
@@ -2116,7 +2136,7 @@ function paintDoll() {
 //   그래서 켜짐 표시(on)만 갈아 끼우고 칸은 그대로 둔다.
 //
 // 악세는 다섯 개까지 겹친다 (DOT_SLOTS 의 max). 누르면 달고 다시 누르면 벗는다.
-const ACC_CATS = ['머리', '귀', '얼굴', '목', '손', '등', '다리', '그 밖'];   // 다리 — 바니걸 스타킹 (2026-11-08)
+const ACC_CATS = ['머리', '귀', '얼굴', '목', '손', '등', '다리', '탈것', '그 밖'];   // 다리 — 바니걸 스타킹 (2026-11-08) · 탈것 — 노트 보드 (2026-11-15)
 
 function esc_(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
