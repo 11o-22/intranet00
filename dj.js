@@ -30,6 +30,9 @@
 //                 ★ 같은 날 사용자 「백스핀은 무작위 말고 지정으로 하자」 — 장착자가 사번 · 이름으로 고른다 (본인도 된다 · 상담사는 안 된다).
 //     더블링      장착한 채로 리듬 게임 한 곡을 끝까지 치면 (듀얼 포함 · 난이도 상관없음) 그날 하루 모든 어둠(EPIC · K 의 방 포함)의 판정 보정 +3.
 //                 「음표가 장착자의 리듬을 탄다」는 설명 글.
+//                 ★ 같은 날 사용자 「그리고 더블링은 장착자 뿐만 아니라 모든 사원들 포함해줘. 같은 어둠에 들어간」
+//                   켜진 장착자와 같은 어둠(같은 방 — 어둠 탐사 · EPIC · K 의 방)에 들어간 사원 모두 +3. 장착자가 여럿이어도 +3 한 번.
+//                   받는 사원은 제 화면에서 같은 방의 장착자를 본다 (users/<장착자>/djUse.dbl · 장착자가 봉인 중이면 없다).
 //     피치 라이딩 나올 때 차고 있어야 한다. 어떻게 나왔든(시간이 다 됨 · 리버스 플레이백 · 누가 풀어 줌) 30분 넘게 있었으면.
 //     어둠        죽음 · 구출 기술은 어둠 탐사(피날레 포함) — EPIC · K 의 방 · 재난은 아니다 (🦊 호갑투와 같다).
 //     꺼지는 때   이벤트 어둠 · 재앙의 장비 봉인 (WONDER_GEAR_OFF) — 다른 커스텀 장비와 같다.
@@ -434,13 +437,24 @@ rescueWrap('b330DoRescue2');
 // 6 — 더블링 (+ 블렌딩 구출 보정) — 판정 보정에 얹는다. 맨 바깥의 gear-cap 이 +23 으로 자른다
 // ==========================================
 function dblOn(me) { return !!(me && wears(me) && useOf(me).dbl); }
+// 오늘 더블링을 켠 장착자가 나와 같은 어둠에 들어왔나 — 나 자신이면 내 사번 · 같은 방의 다른 사원이면 그 사번
+function dblBy(me, r) {
+    if (!me || !r) return null;
+    if (dblOn(me)) return me.code;
+    if (!r.isParty || !r.partyId) return null;
+    const p = parties()[r.partyId];
+    if (!p) return null;
+    return crewOf(p).filter(function (c) { if (c === me.code) return false; const u = userOf(c); return !!(u && dblOn(u) && !sealed(u)); })[0] || null;
+}
+C.dblBy = function () { return dblBy(u_(), run()); };
 wrap('rollDarkBonus', function (_r) {
     return function (kind) {
         let b = Number(_r.apply(this, arguments)) || 0;
         try {
             const me = u_(), r = run();
             if (r && r._djRescue) b += Number(r._djRescue) || 0;
-            if (r && dblOn(me) && !wOff(r.zone) && !wOff()) b += C.DBL.BON;
+            const by = r ? dblBy(me, r) : null;
+            if (by && !wOff(r.zone) && (by !== me.code || !wOff())) b += C.DBL.BON;      // 내 것이면 내 봉인도 본다
         } catch (e) { }
         return b;
     };
@@ -452,9 +466,9 @@ window.djRhythmDone = function (info) {
     if (useOf(me).dbl) return '';
     setUse(me, 'dbl', now());
     const t = info && info.title ? '「' + info.title + '」 ' : '';
-    log_(me, '[' + NAME + '] 더블링 — 리듬 게임 ' + t + '완주 · 오늘 모든 어둠에서 보정 +' + C.DBL.BON);
+    log_(me, '[' + NAME + '] 더블링 — 리듬 게임 ' + t + '완주 · 오늘 나와 같은 어둠에 들어간 사원 모두 보정 +' + C.DBL.BON);
     save({ djUse: 1, history: 1 });
-    return '🎧 더블링 — 음표가 리듬을 탔습니다 · 오늘 모든 어둠에서 보정 +' + C.DBL.BON;
+    return '🎧 더블링 — 음표가 리듬을 탔습니다 · 오늘 나와 같은 어둠에 들어간 사원 모두 보정 +' + C.DBL.BON;
 };
 
 // ==========================================
@@ -658,7 +672,7 @@ const SKILLS = [
     { k: 'rev', n: '리버스 플레이백', d: '하루 한 번 가두리에서 나올 수 있다 (가두리 위 🎧 단추).' },
     { k: 'tone', n: '톤 플레이', d: '지정한 한 사람은 당신과 같은 어둠에 있는 동안 횟수 상관없이 쓰러지지 않는다. 하루 한 번 지정하면 다른 사람으로 바꾸지 못한다.' },
     { k: 'spin', n: '백스핀', d: '하루 한 번, 지정한 사원 한 명에게 공용시설 행운 ' + C.SPIN.LUCK + '% (' + C.SPIN.HOURS + '시간). 당신 자신도 된다.' },
-    { k: 'dbl', n: '더블링', d: '음표가 장착자의 리듬을 탄다. 하루 한 번 리듬 게임 한 곡(난이도 상관없이)을 끝까지 치면 그날 모든 어둠에서 보정 +' + C.DBL.BON + '.' },
+    { k: 'dbl', n: '더블링', d: '음표가 장착자의 리듬을 탄다. 하루 한 번 리듬 게임 한 곡(난이도 상관없이)을 끝까지 치면 그날 모든 어둠에서 당신과 같은 어둠에 들어간 사원 모두 보정 +' + C.DBL.BON + '.' },
     { k: 'pitch', n: '피치 라이딩', d: '가두리에서 ' + C.PITCH.MIN + '분 넘게 있다가 나오면 우주 쇼핑몰의 물건 하나를 무작위로 들고 나온다.' }
 ];
 function stat(k, me) {
@@ -672,7 +686,7 @@ function stat(k, me) {
     if (k === 'rev') return x.rev ? '오늘 썼다' : '오늘 남았다';
     if (k === 'tone') return x.tone ? '오늘의 톤 — ' + (x.toneN || nameOf(x.tone)) + ' 사원' : '오늘 아직 지정하지 않았다';
     if (k === 'spin') return x.spin ? '오늘 — ' + (x.spinN || nameOf(x.spin)) + ' 사원에게 돌아갔다' : '오늘 남았다';
-    if (k === 'dbl') return x.dbl ? '오늘 켜졌다 — 모든 어둠 보정 +' + C.DBL.BON : '오늘 아직 — 리듬 게임 한 곡을 끝까지';
+    if (k === 'dbl') return x.dbl ? '오늘 켜졌다 — 같은 어둠의 사원 모두 보정 +' + C.DBL.BON : '오늘 아직 — 리듬 게임 한 곡을 끝까지';
     if (k === 'pitch') { const e = cageOf(me); return e ? '가두리 안 — ' + Math.floor((now() - (Number(e.at) || now())) / 60000) + '분째' : '가두리 밖'; }
     return '';
 }
