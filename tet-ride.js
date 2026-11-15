@@ -22,9 +22,10 @@
 //     거래로 블록을 내주면 그만큼 탈것에서 빠진다 (모양마다 가진 수까지만 그린다).
 //   · 탄다 — 옷장 악세 「탈것」 의 테트리스 탈것 (closet.js ride 'tet' · 블록을 하나라도 가지면 생긴다).
 //     리듬 보드와 같은 길 (plaza.js) — 블록 위에 올라서고 · [🧩 타기 / 내리기] · 점프 · 빠르기 두 배.
-//   · 크기 — 캐릭터(몸 폭 100 · 키 236 도트)의 0.5 배 = 가로 50 · 세로 118 도트 상자. 블록 하나만 놓으면 그 상자에 꽉 차게,
-//     여럿을 이으면 칸이 작아져 그 상자를 넘지 않는다 (칸 크기 = min(50 / 가로 칸 수, 118 / 세로 칸 수)).
-//     ★ 2026-11-16 사용자 「1.5배가 아니라 0.5배로 하고. 크기는.」 (처음에는 1.5 배 — 가로 150 · 세로 354)
+//   · 크기 — 캐릭터(몸 폭 100 · 키 236 도트)의 1.5 배 = 가로 150 · 세로 354 도트 상자. 블록 하나만 놓으면 그 상자에 꽉 차게,
+//     여럿을 이으면 칸이 작아져 그 상자를 넘지 않는다 (칸 크기 = min(150 / 가로 칸 수, 354 / 세로 칸 수)).
+//     ★ 2026-11-16 사용자 「1.5배가 아니라 0.5배로 하고. 크기는.」 → 0.5 배(50 · 118)로 줄였다가
+//       같은 날 사용자 「크기를 한 세 배는 더 늘려줘.」 → 세 배 = 1.5 배(150 · 354)
 //   · 서는 자리 — 가운데에 가장 가까운 줄(칸이 있는 줄)의 맨 윗블록 위. 그 줄이 발밑에 오게 탈것을 옆으로 맞춘다.
 //   · 잔상 — 움직이면 블록 빛깔의 작은 조각들이 지나온 자리에 떨어져 남았다가 사라진다 (plaza.js trailPaint).
 //
@@ -47,7 +48,7 @@ const SHAPES = {                                    // 오락실 테트리스와
     L: [[2, 0], [0, 1], [1, 1], [2, 1]]
 };
 const MILES = [20, 25, 30, 35, 40, 45, 50];
-const CAP_W = 50, CAP_H = 118;                      // 캐릭터의 0.5 배 (도트 · 2026-11-16 — 처음 1.5 배 150 · 354)
+const CAP_W = 150, CAP_H = 354;                     // 캐릭터의 1.5 배 (도트 · 2026-11-16 — 0.5 배 50 · 118 의 세 배)
 const GW = 10, GH = 8;                              // 조합 판
 const OV = 'tetr-ov';
 const NAME_PRE = '테트리스 블록 ';
@@ -314,7 +315,7 @@ function paint() {
     const total = totalOf(own);
     w.innerHTML = '<div style="background:linear-gradient(145deg,#15151d,#0b0b10); border:1px solid #4a4a5e; border-radius:10px; padding:13px; width:100%; max-width:360px; max-height:92dvh; overflow-y:auto; -webkit-overflow-scrolling:touch; color:#e8e8f0;">'
         + '<div style="font-size:13px; font-weight:bold; color:#ffe9a8; margin-bottom:3px;">🧩 테트리스 탈것 — 조합</div>'
-        + '<div style="font-size:10px; color:#9a9aae; line-height:1.6; margin-bottom:9px;">가진 블록을 판에 놓아 탈것을 만듭니다. 블록 하나면 캐릭터의 0.5배, 여럿을 이으면 그 크기 안으로 작아집니다.<br>'
+        + '<div style="font-size:10px; color:#9a9aae; line-height:1.6; margin-bottom:9px;">가진 블록을 판에 놓아 탈것을 만듭니다. 블록 하나면 캐릭터의 1.5배, 여럿을 이으면 그 크기 안으로 작아집니다.<br>'
         + '블록을 고르고 판을 누르면 놓이고, 놓인 블록을 누르면 빠집니다.</div>'
         + '<div id="tr-prev" style="height:150px; position:relative; overflow:hidden; background:rgba(255,255,255,0.03); border-radius:8px; margin-bottom:9px;"></div>'
         + (total ? '' : '<div style="font-size:11px; color:#ff9f8a; text-align:center; margin:6px 0 9px;">가진 블록이 없습니다. 오락실 테트리스 솔로에서 20줄부터 5줄마다 하나씩 받습니다.</div>')
