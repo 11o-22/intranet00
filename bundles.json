@@ -495,7 +495,8 @@
       "calam-seal.js",
       "alien-weekly.js",
       "craft-pity.js",
-      "party-ghost.js"
+      "party-ghost.js",
+      "calam-freeze.js"
     ]
   ]
 }
