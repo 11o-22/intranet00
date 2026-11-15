@@ -79,6 +79,8 @@ const GACHA_WEAR = [
     //   b — 체형이 바뀌는 옷은 그 몸에 입혀 보여 준다 (closet.js 의 body 와 같다)
     { k: 'sdress',      n: '숏 드레스',  g: 'S', s: ['sdress'],      b: 'body-f' },
     { k: 'school-m',    n: '교복(남자)', g: 'A', s: ['school-m'] },
+    // 남성 힙 의상 (2026-11-15 사용자 「의상들은 뽑기에」 — 등급은 말씀이 없으셔서 의상 1차 교복(남자)처럼 A) — 티 · 반바지 · 재킷 한 벌 (closet.js hip-m)
+    { k: 'hip-m',       n: '남성 힙 의상', g: 'A', s: ['hip-m'] },
     { k: 'nun-robe',    n: '수녀복',     g: 'A', s: ['nun-robe', 'nun-veil'] },   // 2026-11-12 사용자 「이거 뽑기에 넣어주고」 — 수도복 + 베일 (closet.js nun)
     { k: 'devil-m',     n: '악마(남자)', g: 'A', s: ['devil-m'] },
     { k: 'devil-f',     n: '악마(여자)', g: 'A', s: ['devil-f'] },        // 보통 몸 (부츠가 보통 몸 걸음에 맞춰 그려져 있다)
@@ -198,7 +200,9 @@ const GACHA_FEM = [
     { k: 'wshirt',     n: '셔츠',               s: ['w-shirt'] },
     { k: 'wpanty',     n: '여성용 속옷',        s: ['w-panty'] },
     { k: 'slavetee',   n: '슬레이브 목티',      s: ['slave-tee'] },
-    { k: 'gleash',     n: '금 목줄',            s: ['gold-leash'] }
+    { k: 'gleash',     n: '금 목줄',            s: ['gold-leash'] },
+    // 여성 힙 의상 (2026-11-15 사용자 「의상들은 뽑기에」) — 탑 · 치마 · 재킷 한 벌 (closet.js hip-w)
+    { k: 'hip-w',      n: '여성 힙 의상',       s: ['hip-w'] }
 ];
 GACHA.fem = { n: '여성 체형 의상 뽑기', ic: 'wearshop', one: 30000, ten: 300000, miss: 50 };
 // 밀실 거래(p2p-wear.js · p2p-fix.js)가 본다 — 여성 체형 의상은 옷장 권한(dotGrant)이 본체라 따로 옮긴다 (2026-11-09 사용자 「여성 체형용 의상도 밀실로 거래가 가능하게」)

@@ -158,9 +158,10 @@ const DOT = {
         'sound-lp', 'sexy-pantsu', 'gochu', 'red-bikini', 'bunny-stk', 'sound-coat-in', 'pj-bottom', 'w-panty', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'sailor-shoes', 'pj-top', 'w-shirt', 'w-shirt-open', 'knit', 'gym-suit', 'm-shirt', 'han-inner',
         'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit', 'newbie-outfit', 'sailor-bubble', 'garaetteok',
         'school-m', 'sdress', 'devil-m', 'devil-f',         // 의상 1차 (2026-11-04)
+        'hip-m',                                            // 남성 힙 의상 (2026-11-15 · 의상 2차)
         'robe', 'nun-robe', 'han-duru', 'cape',            // 수녀복 (2026-11-12) — 장포 옆
         // 바니걸 (2026-11-08) — 뒤 털 → 의상 → 앞 털. 완전체 그림에서 털 한 장(옆으로 늘어진 털)은 의상 밑, 다른 한 장(걸을 때 감기는 털)은 의상 위였다
-        'bunny-fur-b', 'bunny-suit', 'lingerie', 'slave-tee', 'w-uniform2', 'office-look2', 'bunny-fur-f',
+        'bunny-fur-b', 'bunny-suit', 'lingerie', 'slave-tee', 'w-uniform2', 'office-look2', 'hip-w', 'bunny-fur-f',
         'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in',
         'apron',                                            // 🧺 에이프런 (2026-11-11) — 모든 옷 위 · 장갑 밑
         'glove', 'bungeo'],
@@ -171,7 +172,7 @@ const DOT = {
     //   ★ 검은 고양이 헤일로의 헤일로(cat-halo-halo · 2026-10-31)는 **맨 아래** — 몸 · 옷 · 웅덩이보다도 뒤.
     //   ★ Null Owner 의 틈(nuow-rift · 2026-11-03)도 맨 아래 — 등 뒤에서 열리는 틈과 손.
     //   ★ Null Owner 2 의 여우불(nuow2-fox · 2026-11-03)도 맨 아래 — 등 뒤에서 푸른 불이 일고 여우가 뛴다.
-    BACK_Z: ['nuow2-fox', 'nuow-rift', 'cat-halo-halo', 'leaf-puddle', 'leaf-stem', 'pepero-big-choco', 'pepero-big-straw'],
+    BACK_Z: ['nuow2-fox', 'nuow-rift', 'cat-halo-halo', 'leaf-puddle', 'leaf-stem', 'pepero-big-choco', 'pepero-big-straw', 'star-mobile'],
     // ★ **맨 앞**에 두는 장 — 악세를 몇 개 달아도 이것들이 제일 위다. 적힌 차례대로 — 잎(무조건 앞) → 빗물(잎 위).
     //   ★ 검은 고양이 헤일로의 고양이(cat-halo-cat · 2026-10-31)는 그보다도 앞 — **모든 층(다른 옷 · 악세 포함) 가운데 맨 앞**.
     //   ★ Null Owner 의 착한 친구(nuow-friend · 2026-11-03)도 맨 앞 — 발치에 앉은 토끼 인형과 말풍선.
@@ -265,6 +266,10 @@ const DOT = {
                  'bunny-suit': [0, 1, 2, 3, 4, 5], 'bunny-fur-b': [0, 1, 2, 3, 4, 5], 'bunny-stk': [0, 1, 2, 3, 4, 5],
                  // 란제리 · 금 목줄 (2026-11-08) — 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다
                  'lingerie': [0, 1, 2, 3, 4, 5], 'gold-leash': [0, 1, 2, 3, 4, 5], 'slave-tee': [0, 1, 2, 3, 4, 5], 'w-uniform2': [0, 1, 2, 3, 4, 5], 'office-look2': [0, 1, 2, 3, 4, 5],
+                 // 여성 힙 의상 (2026-11-15) — 서기 줄 여섯 칸이 몸의 들썩임(0 · 2 · 4 · 2 · 0 · 2)을 따라 그려져 있다 (치마는 따라 내려 다시 깔았다)
+                 'hip-w': [0, 1, 2, 3, 4, 5],
+                 // 모빌 (2026-11-15 · 악세 「등」) — 서기 · 걷기 줄 여섯 칸에 별이 흔들린다 · 서 있어도 여섯 칸을 돈다
+                 'star-mobile': [0, 1, 2, 3, 4, 5],
                  // 셔츠 (여성 체형 · 2026-11-08) — 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다 · 몸과 같은 시계로 돈다
                  'w-shirt': [0, 1, 2, 3, 4, 5],
                  // 풀어진 셔츠 · 여성용 속옷 (2026-11-08) — 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다
@@ -609,6 +614,12 @@ const DOT_SLOTS = [
             //   가슴이 드러나는 자리(앞모습 앞섶 · 옆모습 가슴)만 블라우스 천(224 · 둘레 180)으로 메워 한 장에 합쳤다 — 목선은 V 로 조금 남김.
             //   같은 날 지운 예전 오피스 룩(열쇠 office-look · i office)은 거두기(purge-wuniform.js)가 걷으니 열쇠 · i · 그림을 따로 쓴다.
             { i: 'office2', n: '오피스 룩', over: ['office-look2'], own: 'office-look2', fem: true, alone: true, keep: ['cape'] },
+            // ★ 여성 힙 의상 (2026-11-15 사용자 「여성은 여성 힙 의상으로」 「의상들은 뽑기에」 「여성 옷은 들썩거리는 거에 맞춰줘 · 여성 몸에 맞게」)
+            //   주신 그림 셋(여자1 흰 재킷 · 여자2 검은 탑 · 여자3 빨간 체크 치마 · 1728x768 칸 288) → 칸마다 +30 으로 352 칸 · 탑 → 치마 → 재킷 차례로 한 장(hip-w).
+            //   여성 체형(body-w) 몸에 대 보니 걷기 · 서기 열두 칸이 맞았다. 서기 줄은 재킷 · 탑이 몸의 들썩임(0 · 2 · 4 · 2 · 0 · 2)대로 그려져 있었고
+            //   치마만 덜 따라가 있어(0 · 0 · 2 · 0 · 0 · 0) 첫 칸 치마를 칸마다 들썩임만큼 내려 다시 깔았다 (몸은 허리 · 엉덩이까지 같이 내려간다).
+            //   여성 체형 의상 뽑기(gacha.js GACHA_FEM)로 — 뽑으면 dotGrant 에 적힌다 (owner · hasGrant). fem · alone · keep 은 다른 여성 체형 옷과 같다.
+            { i: 'hip-w', n: '여성 힙 의상', over: ['hip-w'], owner: true, fem: true, alone: true, keep: ['cape'] },
             // ★ 의상 뽑기 탈 세 벌 + 퐁실 의상 (2026-10-25) — 주신 그림은 432x192 (칸 72x96) 라
             //   네 배로 늘려 칸마다 가로 +30 으로 352 칸에 옮겼다 (다섯 벌 · 2026-10-23 과 같은 길).
             //   탈 셋은 머리까지 감싸고 얼굴만 뚫려 있어 **머리 위**(top)에 얹는다 — 늑대 잠옷 바깥과 같다.
@@ -622,7 +633,12 @@ const DOT_SLOTS = [
             { i: 'newbie', n: '뉴비 의상', over: ['newbie-outfit'], own: 'newbie-outfit', noTrade: true },
             // ★ 가래떡 의상 (2026-11-11 사용자 「가래떡 의상으로 · 상담사만 줄 수 있게」) — 상담사가 선물함으로 보내 준 사람만 (wear-gift.js)
             //   주신 그림 1728x768 (칸 288) → 칸마다 +30 으로 352 칸. 걷기 넷만 와서 뉴비 의상처럼 5·6번째를 3·2번째로 · 서기는 첫 칸.
-            { i: 'garaetteok', n: '가래떡 의상', over: ['garaetteok'], own: 'garaetteok' }
+            { i: 'garaetteok', n: '가래떡 의상', over: ['garaetteok'], own: 'garaetteok' },
+            // ★ 남성 힙 의상 (2026-11-15 사용자 「남자 의상은 한 세트로 겉옷에 넣어주고 이름은 남성 힙 의상」 「의상들은 뽑기에」)
+            //   주신 그림 셋(남자1 회색 재킷 · 남자2 검은 티 · 남자3 빨간 체크 반바지 · 1728x768 칸 288) → 칸마다 +30 으로 352 칸 ·
+            //   티 → 반바지 → 재킷 차례로 한 장(hip-m). 보통 몸에 대 보니 걷기 · 서기 열두 칸이 맞았다 (서기 여섯 칸은 같은 그림).
+            //   의상 뽑기(gacha.js GACHA_WEAR · A) — 뽑은 사람만 (own)
+            { i: 'hip-m', n: '남성 힙 의상', over: ['hip-m'], own: 'hip-m' }
             // (룩키마트 의상 · 가을 니트 · 체육복은 2026-10-23 상의 칸으로 옮겼다)
             // ★ 가을 니트 (2026-10-23) — 주신 그림은 1728x768 (칸 288) 에 머리 · 손 · 다리까지 그려진 통짜.
             //   칸마다 가로 +30 으로 352 칸에 옮기니 몸 그림과 자리가 딱 맞아, 몸과 자리 · 색이 똑같은 칸을 빼고
@@ -825,7 +841,11 @@ const DOT_SLOTS = [
             //   주신 그림은 1728x768 (칸 288) 에 서기 첫 칸 하나뿐 — 열두 칸에 똑같이 깔고(+30 → 352 칸),
             //   걷기 2 · 4 · 6 칸은 몸이 4px 내려앉으므로 함께 4px 내렸다. 몸 뒤(BACK_Z)에 깐다.
             { i: 'pepero-big-choco', n: '대왕 초코 빼빼로', back: ['pepero-big-choco'], own: 'pepero-big-choco', cat: '등' },
-            { i: 'pepero-big-straw', n: '대왕 딸기 빼빼로', back: ['pepero-big-straw'], own: 'pepero-big-straw', cat: '등' }
+            { i: 'pepero-big-straw', n: '대왕 딸기 빼빼로', back: ['pepero-big-straw'], own: 'pepero-big-straw', cat: '등' },
+            // ★ 모빌 (2026-11-15 사용자 「모빌은 상담사가 넣어 주는 식으로 악세 등에 넣자 · 모빌은 프레임 돌려야 해」) — 상담사가 선물함으로 보내 준 사람만 (wear-gift.js)
+            //   주신 그림(남녀 공통 모빌 · 1728x768 칸 288) → 칸마다 +30 으로 352 칸. 머리 위로 휘어진 줄에 별 · 리본이 매달려 있고
+            //   걷기 · 서기 줄 모두 여섯 칸에 걸쳐 흔들린다 — 서 있을 때도 여섯 칸을 돈다 (FLAP_COLS). 머리와 겹치지 않아 몸 뒤(BACK_Z)에 깐다.
+            { i: 'star-mobile', n: '모빌', back: ['star-mobile'], own: 'star-mobile', cat: '등' }
         ]
     }
 ];
