@@ -87,7 +87,7 @@ function snap(k) {
 }
 function snapAll() {
     const out = {};
-    try { ready().forEach(function (k) { out[k] = snap(k); }); } catch (e) { console.warn('[🧸] 둘이 — 인형 기록', e); }
+    try { ready().forEach(function (k, i) { out[k] = snap(k); out[k].wi = i; }); } catch (e) { console.warn('[🧸] 둘이 — 인형 기록', e); }   // wi — 동행 칸 순서 = 나갈 차례 (doll-battle.js seqKeys · 2026-11-15)
     return Object.keys(out).length ? clean(out) : null;
 }
 

@@ -104,6 +104,22 @@ function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 function copy(o) { return JSON.parse(JSON.stringify(o)); }
 function arrOf(v) { return Array.isArray(v) ? v : (v && typeof v === 'object') ? Object.keys(v).sort(function (a, b) { return a - b; }).map(function (k) { return v[k]; }) : []; }
 function objOf(v) { if (!v || typeof v !== 'object') return {}; if (Array.isArray(v)) { const o = {}; v.forEach(function (x, i) { if (x != null) o[i] = x; }); return o; } return v; }
+// ★ 판에 적힌 인형 사본(여정 members/<사번>/dolls · 결투 a|b.dolls)을 나갈 차례대로 — 적어 둔 자리(wi)로 세운다
+//   2026-11-15 사용자 「펫 출전 순서도 정할 수 있게 해줘.」 「아니 아예 동행 순서를 출전 순서랑 같게 해줘.」
+//   사본은 { 인형 열쇠: 기록 } 이라 서버를 거치면 열쇠(번호) 순으로 돌아온다 — 그대로 세우면 동행 칸 순서와 상관없이
+//   번호가 빠른 인형이 먼저 나갔다 (혼자 싸우는 출몰지만 동행 순서였다). 사본을 뜰 때 자리를 같이 적는다:
+//     여정 (doll-party.js) · 둘이 (doll-duo.js)   wi = 동행 칸 순서 (갈 수 있는 인형 가운데)
+//     결투 (pet-battle.js)                          wi = 고른 인형이 0 · 나머지는 동행 칸 순서
+//   자리가 안 적힌 옛 사본은 전처럼 번호 순 (자리가 적힌 것 뒤에).
+function seqKeys(ds) {
+    return Object.keys(ds || {}).sort(function (a, b) {
+        const x = ds[a] ? Number(ds[a].wi) : NaN, y = ds[b] ? Number(ds[b].wi) : NaN;
+        const hx = isFinite(x) && ds[a].wi != null, hy = isFinite(y) && ds[b].wi != null;
+        if (hx && hy && x !== y) return x - y;
+        if (hx !== hy) return hx ? -1 : 1;
+        return Number(a) - Number(b);
+    });
+}
 // 파이어베이스에서 돌아온 엔진 상태 — 숫자 열쇠 칸(pp)이 배열로 바뀌었으면 되돌린다 · 빠진 배열은 채운다
 function normS(S) {
     if (!S || !S.sides) return S;
@@ -1666,7 +1682,7 @@ function sideOfCode(S, code) { const o = arrOf(S.order); for (let i = 0; i < o.l
 // 전투 시작 — 방장이 만든다. members[code].dolls 는 그 사원 인형의 기록(전체) · order 차례로 진영 A · C · D
 function partyStart(run, spec, seed) {
     const order = arrOf(run.order).filter(function (c) { const m = run.members[c]; return m && !m.left && m.dolls; });
-    const recsOf = function (c) { const ds = objOf(run.members[c].dolls); return Object.keys(ds).map(function (k) { return recOf(ds[k], k); }).filter(function (r) { return D().hpOf(r) > 0; }); };
+    const recsOf = function (c) { const ds = objOf(run.members[c].dolls); return seqKeys(ds).map(function (k) { return recOf(ds[k], k); }).filter(function (r) { return D().hpOf(r) > 0; }); };   // 동행 순서대로 (seqKeys)
     if (run.dbl) {
         // ★ 더블 — 탐사자 둘까지 · 탐사자당 한 자리 (혼자면 두 자리 다) · 상대는 둘 (또는 보스 하나)
         const artOf2 = function (c) { const ds = objOf(run.members[c].dolls); const k = Object.keys(ds)[0]; return !!(k && ds[k] && ds[k].art); };
@@ -2227,7 +2243,7 @@ async function partyEnd(r, o) {
 //   신청한 쪽(a)이 진영 A · 받은 쪽(b)이 B. 둘 다 고르면 어느 화면이든 트랜잭션으로 한 턴을 푼다 (resolvePvp). 출력문(play)은 두 화면이 같은 연출로.
 //   싸우는 것은 인형 — 한쪽 인형이 다 쓰러지면 진다. 끝나면 양쪽이 제 인형의 HP · PP · 상태를 기록에 적는다 (경험치 없음 · 노력치는 적는다).
 function pvpStart(cur, seed) {
-    const recs = function (sd) { const ds = objOf(sd.dolls); return Object.keys(ds).map(function (k) { return recOf(ds[k], k); }).filter(function (r) { return D().hpOf(r) > 0; }); };
+    const recs = function (sd) { const ds = objOf(sd.dolls); return seqKeys(ds).map(function (k) { return recOf(ds[k], k); }).filter(function (r) { return D().hpOf(r) > 0; }); };   // 고른 인형 → 동행 순서 (seqKeys)
     const ra = recs(cur.a), rb = recs(cur.b);
     const S = BT().start({ my: ra, owner: cur.a.name, code: cur.a.code, art: { A: !!(cur.a.doll && cur.a.doll.art) },
         foe: rb.map(function (r) { return { rec: r, name: r.nick || D().spName(r.sp), art: !!(cur.b.doll && cur.b.doll.art) }; }),

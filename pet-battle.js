@@ -614,7 +614,8 @@ function prepView(o) {
         if (doll) {
             const ids = [String(mine.pet)];
             try { D_().withList(me).forEach(function (id) { if (ids.indexOf(String(id)) < 0 && ids.length < 3) ids.push(String(id)); }); } catch (e) { }
-            ids.forEach(function (id) { const d = dollSnap(id, me); if (d && d.hp > 0) dolls[id] = d; });
+            let wi = 0;                                                  // 나갈 차례 — 고른 인형이 먼저, 나머지는 동행 칸 순서 (doll-battle.js seqKeys · 2026-11-15)
+            ids.forEach(function (id) { const d = dollSnap(id, me); if (d && d.hp > 0) { d.wi = wi++; dolls[id] = d; } });
             used[String(mine.pet)] = 1;
         }
         tx(o._k, function (cur) {

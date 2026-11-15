@@ -288,7 +288,7 @@ function enter(key) {
             const ks = ready();
             if (!ks.length) { mref.update({ out: 1, left: 1 }); alert_('함께 갈 봉제인형이 없습니다.'); return; }
             const dolls = {};
-            ks.forEach(function (k) { dolls[k] = snap(k); });
+            ks.forEach(function (k, i) { dolls[k] = snap(k); dolls[k].wi = i; });     // wi — 동행 칸 순서 = 나갈 차례 (doll-battle.js seqKeys · 2026-11-15)
             mref.update({ name: me.name, dolls: dolls, act: ks[0], at: now() }).then(function () {
                 S.runKey = key; S.code = me.code; S.ended = false; S.applied = {}; S.fightOn = null;
                 S.ref = d.ref(RUN + '/' + key);
