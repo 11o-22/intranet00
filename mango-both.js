@@ -38,6 +38,20 @@
 //   확률도 「몸」으로 센다. 망고맛만으로는 뒤집힌 것으로 세지 않으므로
 //   본래 확률이 쓰인다.
 //
+// ■ ★ 2026-11-15 — 문신이 있으면 **몸과 상관없이 둘 다**
+//   사용자 「자궁 문신이 있는 경우에는 어떤 경우든 임신이 뜨게 해줘 착정이랑.」
+//   위 표에서 문신이 있는데도 「받기만」이던 두 줄을 「둘 다」로 바꿨다 — 시킬 수 있나를 셀 때도 문신이 있으면 된다.
+//
+//       남성 + 망고           둘 다
+//       남성 + 우유 + 망고     둘 다          ← 전에는 받기만
+//       여성 + 망고           둘 다          ← 전에는 받기만
+//       여성 + 포도 + 망고     둘 다
+//       (문신이 없는 줄 · 성별 미지정은 그대로)
+//
+//   그래서 문신이 있는 사원은 받을 수 있는 상대의 카드에서 「임신시키기」, 시킬 수 있는 상대의 카드에서 「착정한다」 를 늘 보고,
+//   문신이 있는 사원의 카드를 연 쪽도 제 몸에 맞는 단추를 본다 (시키는 몸이면 임신시키기 · 받는 몸이면 착정).
+//   확률은 전처럼 「몸」으로 센다 (우유 · 포도로 뒤집혔을 때만 반대편 확률) · 다이아 플러그 · 인원 한도는 그대로 막는다.
+//
 // ■ 콘솔
 //   mangoState(사번)   둘 다 되는 상태인지 · 확률
 //   mangoTable()       위 표가 지금 코드에서 그대로 나오는지
@@ -68,10 +82,10 @@ function bodyBears(u) {
     return false;
 }
 
-// 망고맛 때문에 둘 다 되는 상태인가 (알림 문구에 쓴다)
+// 망고맛 때문에 둘 다 되는 상태인가 (알림 문구에 쓴다) — 2026-11-15 부터 문신이 있으면 몸과 상관없이 둘 다
 function mangoBothWay(u) {
     if (!u || !gen(u)) return false;
-    return hasMango(u) && !bodyBears(u);
+    return hasMango(u);
 }
 window.isMangoBoth = mangoBothWay;
 window.isMangoMale = mangoBothWay;               // 예전 이름 호환
@@ -94,7 +108,7 @@ window.isMangoMale = mangoBothWay;               // 예전 이름 호환
 })();
 
 // ==========================================
-// 2. 시킬 수 있나 — 본래 몸으로만 센다 (망고맛은 안 본다)
+// 2. 시킬 수 있나 — 문신이 있으면 된다 (2026-11-15 · 전에는 본래 몸이 시키는 쪽일 때만)
 // ==========================================
 (function hookSire() {
     const iv = setInterval(function () {
@@ -103,12 +117,12 @@ window.isMangoMale = mangoBothWay;               // 예전 이름 호환
         const _s = canSire;
         canSire = function (user) {
             if (!user || !gen(user)) return false;
-            if (hasMango(user)) return !bodyBears(user);      // 문신은 시키는 데 상관없다
+            if (hasMango(user)) return true;                  // 문신이 있으면 어떤 몸이든 시킬 수도 있다
             return _s.apply(this, arguments);
         };
         canSire._mango = true;
         clearInterval(iv);
-        console.log('[망고] 자궁 문신은 몸을 바꾸지 않습니다 — 둘 다 되는 자리를 열었습니다');
+        console.log('[망고] 자궁 문신이 있으면 시키는 것도 받는 것도 됩니다 (몸과 상관없이)');
     }, 400);
 })();
 
@@ -132,6 +146,17 @@ window.isMangoMale = mangoBothWay;               // 예전 이름 호환
 // ==========================================
 // 4. 사원 상세에 한 줄
 // ==========================================
+// 단추 칸이 나중에 생기는 때(착정 단추만 붙는 카드 — preg-v2.js reshape)에도 부를 수 있게 따로 둔다
+function noteAdd(code) {
+    const t = (typeof db !== 'undefined' && db.users) ? db.users[code] : null;
+    if (!t || !mangoBothWay(t)) return;
+    const box = document.getElementById('preg-btn-box');
+    if (!box || document.getElementById('mango-note')) return;
+    box.insertAdjacentHTML('afterbegin',
+        '<div id="mango-note" style="font-size:10px; color:#ffd76a; margin:0 0 8px 0; line-height:1.6;">'
+        + '망고맛 물약 — 자궁 문신이 있습니다. 시키는 것도, 받는 것도 됩니다.</div>');
+}
+window.mangoNoteAdd = noteAdd;
 (function hookBtn() {
     const iv = setInterval(function () {
         if (typeof addPregBtn !== 'function') return;
@@ -139,15 +164,7 @@ window.isMangoMale = mangoBothWay;               // 예전 이름 호환
         const _a = addPregBtn;
         addPregBtn = function (code) {
             const r = _a.apply(this, arguments);
-            try {
-                const t = (typeof db !== 'undefined' && db.users) ? db.users[code] : null;
-                if (!t || !mangoBothWay(t)) return r;
-                const box = document.getElementById('preg-btn-box');
-                if (!box || document.getElementById('mango-note')) return r;
-                box.insertAdjacentHTML('afterbegin',
-                    '<div id="mango-note" style="font-size:10px; color:#ffd76a; margin:0 0 8px 0; line-height:1.6;">'
-                    + '망고맛 물약 — 자궁 문신이 있습니다. 시키는 것도, 받는 것도 됩니다.</div>');
-            } catch (e) { }
+            try { noteAdd(code); } catch (e) { }
             return r;
         };
         addPregBtn._mango = true;

@@ -398,6 +398,8 @@ function reshape(code) {
             + ' color:#fff !important;" onclick="tryMilk(\'' + code + '\')">'
             + '착정한다' + (milkNear(t) ? '' : ' <span style="font-size:10px; color:#ffd76a;">(동의 필요)</span>') + '</button>');
     }
+    // 🥭 자궁 문신 안내 한 줄 — 칸을 여기서 만든 카드에도 (mango-both.js · 이미 있으면 안 붙는다)
+    try { if (typeof window.mangoNoteAdd === 'function') window.mangoNoteAdd(code); } catch (e) { }
 }
 
 // ==========================================
