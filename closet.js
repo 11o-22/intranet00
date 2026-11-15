@@ -2154,7 +2154,7 @@ function paintDoll() {
         }
         // 🧩 테트리스 탈것 — 서는 줄 윗면에 세운다 (광장과 같은 모양 · tet-ride.js tetRideEl)
         if (L.ride === 'tet' && typeof window.tetRideEl === 'function' && typeof window.tetRideMine === 'function') {
-            const v = window.tetRideEl(window.tetRideMine(u_()), 1);
+            const v = window.tetRideEl(window.tetRideMine(u_()), 1, (u_() || {}).tetRideSkin);
             if (v) {
                 stage.style.position = 'relative';
                 stage.style.overflow = 'visible';

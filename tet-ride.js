@@ -28,6 +28,7 @@
 //       같은 날 사용자 「크기를 한 세 배는 더 늘려줘.」 → 세 배 = 1.5 배(150 · 354)
 //   · 서는 자리 — 가운데에 가장 가까운 줄(칸이 있는 줄)의 맨 윗블록 위. 그 줄이 발밑에 오게 탈것을 옆으로 맞춘다.
 //   · 잔상 — 움직이면 블록 빛깔의 작은 조각들이 지나온 자리에 떨어져 남았다가 사라진다 (plaza.js trailPaint).
+//   · 블럭 모양 (2026-11-16) — 조합 창에서 오락실 테트리스와 같은 넷(기본 · 입체 · 테두리 · 젤리)을 고른다 · u.tetRideSkin (아래 SKINS)
 //
 // ■ 콘솔
 //   tetRideState()          내 블록 · 조합 · 받은 줄
@@ -107,8 +108,8 @@ window.tetRideMine = mine;
 // 칸 목록 · 둘레 (판 좌표를 둘레 안으로 당긴다)
 function layout(tr) {
     const cells = [];
-    tr.forEach(function (p) {
-        cellsOf(p[0], p[1]).forEach(function (c) { cells.push({ x: c[0] + p[2], y: c[1] + p[3], t: p[0] }); });
+    tr.forEach(function (p, i) {
+        cellsOf(p[0], p[1]).forEach(function (c) { cells.push({ x: c[0] + p[2], y: c[1] + p[3], t: p[0], id: i }); });
     });
     if (!cells.length) return null;
     const x0 = Math.min.apply(null, cells.map(function (c) { return c.x; }));
@@ -130,30 +131,86 @@ function standOf(L) {
     });
     return best;
 }
+// ★ 블럭 모양 (2026-11-16 사용자 「블럭 탈것 모양도 게임 시에 모양 종류처럼 고를 수 있게」)
+//   오락실 테트리스의 블럭 모양(tetris-plus.js SKINS — 기본 · 입체 · 테두리 · 젤리)과 같은 넷 · 같은 빛깔 · 같은 그리는 법.
+//   게임에서 고른 것(u.tetSkin)과는 따로 고른다 — u.tetRideSkin. 남에게는 자리 기록 ts 로 실어 보낸다 (plaza.js).
+const SKINS = {
+    base:  { n: '기본', pal: COLORS },
+    bevel: { n: '입체', pal: { I: '#3fcfe0', O: '#e4cd3a', T: '#9a3ed6', S: '#4cc13a', Z: '#d83232', J: '#2a4ad8', L: '#e3922e' } },
+    line:  { n: '테두리', pal: { I: '#4a90e2', O: '#ececec', T: '#f2c14e', S: '#8fd14f', Z: '#e8584a', J: '#b07ce8', L: '#f0903a' } },
+    jelly: { n: '젤리', pal: { I: '#5fd23e', O: '#3d9df2', T: '#b44fe3', S: '#f4bf2f', Z: '#ea4a2e', J: '#d35fe0', L: '#f28b30' } }
+};
+const SKIN_KEYS = ['base', 'bevel', 'line', 'jelly'];
+function skinOf(v) { return SKINS[v] ? v : 'base'; }
+window.TET_RIDE.SKINS = SKINS;
+function rgb(h) { h = String(h).replace('#', ''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; }
+function mix(h, to, t) { const a = rgb(h); return 'rgb(' + a.map(function (v) { return Math.round(v + (to - v) * t); }).join(',') + ')'; }
+function lt(h, t) { return mix(h, 255, t); }
+function dk(h, t) { return mix(h, 0, t); }
+// 칸 하나 — 오락실 tetris-plus.js cellHtml 을 칸 크기(px)에 맞춰 옮겼다. same(dx, dy) — 그쪽 이웃이 같은 조각인가 (테두리)
+function cellCss(sk, col, cell, same) {
+    const box = 'position:absolute;inset:0;box-sizing:border-box;';
+    if (sk === 'bevel') {
+        const b = Math.max(1, Math.round(cell * 0.13));
+        return '<div style="' + box + 'background:linear-gradient(135deg,' + lt(col, .14) + ',' + col + ' 60%);border:' + b + 'px solid;'
+            + 'border-color:' + lt(col, .38) + ' ' + dk(col, .28) + ' ' + dk(col, .36) + ' ' + lt(col, .22) + ';"></div>';
+    }
+    if (sk === 'jelly') {
+        const mg = Math.max(0.5, Math.round(cell * 0.045 * 2) / 2);
+        return '<div style="position:absolute;inset:' + mg + 'px;border-radius:30%;background:linear-gradient(180deg,' + lt(col, .5) + ' 0%,' + lt(col, .18) + ' 24%,'
+            + col + ' 46%,' + col + ' 78%,' + dk(col, .14) + ' 100%);box-shadow:inset 0 0 0 1px ' + lt(col, .32) + ';"></div>';
+    }
+    if (sk === 'line') {
+        const m = Math.max(1, Math.round(cell * 0.08)), w = Math.max(1, Math.round(cell * 0.09)), r = Math.max(2, Math.round(cell * 0.2));
+        const T = same(0, -1), B = same(0, 1), L = same(-1, 0), R = same(1, 0);
+        const ins = 'top:' + (T ? 0 : m) + 'px;bottom:' + (B ? 0 : m) + 'px;left:' + (L ? 0 : m) + 'px;right:' + (R ? 0 : m) + 'px;';
+        const bw = (T ? 0 : w) + 'px ' + (R ? 0 : w) + 'px ' + (B ? 0 : w) + 'px ' + (L ? 0 : w) + 'px';
+        const rad = (!T && !L ? r : 0) + 'px ' + (!T && !R ? r : 0) + 'px ' + (!B && !R ? r : 0) + 'px ' + (!B && !L ? r : 0) + 'px';
+        const g = 'linear-gradient(' + col + ',' + col + ')', bg = [];
+        const corner = function (vx, vy) {
+            bg.push(g + ' ' + vx + ' ' + m + 'px ' + vy + ' 0 / ' + w + 'px ' + (m + w) + 'px no-repeat');
+            bg.push(g + ' ' + vx + ' 0 ' + vy + ' ' + m + 'px / ' + (m + w) + 'px ' + w + 'px no-repeat');
+        };
+        if (T && R && !same(1, -1)) corner('right', 'top');
+        if (T && L && !same(-1, -1)) corner('left', 'top');
+        if (B && R && !same(1, 1)) corner('right', 'bottom');
+        if (B && L && !same(-1, 1)) corner('left', 'bottom');
+        return '<div style="' + box + (bg.length ? 'background:' + bg.join(',') + ';' : '') + '">'
+            + '<div style="position:absolute;' + ins + 'box-sizing:border-box;border-style:solid;border-color:' + col + ';border-width:' + bw + ';border-radius:' + rad + ';"></div></div>';
+    }
+    // base — 오락실 기본처럼 납작한 칸 · 칸 사이 가는 틈 · 살짝 둥근 모서리
+    const gap = cell >= 8 ? 1 : 0;
+    return '<div style="position:absolute;inset:' + (gap / 2) + 'px;border-radius:' + Math.max(1, Math.round(cell * 0.09)) + 'px;background:' + col + ';"></div>';
+}
 // ★ 그린다 — 광장(plaza.js makeOne) · 옷장(closet.js paintDoll) · 조합 창 미리 보기
-//   k — 칸 배율 (도트 → px). 돌려주는 것 — { el, w, h, lift(서는 높이), standX(왼끝에서 서는 줄 가운데까지), cells, cell }
-function rideEl(tr, k) {
+//   k — 칸 배율 (도트 → px) · sk — 블럭 모양 (없으면 기본)
+//   돌려주는 것 — { el, w, h, lift(서는 높이), standX(왼끝에서 서는 줄 가운데까지), cells, cell }
+function rideEl(tr, k, sk) {
     const L = layout(clean(tr));
     if (!L) return null;
+    sk = skinOf(sk);
+    const pal = SKINS[sk].pal;
     const cell = Math.max(2, Math.floor(Math.min(CAP_W * k / L.cols, CAP_H * k / L.rows)));
     const w = cell * L.cols, h = cell * L.rows;
     const el = document.createElement('div');
     el.className = 'plaza-tride';
+    el.dataset.sk = sk;
     el.style.cssText = 'position:absolute;left:50%;width:' + w + 'px;height:' + h + 'px;pointer-events:none;';
-    const b = Math.max(1, Math.round(cell * 0.14));
+    const at = {};
+    L.cells.forEach(function (c) { at[c.x + ',' + c.y] = c.id; });
+    let html = '';
     L.cells.forEach(function (c) {
-        const d = document.createElement('div');
-        d.style.cssText = 'position:absolute;left:' + (c.x * cell) + 'px;top:' + (c.y * cell) + 'px;width:' + cell + 'px;height:' + cell + 'px;'
-            + 'box-sizing:border-box;background:' + COLORS[c.t] + ';'
-            + (cell >= 6 ? 'border:1px solid rgba(0,0,0,.38);' : '')
-            + 'box-shadow:inset ' + b + 'px ' + b + 'px 0 rgba(255,255,255,.38),inset -' + b + 'px -' + b + 'px 0 rgba(0,0,0,.22);';
-        el.appendChild(d);
+        const same = function (dx, dy) { return at[(c.x + dx) + ',' + (c.y + dy)] === c.id; };
+        html += '<div style="position:absolute;left:' + (c.x * cell) + 'px;top:' + (c.y * cell) + 'px;width:' + cell + 'px;height:' + cell + 'px;">'
+            + cellCss(sk, pal[c.t], cell, same) + '</div>';
     });
+    el.innerHTML = html;
     const st = standOf(L);
     return { el: el, w: w, h: h, lift: (L.rows - st.top) * cell, standX: (st.x + 0.5) * cell, cell: cell,
-             cells: L.cells.map(function (c) { return { x: c.x * cell, y: c.y * cell, c: COLORS[c.t] }; }) };
+             cells: L.cells.map(function (c) { return { x: c.x * cell, y: c.y * cell, c: pal[c.t] }; }) };
 }
 window.tetRideEl = rideEl;
+window.tetRideSkin = function (u) { u = u || u_(); return skinOf(u && u.tetRideSkin); };
 
 // ==========================================
 // 물품 — 블록 일곱 가지 (밀실 거래 됨 · 상점에는 안 판다)
@@ -323,6 +380,8 @@ function paint() {
         + '<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; min-height:30px;">'
         + '<button id="tr-rot" class="game-btn" style="flex:0 0 auto; margin:0; padding:6px 12px; font-size:12px;"' + (ST.sel ? '' : ' disabled') + '>↻ 돌리기</button>'
         + '<span style="flex:1; display:flex; align-items:center; gap:7px; font-size:11px; color:#aaa;">' + (ST.sel ? mini(ST.sel, ST.rot, 9) + ' <span>놓을 자리를 누르세요</span>' : '<span>블록을 고르세요</span>') + '</span></div>'
+        + '<div style="font-size:11px; color:#cfd8e6; margin:2px 0 6px;">🎨 블럭 모양 <span style="font-size:10px; color:#8a8a9a;">오락실 테트리스와 같은 넷 · 누르면 바로 바뀝니다</span></div>'
+        + '<div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:5px; margin-bottom:9px;">' + skinBtns(u) + '</div>'
         + '<div id="tr-grid" style="display:grid; grid-template-columns:repeat(' + GW + ', ' + C + 'px); gap:2px; justify-content:center; margin-bottom:8px;">' + grid + '</div>'
         + '<div id="tr-msg" style="min-height:16px; font-size:11px; color:#ffcf7a; text-align:center; margin-bottom:6px;">' + esc(ST.msg) + '</div>'
         + '<div style="display:flex; gap:6px;">'
@@ -337,11 +396,36 @@ function paint() {
         c.onclick = function () { cellTap(Number(c.dataset.x), Number(c.dataset.y)); };
     });
     w.querySelector('#tr-rot').onclick = function () { ST.rot = (ST.rot + 1) & 3; paint(); };
+    Array.prototype.forEach.call(w.querySelectorAll('.tr-sk'), function (b) { b.onclick = function () { skinPick(b.dataset.sk); }; });
+    Array.prototype.forEach.call(w.querySelectorAll('.tr-skp'), function (box) {
+        const v = rideEl([['T', 0, 0, 0]], 0.3, box.dataset.sk);
+        if (v) { v.el.style.left = '50%'; v.el.style.top = '50%'; v.el.style.marginLeft = (-v.w / 2) + 'px'; v.el.style.marginTop = (-v.h / 2) + 'px'; box.appendChild(v.el); }
+    });
     w.querySelector('#tr-clr').onclick = function () { ST.tr = []; ST.msg = ''; paint(); };
     w.querySelector('#tr-x').onclick = shut;
     w.querySelector('#tr-save').onclick = saveRide;
     prev();
 }
+function skinBtns(u) {
+    const cur = skinOf(u && u.tetRideSkin);
+    return SKIN_KEYS.map(function (k) {
+        const on = cur === k;
+        return '<button class="tr-sk" data-sk="' + k + '" style="margin:0; padding:5px 2px 6px; border-radius:7px; cursor:pointer; color:#ddd; font-size:10px;'
+            + ' background:' + (on ? 'linear-gradient(145deg,#4a5a70,#2a3240)' : 'rgba(255,255,255,0.04)') + '; border:1px solid ' + (on ? '#9fb4d0' : 'rgba(255,255,255,0.12)') + ';">'
+            + '<span class="tr-skp" data-sk="' + k + '" style="position:relative; display:block; height:34px; margin-bottom:3px;"></span>' + SKINS[k].n + '</button>';
+    }).join('');
+}
+// 고르면 바로 저장 (오락실 블럭 모양과 같다) — 광장 · 옷장도 바로 바뀐다
+function skinPick(k) {
+    const u = u_(); if (!u || !SKINS[k]) return;
+    u.tetRideSkin = k;
+    save({ tetRideSkin: 1 });
+    try { if (typeof window.plazaRedress === 'function') window.plazaRedress(); } catch (e) { }
+    try { const b = document.getElementById('house-closet-body'); if (b && b.offsetParent && typeof window.renderCloset === 'function') window.renderCloset(); } catch (e) { }
+    ST.msg = '블럭 모양 — ' + SKINS[k].n;
+    paint();
+}
+window.tetRideSkinPick = skinPick;
 function cellTap(x, y) {
     const u = u_(); if (!u) return;
     // 놓인 블록을 누르면 뺀다
@@ -366,7 +450,7 @@ function prev() {
     box.innerHTML = '';
     const u = u_(); if (!u) return;
     const k = 0.34;
-    const v = rideEl(ST.tr, k);
+    const v = rideEl(ST.tr, k, u.tetRideSkin);
     const sp = (typeof window.dotSpec === 'function') ? window.dotSpec() : { W: 352, H: 384, FOOT: 8 };
     const wrap = document.createElement('div');
     const W = sp.W * k, H = sp.H * k, foot = (sp.FOOT || 8) * k;
