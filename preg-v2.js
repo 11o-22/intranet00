@@ -363,10 +363,18 @@ function reshape(code) {
     const t = db.users[code];
     if (!t) return;
     let box = document.getElementById('preg-btn-box');
-    // ★ 상담사 — 단추 칸이 없어도 착정할 수 있으면 칸을 만들어 띄운다 (2026-10-21)
-    if (!box && currentUser.code === 'kario0987' && code !== currentUser.code && canMilk(t)) {
+    // ★ 단추 칸이 없어도 착정할 수 있으면 칸을 만들어 띄운다 — 2026-10-21 상담사만 → 2026-11-15 누구나
+    //   2026-11-15 사용자 「일부 사원이 임신 착정 버튼이 안 떠.」
+    //   칸(preg-btn-box)은 원본(pregnancy.js addPregBtn)이 「임신 중 표시 · 플러그 안내 · 리치맛 안내 · 임신시키기 단추」 가운데
+    //   하나라도 있을 때만 만든다. 받는 쪽이 보통 상대(임신 중도 아니고 리치맛도 없고, 내가 임신시킬 수도 없는 사람)의
+    //   카드를 열면 넷 다 없어 칸이 안 생기고, 착정 단추를 붙일 자리가 없어 그대로 돌아갔다 — 상대에 따라 뜨다 말다 했다.
+    if (!box && code !== currentUser.code && canMilk(t)) {
         const wrap = document.getElementById('emp-detail-card-container');
-        if (wrap) { wrap.insertAdjacentHTML('beforeend', '<div id="preg-btn-box"></div>'); box = document.getElementById('preg-btn-box'); }
+        if (wrap) {
+            wrap.insertAdjacentHTML('beforeend', '<div id="preg-btn-box"></div>');
+            box = document.getElementById('preg-btn-box');
+            if (box) box.dataset.forCode = String(code);      // 다른 카드를 열 때 걷히게 (preg-left.js 가 이 표시로 가린다)
+        }
     }
     if (!box) return;
 
