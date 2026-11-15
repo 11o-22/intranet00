@@ -27,6 +27,7 @@
 //     에코 아웃   지목은 어둠 안에서 — 위쪽 🎧 단추 (같은 방 사람 가운데 넷 · 본인은 따로). 그 어둠에서만 · 끝나면 방과 함께 사라진다.
 //     톤 플레이   남만 지정한다 (본인은 에코 아웃 몫이 따로 있다). 그날은 바꾸지 못한다.
 //     백스핀      상담사를 뺀 전 사원 가운데 무작위 (장착자 자신도 걸릴 수 있다). 받은 사원 화면에 알림.
+//                 ★ 같은 날 사용자 「백스핀은 무작위 말고 지정으로 하자」 — 장착자가 사번 · 이름으로 고른다 (본인도 된다 · 상담사는 안 된다).
 //     더블링      장착한 채로 리듬 게임 한 곡을 끝까지 치면 (듀얼 포함 · 난이도 상관없음) 그날 하루 모든 어둠(EPIC · K 의 방 포함)의 판정 보정 +3.
 //                 「음표가 장착자의 리듬을 탄다」는 설명 글.
 //     피치 라이딩 나올 때 차고 있어야 한다. 어떻게 나왔든(시간이 다 됨 · 리버스 플레이백 · 누가 풀어 줌) 30분 넘게 있었으면.
@@ -602,15 +603,14 @@ function toneSet(target) {
     alert_('🎧 톤 플레이\n\n오늘의 톤 — ' + (target.name || target.code) + ' 사원.\n당신과 같은 어둠에 있는 동안 이 사원은 쓰러지지 않습니다.\n\n오늘은 바꿀 수 없습니다.');
     return true;
 }
-function spinGo() {
+function spinGo(target) {
     const me = u_();
     if (!me || !live(me)) { alert_(NAME + ' 를 차고 있어야 합니다.'); return; }
     if (useOf(me).spin) { alert_('🎧 백스핀은 하루에 한 번입니다.\n\n오늘은 ' + (useOf(me).spinN || '') + ' 사원에게 돌아갔습니다.'); return; }
+    if (!target || !target.code) { alert_('그 사원을 찾지 못했습니다.'); return; }
+    if (target.code === ADMIN && me.code !== ADMIN) { alert_('상담사는 지정할 수 없습니다.'); return; }
     const book = users();
-    const list = Object.keys(book).filter(function (c) { const x = book[c]; return x && x.name && c !== ADMIN; });
-    if (me.code !== ADMIN && list.indexOf(me.code) < 0) list.push(me.code);
-    if (!list.length) { alert_('돌릴 사원이 없습니다.'); return; }
-    const code = list[Math.floor(Math.random() * list.length)];
+    const code = target.code;
     const t = now();
     const v = { by: me.code, n: me.name || me.code, at: t, until: t + C.SPIN.HOURS * HOUR };
     const tgt = userOf(code) || {};
@@ -624,7 +624,7 @@ function spinGo() {
     setUse(me, 'spinN', tn);
     log_(me, '[' + NAME + '] 백스핀 — ' + tn + ' 사원에게 공용시설 행운 ' + C.SPIN.LUCK + '% (' + C.SPIN.HOURS + '시간)');
     save({ djUse: 1, history: 1 });
-    alert_('🎧 백스핀\n\n판을 뒤로 감았다 놓습니다. 바늘이 멈춘 자리 —\n\n' + tn + ' 사원' + (code === me.code ? ' (당신)' : '') + '\n공용시설 행운 ' + C.SPIN.LUCK + '% · ' + C.SPIN.HOURS + '시간');
+    alert_('🎧 백스핀\n\n판을 뒤로 감았다 놓습니다. 바늘을 내려놓은 자리 —\n\n' + tn + ' 사원' + (code === me.code ? ' (당신)' : '') + '\n공용시설 행운 ' + C.SPIN.LUCK + '% · ' + C.SPIN.HOURS + '시간');
 }
 function spinOf(u) { const s = u && u.djSpin; return (s && Number(s.until) > now()) ? s : null; }
 C.spinOf = spinOf;
@@ -657,7 +657,7 @@ const SKILLS = [
     { k: 'echo', n: '에코 아웃', d: '매 어둠마다 ' + C.ECHO.PICK + '명을 지목해 저마다 즉사를 ' + C.ECHO.EACH + '번 면하게 한다 (어둠 안 위쪽 🎧 단추). 당신도 그 어둠에서 ' + C.ECHO.SELF + '번 죽음에서 벗어난다.' },
     { k: 'rev', n: '리버스 플레이백', d: '하루 한 번 가두리에서 나올 수 있다 (가두리 위 🎧 단추).' },
     { k: 'tone', n: '톤 플레이', d: '지정한 한 사람은 당신과 같은 어둠에 있는 동안 횟수 상관없이 쓰러지지 않는다. 하루 한 번 지정하면 다른 사람으로 바꾸지 못한다.' },
-    { k: 'spin', n: '백스핀', d: '하루 한 번, 전 사원 가운데 무작위 한 명에게 공용시설 행운 ' + C.SPIN.LUCK + '% (' + C.SPIN.HOURS + '시간).' },
+    { k: 'spin', n: '백스핀', d: '하루 한 번, 지정한 사원 한 명에게 공용시설 행운 ' + C.SPIN.LUCK + '% (' + C.SPIN.HOURS + '시간). 당신 자신도 된다.' },
     { k: 'dbl', n: '더블링', d: '음표가 장착자의 리듬을 탄다. 하루 한 번 리듬 게임 한 곡(난이도 상관없이)을 끝까지 치면 그날 모든 어둠에서 보정 +' + C.DBL.BON + '.' },
     { k: 'pitch', n: '피치 라이딩', d: '가두리에서 ' + C.PITCH.MIN + '분 넘게 있다가 나오면 우주 쇼핑몰의 물건 하나를 무작위로 들고 나온다.' }
 ];
@@ -684,7 +684,7 @@ function menu() {
     const rows = SKILLS.map(function (S, i) {
         let btns = '';
         if (!off && S.k === 'tone' && !x.tone) btns = '<button class="game-btn dj-tone" style="flex:0 0 auto; margin:0; padding:7px 10px; font-size:10px;' + NEON + '">지정한다</button>';
-        if (!off && S.k === 'spin' && !x.spin) btns = '<button class="game-btn dj-spin" style="flex:0 0 auto; margin:0; padding:7px 10px; font-size:10px;' + NEON + '">돌린다</button>';
+        if (!off && S.k === 'spin' && !x.spin) btns = '<button class="game-btn dj-spin" style="flex:0 0 auto; margin:0; padding:7px 10px; font-size:10px;' + NEON + '">지정한다</button>';
         if (!off && S.k === 'echo' && run() && run().isParty && plain(run())) btns = '<button class="game-btn dj-echo" style="flex:0 0 auto; margin:0; padding:7px 10px; font-size:10px;' + NEON + '">지목한다</button>';
         return '<div style="display:flex; align-items:center; gap:6px; padding:9px 0; border-top:1px solid rgba(255,255,255,0.06);">'
             + '<div style="flex:1; min-width:0;"><div style="font-size:11.5px; color:#e6f8ff;">' + (i + 1) + '. ' + S.n + '</div>'
@@ -695,7 +695,7 @@ function menu() {
         + '<button id="dj-x" class="game-btn" style="' + BTN + GREY + ' margin-top:10px;">닫는다</button>');
     w.querySelector('#dj-x').onclick = shut;
     const tb = w.querySelector('.dj-tone'); if (tb) tb.onclick = askTone;
-    const sb = w.querySelector('.dj-spin'); if (sb) sb.onclick = function () { shut(); spinGo(); };
+    const sb = w.querySelector('.dj-spin'); if (sb) sb.onclick = askSpin;
     const eb = w.querySelector('.dj-echo'); if (eb) eb.onclick = echoMenu;
 }
 window.djMenu = menu;
@@ -712,6 +712,21 @@ function askTone() {
         if (!t) { alert_('그 사원을 찾지 못했습니다.'); return; }
         shut();
         toneSet(t);
+    };
+}
+function askSpin() {
+    const w = box(head('🎧 백스핀', '누구에게 바늘을 내려놓습니까. 그 사원은 ' + C.SPIN.HOURS + '시간 동안 공용시설 행운 ' + C.SPIN.LUCK + '%. 당신 자신도 됩니다.<br>하루 한 번.')
+        + '<input id="dj-who" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="사번 또는 이름" style="width:100%; padding:10px; font-size:13px; margin-bottom:10px; box-sizing:border-box;">'
+        + '<button id="dj-ok" class="game-btn" style="' + BTN + NEON + '">지정한다</button>'
+        + '<button id="dj-no" class="game-btn" style="' + BTN + GREY + '">뒤로</button>');
+    const f = w.querySelector('#dj-who');
+    setTimeout(function () { try { f.focus(); } catch (e) { } }, 80);
+    w.querySelector('#dj-no').onclick = menu;
+    w.querySelector('#dj-ok').onclick = function () {
+        const t = findUser(f.value);
+        if (!t) { alert_('그 사원을 찾지 못했습니다.'); return; }
+        shut();
+        spinGo(t);
     };
 }
 // 장착칸 단추
