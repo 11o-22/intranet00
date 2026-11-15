@@ -74,18 +74,24 @@ function isFem(k) { return !!femKeys()[k]; }
 function build() {
     const out = [];
     if (typeof DOT_SLOTS === 'undefined') return out;
+    const seen = {};
     DOT_SLOTS.forEach(function (s) {
         s.items.forEach(function (it) {
             if (!it.own) return;
             if (it.noTrade) return;          // 상담사가 선물로만 주는 것 (유리 펜)
-            out.push({ k: it.own, n: it.n, slot: s.n });
+            // ★ 여러 칸이 한 열쇠인 옷(힙 의상 — 상의 · 하의 · 망토 · 2026-11-15)은 한 줄로 · 이름은 tn
+            if (seen[it.own]) { seen[it.own].slot += ' · ' + s.n; return; }
+            const row = { k: it.own, n: it.tn || it.n, slot: s.n };
+            seen[it.own] = row;
+            out.push(row);
         });
     });
     // ★ 여성 체형 의상 — 옷장 열쇠(i)가 곧 거래 열쇠
     const F = femKeys();
     Object.keys(F).forEach(function (k) {
-        let slot = '여성 체형';
-        DOT_SLOTS.forEach(function (s) { s.items.forEach(function (it) { if (it.i === k) slot = s.n + ' · 여성 체형'; }); });
+        const at = [];
+        DOT_SLOTS.forEach(function (s) { s.items.forEach(function (it) { if (it.i === k && it.fem && at.indexOf(s.n) < 0) at.push(s.n); }); });
+        const slot = at.length ? at.join(' · ') + ' · 여성 체형' : '여성 체형';     // 여러 칸이 한 열쇠(여성 힙 의상 · 2026-11-15)면 칸을 이어 적는다
         out.push({ k: k, n: F[k].n, slot: slot });
     });
     return out;
