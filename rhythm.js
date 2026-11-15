@@ -526,6 +526,8 @@ function clockTick() {
 }
 // 곡 시각 (싱크 빼기 전)
 function clockMs() {
+    // 🎧 피치 라이딩을 보는 사람 — 손짓 없이 열려 소리 장치가 멈춰 있을 수 있다. 소리 없이 서버 시각으로 채보만 내린다
+    if (CLIP && CLIP.watch && CLIP.startAt && (!AU.ctx || AU.ctx.state !== 'running')) return srv() - CLIP.startAt;
     if (!AU.ctx || AU.ctx.state !== 'running') return rawMs();
     if (CK.base == null) clockTick();
     return performance.now() + CK.base;
@@ -795,6 +797,142 @@ function close() {
     MODE = 'off';
 }
 window.rhythmOpen = open;
+
+// ==========================================
+// 🎧 피치 라이딩 — 어둠 안에서 곡 하나의 하드 10 초 (dj.js · 2026-11-15 사용자)
+// ==========================================
+//   「피치 라이딩 어둠 도중에 리듬 게임에 있는 리듬에서 아무거나 하드로 10 초 정도 나오게 하고
+//    채보의 절반 이상 쳤을 경우 행운 +2, 회피 +1이 친 당사자한테 적용되게 해줘.」
+//   물어서 정한 것 — 장착자만 친다 · 채보가 내려오는 것은 같은 방 사람들도 본다 · 곡은 아티스트 「광시」 것을 뺀다 · 어둠 한 판에 한 번.
+//
+//   rhythmClipPick()           곡 하나 · 하드 10 초 자리 { key, title, at, len }   (광시 빼고 · 노트가 넉넉한 자리)
+//   rhythmClip(o)              o = { key, at, len, watch, label, onStart(startAt) } → Promise<{ hit, total, ok } | null>
+//                              치는 사람 — 곡을 받고 나면 지금 + LEAD 에 시작할 서버 시각을 정해 onStart 로 알린다
+//                              보는 사람(watch) — 판정 없이 채보만 내려온다 · rhythmClipStart(서버 시각)을 받아야 시작 · ✕ 로 닫는다
+//   rhythmClipLabel(글)        위쪽 한 줄을 바꾼다 (보는 사람 — 「○○ 사원 · 적중 n」)
+//   rhythmClipState()          { key, watch, c, n, m, total } — 치는 동안
+//   멈춤이 없다 · 기록 · 랭킹 · 꿈결 · 더블링에 들지 않는다.
+const CLIP_MS = 10000;
+let CLIP = null;
+function clipHud() {
+    const c = CLIP; if (!c) return '';
+    return '<div style="position:absolute;left:0;right:0;top:calc(10px + ' + (SAFE.t || 0) + 'px);text-align:center;pointer-events:none;">'
+        + '<div style="display:inline-block;padding:5px 14px;border-radius:999px;background:rgba(6,16,26,.72);border:1px solid rgba(95,208,255,.5);font-size:12px;color:#cfefff;letter-spacing:1px;">'
+        + '🎧 피치 라이딩 · ' + esc(c.s.title) + ' <b style="color:#ff5f73;">HARD</b><span data-v="cliplab" style="color:#9fe7ff;">' + (c.label ? ' · ' + esc(c.label) : '') + '</span></div></div>'
+        + (c.watch ? '<button class="rg-pause" data-k="clipx" style="pointer-events:auto;">✕</button>' : '');
+}
+// 노트가 넉넉한(열 개 넘게) 10 초 자리 — 앞뒤를 조금 비우고 무작위 · 못 찾으면 가장 빽빽한 자리
+function clipAt(ch, len) {
+    const c = (ch && ch.charts && (ch.charts.hard || ch.charts.normal)) || null;
+    const ts = c ? c.notes.map(function (n) { return n[0]; }) : [];
+    const dur = Number(ch && ch.dur) || (ts.length ? ts[ts.length - 1] + 2000 : 60000);
+    const lo = 3000, hi = Math.max(lo, dur - len - 2500);
+    for (let k = 0; k < 30; k++) {
+        const a = Math.round(lo + Math.random() * (hi - lo));
+        const n = ts.filter(function (t) { return t >= a && t < a + len; }).length;
+        if (n >= 12) return a;
+    }
+    return Math.round(previewAt(ch));
+}
+window.rhythmClipPick = function () {
+    const list = SONGS.filter(function (s) { return s.artist !== '광시'; });
+    const s = list[Math.floor(Math.random() * list.length)];
+    return loadChart(s).then(function (ch) { return { key: s.key, title: s.title, at: clipAt(ch, CLIP_MS), len: CLIP_MS }; });
+};
+window.rhythmClip = function (o) {
+    return new Promise(function (res) {
+        const s = SONGS.find(function (x) { return x.key === (o && o.key); });
+        if (!s || OV || !canPlay()) { res(null); return; }
+        open();
+        if (!OV) { res(null); return; }
+        const my = { s: s, at: Math.max(0, Number(o.at) || 0), len: Number(o.len) || CLIP_MS, watch: !!o.watch, label: o.label || '',
+                     startAt: o.startAt || null, onStart: o.onStart, res: res, buf: null, chart: null, began: false, end: false };
+        CLIP = my;
+        previewStop(true);
+        if (!my.watch) { sessionOn(); ctx(); keepAlive(); } else { try { ctx(); } catch (e) { } }
+        MODE = 'load';
+        UI.innerHTML = '<div class="rg-bg"></div><div class="rg-load"><div style="text-align:center;line-height:2;"><div style="font-size:12px;letter-spacing:4px;color:#9fe7ff;">🎧 PITCH RIDING</div>'
+            + '<div>' + esc(s.title) + ' · <b style="color:#ff5f73;">HARD</b> · 10 초</div><div data-v="cliplab" style="font-size:12px;color:#9ab;">' + (my.watch ? esc(my.label || '') + ' 불러오는 중…' : '불러오는 중…') + '</div></div></div>'
+            + (my.watch ? '<button class="rg-pause" data-k="clipx">✕</button>' : '');
+        const xb = UI.querySelector('[data-k="clipx"]'); if (xb) xb.onclick = function (e) { e.stopPropagation(); clipEnd(null); };
+        // 너무 오래 못 받으면 접는다
+        my.to = setTimeout(function () { if (CLIP === my && !my.began) clipEnd(null); }, 25000);
+        Promise.all([loadSong(s), loadChart(s)]).then(function (r) {
+            if (CLIP !== my || !OV) return;
+            my.buf = r[0]; my.chart = r[1];
+            if (!my.watch && !my.startAt) {
+                my.startAt = Math.round(srv() + LEAD * 1000);
+                try { if (typeof my.onStart === 'function') my.onStart(my.startAt); } catch (e) { }
+            }
+            clipGo();
+        }).catch(function () { if (CLIP === my) clipEnd(null); });
+    });
+};
+// 받았고 · 시작할 서버 시각을 알면 판을 편다
+function clipGo() {
+    const c = CLIP;
+    if (!c || c.began || !c.buf || !c.chart || !c.startAt) return;
+    if (srv() > c.startAt + c.len) { clipEnd(null); return; }          // 이미 끝난 판
+    c.began = true; clearTimeout(c.to);
+    const ch = c.chart, hard = ch.charts.hard || ch.charts.normal, a = c.at, b = c.at + c.len;
+    const notes = hard.notes.filter(function (n) { return n[0] >= a && n[0] < b; }).map(function (n) {
+        const m = n.slice(); m[0] = n[0] - a;
+        if (m[2] === 1) m[3] = Math.max(60, Math.min(Number(n[3]) || 0, b + 400 - n[0]));   // 길게 누르기는 10 초 끝을 조금만 넘게
+        return m;
+    });
+    const ch2 = Object.assign({}, ch, { dur: c.len, charts: { hard: Object.assign({}, hard, { notes: notes }) } });
+    begin(c.s, 'hard', c.buf, ch2);
+}
+window.rhythmClipStart = function (startAt) { const c = CLIP; if (!c || !startAt) return; if (!c.startAt) c.startAt = Number(startAt); clipGo(); };
+window.rhythmClipLabel = function (t) { const c = CLIP; if (!c || !UI) return; c.label = String(t || ''); const el = UI.querySelector('[data-v="cliplab"]'); if (el) el.textContent = c.began ? ' · ' + c.label : c.label; };
+window.rhythmClipState = function () { const c = CLIP; return (c && P) ? { key: c.s.key, watch: c.watch, c: P.cnt.c, n: P.cnt.n, m: P.cnt.m, total: P.total, began: c.began } : (c ? { key: c.s.key, watch: c.watch, began: false } : null); };
+// 「들리는 소리의 10 초 머리」가 c.startAt(서버 시각)에 오게 — 늦게 받았으면 그만큼 건너뛴 자리부터 (duelAudio 와 같은 셈)
+function clipAudio(buf) {
+    const c = CLIP; if (!c || !buf) return;
+    const cx = ctx();
+    try { if (AU.src) { AU.src.onended = null; AU.src.stop(); } } catch (e) { }
+    const lat = Math.max(0, Math.min(0.35, cx.currentTime - outT()));
+    const lead = (c.startAt - srv()) / 1000 - lat - (AU.lagNow || 0) / 1000;
+    const g = cx.createGain(); g.connect(AU.gain);
+    const src = cx.createBufferSource(); src.buffer = buf; src.connect(g);
+    const t = cx.currentTime, base = c.at / 1000, L = c.len / 1000;
+    let when, off;
+    if (lead > 0.08) { AU.startAt = t + lead; when = AU.startAt; off = base; }
+    else { const late = 0.08 - lead; AU.startAt = t + 0.08 - late; when = t + 0.08; off = base + late; }
+    const end = AU.startAt + L;
+    try {
+        g.gain.setValueAtTime(0, when);
+        g.gain.linearRampToValueAtTime(1, when + 0.25);
+        g.gain.setValueAtTime(1, Math.max(when + 0.3, end - 0.6));
+        g.gain.linearRampToValueAtTime(0, end + 0.4);
+    } catch (e) { }
+    if (off < buf.duration - 0.05) src.start(when, off, Math.max(0.05, end + 0.45 - when));
+    src.onended = function () { if (P && MODE === 'play' && AU.src === src) P.audioEnd = true; };
+    AU.src = src;
+    clockReset();
+}
+function clipResult() {
+    const c = CLIP; if (!c || c.end) return;
+    MODE = 'result';
+    stopPlay();
+    const hit = P ? P.cnt.c + P.cnt.n : 0, total = P ? P.total : 0, ok = total > 0 && hit * 2 >= total;
+    const r = { hit: hit, total: total, ok: ok };
+    UI.innerHTML = '<div class="rg-bg"></div><div class="rg-modal" style="background:transparent"><div class="rg-box" style="align-items:center;text-align:center;gap:8px;padding:16px 26px;">'
+        + '<div style="font-size:12px;letter-spacing:4px;color:#9fe7ff;">🎧 PITCH RIDING</div>'
+        + '<div style="font-size:13px;color:#aab;">' + esc(c.s.title) + ' · <b style="color:#ff5f73;">HARD</b> · 10 초</div>'
+        + (c.watch ? '<div style="font-size:14px;color:#cfefff;" data-v="cliplab">' + esc(c.label || '') + '</div>'
+            : '<div style="font-family:Georgia,serif;font-size:30px;color:#fff;">' + hit + '<small style="font-size:15px;color:#9ab;"> / ' + total + '</small></div>'
+              + '<div style="font-size:15px;font-weight:bold;letter-spacing:3px;color:' + (ok ? '#9fe7ff' : '#a3a3b3') + ';">' + (ok ? '절반 넘게 탔다 — 행운 +2 · 회피 +1' : '절반에 못 미쳤다') + '</div>')
+        + '</div></div>';
+    setTimeout(function () { if (CLIP === c) clipEnd(c.watch ? null : r); }, c.watch ? 1800 : 2400);
+}
+function clipEnd(r) {
+    const c = CLIP; if (!c || c.end) return;
+    c.end = true; clearTimeout(c.to);
+    CLIP = null;
+    try { close(); } catch (e) { }
+    try { c.res(r); } catch (e) { }
+}
 // ★ 치는 동안 뒤의 화면 다시 그리기(updateUI)를 미룬다 (2026-11-15 사용자 「리듬게임 버퍼링도 좀 있는 거 수정해 줘」)
 //   리듬 게임이 덮고 있어 안 보이는데, 남의 기록이 바뀔 때마다 · 여러 시계가 불러 한 번에 10 ms 넘게(휴대폰) 들었다 — 그 틀이 끊겨 보였다.
 //   치는 동안(불러오기 · 치기)은 5 초에 한 번만 그리고, 끝나면 밀린 것을 한 번 그린다.
@@ -1059,16 +1197,22 @@ function begin(s, d, buf, chart) {
     P = { s: s, d: d, chart: chart, notes: notes, chains: chains, total: total, score: 0, combo: 0, maxCombo: 0,
           cnt: { c: 0, n: 0, m: 0 }, offs: [], ptr: {}, judge: null, fx: [], parts: [], ended: false, head: 0, duel: !!DUEL };
     // 듀얼에는 멈춤이 없다 — 같은 자리에 ✕ (나가기)
-    UI.innerHTML = DUEL ? '<button class="rg-pause" data-k="quit">✕</button>' : '<button class="rg-pause" data-k="pause">❚❚</button>';
-    UI.querySelector('.rg-pause').onclick = function (e) { e.stopPropagation(); if (DUEL) duelQuitAsk(); else pause(); };
-    bindInput();
+    if (CLIP) {                                    // 🎧 피치 라이딩 — 멈춤 없음 · 보는 사람만 ✕ (닫기)
+        UI.innerHTML = clipHud();
+        const xb = UI.querySelector('[data-k="clipx"]'); if (xb) xb.onclick = function (e) { e.stopPropagation(); clipEnd(null); };
+    } else {
+        UI.innerHTML = DUEL ? '<button class="rg-pause" data-k="quit">✕</button>' : '<button class="rg-pause" data-k="pause">❚❚</button>';
+        UI.querySelector('.rg-pause').onclick = function (e) { e.stopPropagation(); if (DUEL) duelQuitAsk(); else pause(); };
+    }
+    if (CLIP && CLIP.watch) unbindInput(); else bindInput();
     bgFor(s);                                      // 바탕 표지를 미리 받아 둔다
     if (AU.lag[s.key] == null) AU.lag[s.key] = headLag(buf, chart.head);
     AU.lagNow = AU.lag[s.key];
     clockReset();
     const cx = ctx();
     keepAlive();
-    if (DUEL) { duelAudio(buf); duelListen(); }    // 둘이 같은 때(서버 시각)에 시작한다
+    if (CLIP) clipAudio(buf);                      // 🎧 피치 라이딩 — 곡 가운데 10 초 · 정한 서버 시각에
+    else if (DUEL) { duelAudio(buf); duelListen(); }    // 둘이 같은 때(서버 시각)에 시작한다
     else {
         AU.src = cx.createBufferSource(); AU.src.buffer = buf; AU.src.connect(AU.gain);
         AU.startAt = cx.currentTime + LEAD;
@@ -1086,6 +1230,7 @@ const WD = { last: null, at: 0, tried: 0, on: false };
 function wdReset() { WD.last = null; WD.at = performance.now(); WD.tried = 0; wakeHide(); }
 function watchdog() {
     if (MODE !== 'play' || !P) { if (WD.on) wakeHide(); return; }
+    if (CLIP && CLIP.watch) return;                 // 🎧 보는 사람은 소리가 없어도 된다
     const c = AU.ctx, pn = performance.now();
     const t = c ? c.currentTime : -1;
     if (c && c.state === 'running' && t !== WD.last) { WD.last = t; WD.at = pn; if (WD.on) wakeHide(); return; }
@@ -1154,7 +1299,7 @@ function stopPlay() {
     unbindInput();
 }
 function pause() {
-    if (MODE !== 'play' || DUEL) return;               // 듀얼에는 멈춤이 없다 (둘의 곡이 어긋난다)
+    if (MODE !== 'play' || DUEL || CLIP) return;       // 듀얼 · 🎧 피치 라이딩에는 멈춤이 없다 (곡이 어긋난다)
     MODE = 'pause';
     STILL.pauseAt = performance.now();
     try { AU.ctx.suspend(); } catch (e) { }
@@ -1436,6 +1581,10 @@ function step(now) {
         const n = P.notes[i];
         const dt = now - n.t;
         if (dt < -W_NORMAL - 300) break;
+        if (CLIP && CLIP.watch) {                  // 🎧 보는 사람 — 판정 없이 판정선을 지나 사라진다
+            if (!n.done && dt >= (n.k === 1 ? n.len : 0)) { n.done = true; if (n.k === 1) n.tail = 'w'; }
+            continue;
+        }
         if (n.done) {
             if (n.k === 1 && !n.tail) {
                 if (n.j === 'm') { n.tail = 'm'; addScore('m'); continue; }
@@ -2850,6 +2999,7 @@ function rfxRun(rk) {
 // ==========================================
 function result() {
     if (!P || !OV) return;
+    if (CLIP) { clipResult(); return; }            // 🎧 피치 라이딩 — 기록 · 랭킹 · 꿈결에 들지 않는다
     if (P.duel) { if (DUEL && DUEL.st === 'play') duelResult(); return; }     // 👥 듀얼 — 랭킹 · 꿈결 · 최고 기록에 들지 않는다
     MODE = 'result';
     stopPlay();

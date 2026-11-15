@@ -14,12 +14,13 @@
 //    5. 백스핀 - 하루 한 번 전 사원 중 랜덤으로 행운 200% 를 준다.
 //    6. 더블링 - 음표가 장착자의 리듬을 탄다. 하루 한 번 리듬 게임 (곡 난이도 상관x) 하나를 완주 시 모든 어둠에서 보정 +3
 //    7. 피치 라이딩 - 가두리에서 30분 이상 있을 시 나올 때 랜덤으로 우주 쇼핑몰의 아이템 하나를 들고 나온다.
+//       → 같은 날 「어둠 도중에 리듬 게임 곡 하나를 하드로 10 초 · 절반 이상 치면 행운 +2 · 회피 +1」 로 바꿈 (아래 7 · rhythm.js rhythmClip)
 //
 //   물어서 정한 것 (같은 날)
 //     에코 아웃   지목한 4명이 **저마다 4번씩** 즉사를 면한다 (모두 16번) · 본인은 따로 4번
 //     톤 플레이   지정한 사람은 **장착자와 같은 어둠에 있을 때만** 무조건 산다
 //     백스핀      공용시설 행운 200% (×3) · 24시간
-//     피치 라이딩 값이 쌀수록 잘 나온다 (보물 찾기 상자와 같은 셈 — 1/√값) · 한정품은 뺀다
+//     피치 라이딩 (처음 것 — 없앰) 값이 쌀수록 잘 나온다 · 한정품은 뺀다
 //
 //   그 밖에 정한 것
 //     블렌딩      확정 구출은 구조 화면에 칸을 하나 붙인다 (🌟 파군처럼). 셋을 다 쓰면 그 어둠에서 장착자가 하는 구출 판정 +3
@@ -33,7 +34,7 @@
 //                 ★ 같은 날 사용자 「그리고 더블링은 장착자 뿐만 아니라 모든 사원들 포함해줘. 같은 어둠에 들어간」
 //                   켜진 장착자와 같은 어둠(같은 방 — 어둠 탐사 · EPIC · K 의 방)에 들어간 사원 모두 +3. 장착자가 여럿이어도 +3 한 번.
 //                   받는 사원은 제 화면에서 같은 방의 장착자를 본다 (users/<장착자>/djUse.dbl · 장착자가 봉인 중이면 없다).
-//     피치 라이딩 나올 때 차고 있어야 한다. 어떻게 나왔든(시간이 다 됨 · 리버스 플레이백 · 누가 풀어 줌) 30분 넘게 있었으면.
+//     피치 라이딩 (처음 것 — 없앰) 나올 때 차고 있어야 한다 · 30분 넘게 있었으면.
 //     어둠        죽음 · 구출 기술은 어둠 탐사(피날레 포함) — EPIC · K 의 방 · 재난은 아니다 (🦊 호갑투와 같다).
 //     꺼지는 때   이벤트 어둠 · 재앙의 장비 봉인 (WONDER_GEAR_OFF) — 다른 커스텀 장비와 같다.
 //     가두리      본인이 스스로 나오는 것만 (커스텀 장비 규칙) · 여정 가두리의 처음 30분 잠김은 지킨다 · 격리에 딸린 가두리는 아니다.
@@ -53,7 +54,7 @@ window.DJ = {
     ECHO: { PICK: 4, EACH: 4, SELF: 4 },
     SPIN: { HOURS: 24, LUCK: 200 },
     DBL: { BON: 3 },
-    PITCH: { MIN: 30 }
+    PITCH: { STEPS: 3, LUCK: 2, EVA: 1 }
 };
 
 (function discJockey() {
@@ -200,7 +201,7 @@ function echoOf(r, code) {
     return (v && v.by) ? v : null;
 }
 function keepN(r) {
-    try { const me = u_(), d = db_(); if (r && me && d) d.ref('darkRuns/' + me.code + '/djN').set({ s: r._djSelf || 0, b: r._djBlend || 0 }); } catch (e) { }
+    try { const me = u_(), d = db_(); if (r && me && d) d.ref('darkRuns/' + me.code + '/djN').set({ s: r._djSelf || 0, b: r._djBlend || 0, p: r._djPitch ? 1 : 0 }); } catch (e) { }
 }
 function toneSave(me, r) {
     const by = toneBy(me, r);
@@ -495,7 +496,6 @@ window.djReverse = function () {
         log_(me, '[' + NAME + '] 리버스 플레이백 — 판을 거꾸로 돌려 가두리에서 나왔습니다.');
         save({ djUse: 1, history: 1 });
         alert_('🎧 리버스 플레이백\n\n판을 거꾸로 돌립니다. 들어오던 길이 되감깁니다.\n가두리에서 나왔습니다. (오늘 몫을 썼습니다)');
-        setTimeout(function () { try { pitchTick(); } catch (err) { } }, 600);
     });
 };
 setInterval(function () {
@@ -525,79 +525,118 @@ setInterval(function () {
 }, 1000);
 
 // ==========================================
-// 7 — 피치 라이딩: 가두리에 30분 넘게 있다 나오면 우주 쇼핑몰 물건 하나
+// 7 — 피치 라이딩: 어둠 한 판에 한 번, 리듬 게임 곡 하나의 하드 10 초 (rhythm.js rhythmClip)
 // ==========================================
-//   가두리에 든 때를 users/<사번>/djCage 에 적어 두고, 빠진 것을 보면 그동안 있었던 시간을 잰다.
-//   화면이 꺼져 있던 사이에 빠졌으면 — 정해진 시간이 다 돼서 나온 것이면 그때까지, 아니면 마지막으로 본 때까지만 센다.
-const PITCH_SKIP = ['황룡의 눈', '산군의 도움', '🪄 도깨비 방망이', '🫙 소원권', '여우구슬', '금고', '사직서', '🎫 기록 소실 티켓', '📝 사원명 변경권',
-    '복사기', '정갈한 문패', '오색 신발끈', NAME];
-function priceOf(n) {
-    const c = (typeof ITEM_CATALOG !== 'undefined') ? ITEM_CATALOG[n] : null;
-    const p = c ? parseInt(c.price, 10) : NaN;
-    return (isNaN(p) || p <= 0) ? 10000 : p;
+//   ★ 2026-11-15 사용자 「피치 라이딩 어둠 도중에 리듬 게임에 있는 리듬에서 아무거나 하드로 10 초 정도 나오게 하고
+//     채보의 절반 이상 쳤을 경우 행운 +2, 회피 +1이 친 당사자한테 적용되게 해줘.」
+//     물어서 정한 것 — 장착자만 친다 · 채보가 내려오는 것은 같은 방 사람들도 본다 · 아티스트 「광시」 곡은 뺀다 ·
+//     어둠 한 판에 한 번 · 처음의 가두리 효과(30 분 → 우주 쇼핑몰 물건)는 없앴다 (어둠 속 리듬으로 바꿈).
+//   · 어둠 탐사(피날레 포함 · 혼자도)의 1~3 번째 장면 가운데 무작위 한 곳에서, 장면이 뜬 뒤 1.5 초에 연다 (투표 · 구조 중이면 다음 장면).
+//   · 절반 = 채보 몫(길게 누르기는 머리 · 꼬리 둘) 가운데 CHARMING + NORMAL 이 절반 이상.
+//   · 행운 +2 · 회피 +1 은 그 어둠에서만 (itemBuffs run — 🔎 눈의 버프와 같은 길 · 탐사가 끝나면 걷힌다).
+//   · 같은 방 — darkParties/<방>/djPitch = { id, by, n, key, title, at, len, t0, startAt, prog: { c, n, m, total }, res: { hit, total, ok } }
+//     보는 사람 화면에 같은 10 초가 같은 서버 시각에 내려온다 (판정 없음 · 소리는 될 때만 · ✕ 로 닫는다).
+const PITCH = { STEPS: 3, DELAY: 1500, LUCK: 2, EVA: 1 };
+function pitchSafe(r) {
+    if (!r || r._dead || r.dying || r._settled) return false;
+    if (document.getElementById('rg-ov') || document.getElementById('kcal-ov')) return false;
+    const va = document.getElementById('vote-area');
+    if (va && va.querySelector('button')) return false;                    // 투표 중
+    const body = (typeof darkBodyEl === 'function') ? darkBodyEl() : null;
+    if (body && /구조|위험/.test(((body.querySelector('div') || {}).textContent || '').slice(0, 20))) return false;
+    return true;
 }
-function pitchPool(me) {
-    const pool = [];
+function pitchDue(r) {
+    const me = u_();
+    if (!me || !r || !live(me) || !plain(r) || r._djPitch) return false;
+    if (typeof window.rhythmClip !== 'function') return false;
+    if (r._djPitchAt == null) r._djPitchAt = 1 + Math.floor(Math.random() * PITCH.STEPS);
+    return (Number(r.step) || 0) >= r._djPitchAt;
+}
+wrap('renderDarkStep', function (_r) {
+    return function () {
+        const out = _r.apply(this, arguments);
+        try {
+            const r = run();
+            if (pitchDue(r)) {
+                const st = r.step;
+                setTimeout(function () {
+                    const r2 = run();
+                    if (r2 !== r || r2.step !== st || !pitchDue(r2) || !pitchSafe(r2)) return;
+                    pitchGo(r2);
+                }, PITCH.DELAY);
+            }
+        } catch (e) { }
+        return out;
+    };
+});
+function srvNow() { try { if (typeof window.serverNow === 'function') return Number(window.serverNow()) || now(); } catch (e) { } return now(); }
+function pitchGo(r) {
+    const me = u_(); if (!me || !r) return;
+    r._djPitch = 1; keepN(r);
+    const pid = (r.isParty && r.partyId) ? r.partyId : null;
+    const ref = (pid && db_()) ? db_().ref('darkParties/' + pid + '/djPitch') : null;
+    let prog = 0;
+    window.rhythmClipPick().then(function (pk) {
+        if (run() !== r) return null;
+        const rec = { id: me.code + '_' + now(), by: me.code, n: me.name || me.code, key: pk.key, title: pk.title, at: pk.at, len: pk.len, t0: srvNow() };
+        if (ref) { try { ref.set(rec); } catch (e) { } }
+        chat('🎧 ' + (me.name || '') + ' 사원의 피치 라이딩 — 「' + pk.title + '」 HARD 10 초');
+        try { if (r.log) r.log.push('[🎧 피치 라이딩] ' + pk.title + ' HARD 10 초'); } catch (e) { }
+        if (ref) prog = setInterval(function () {
+            try { const st = window.rhythmClipState && window.rhythmClipState(); if (st && st.began && !st.watch) ref.child('prog').set({ c: st.c || 0, n: st.n || 0, m: st.m || 0, total: st.total || 0 }); } catch (e) { }
+        }, 800);
+        return window.rhythmClip({ key: pk.key, at: pk.at, len: pk.len, onStart: function (sa) { if (ref) { try { ref.child('startAt').set(sa); } catch (e) { } } } })
+            .then(function (res) { return { pk: pk, res: res }; });
+    }).then(function (o) {
+        clearInterval(prog);
+        if (!o) return;
+        const res = o.res, pk = o.pk;
+        if (!res) { chat('🎧 ' + (me.name || '') + ' 사원의 피치 라이딩이 끊겼습니다.'); return; }
+        if (ref) { try { ref.child('res').set(res); } catch (e) { } }
+        if (res.ok) {
+            const add = (typeof window.ibAdd === 'function') ? window.ibAdd : (typeof ibAdd === 'function' ? ibAdd : null);
+            try { if (add) { add(me, 'luck', PITCH.LUCK, 12 * HOUR, NAME, { run: true }); add(me, 'eva', PITCH.EVA, 12 * HOUR, NAME, { run: true }); } } catch (e) { }
+            // 회피 · 행운 몫은 탐사 들머리에 한 번만 읽힌다 — 다시 채운다 (🔎 눈과 같다)
+            try { if (typeof resetDnaCharge === 'function') resetDnaCharge(); } catch (e) { }
+            log_(me, '[' + NAME + '] 피치 라이딩 — 「' + pk.title + '」 HARD ' + res.hit + ' / ' + res.total + ' · 이 어둠에서 행운 +' + PITCH.LUCK + ' · 회피 +' + PITCH.EVA);
+            toast('🎧 피치 라이딩 — 행운 +' + PITCH.LUCK + ' · 회피 +' + PITCH.EVA);
+            chat('🎧 ' + (me.name || '') + ' 사원이 음정을 탔습니다 — ' + res.hit + ' / ' + res.total + ' · 행운 +' + PITCH.LUCK + ' · 회피 +' + PITCH.EVA);
+        } else {
+            log_(me, '[' + NAME + '] 피치 라이딩 — 「' + pk.title + '」 HARD ' + res.hit + ' / ' + res.total + ' · 절반에 못 미쳤습니다');
+            chat('🎧 ' + (me.name || '') + ' 사원의 피치 라이딩 — ' + res.hit + ' / ' + res.total + ' · 절반에 못 미쳤습니다');
+        }
+        try { if (r.log) r.log.push('[🎧 피치 라이딩] ' + res.hit + ' / ' + res.total + (res.ok ? ' — 행운 +2 · 회피 +1' : ' — 실패')); } catch (e) { }
+        save({ history: 1 });
+    }).catch(function (e) { clearInterval(prog); console.warn('[🎧 DJ] 피치 라이딩', e && e.message); });
+}
+// 같은 방 사람 — 채보가 내려오는 것을 본다 (판정 없음)
+let pitchSeen = '', pitchWatch = '';
+setInterval(function () {
     try {
-        (typeof ALIEN_ITEMS_POOL !== 'undefined' && Array.isArray(ALIEN_ITEMS_POOL) ? ALIEN_ITEMS_POOL : []).forEach(function (n) {
-            if (pool.indexOf(n) >= 0 || PITCH_SKIP.indexOf(n) >= 0) return;
-            if (typeof ITEM_CATALOG === 'undefined' || !ITEM_CATALOG[n]) return;
-            pool.push(n);
-        });
-    } catch (e) { }
-    // 쓸 수 있는 것(소속)이 있으면 그 안에서
-    try {
-        if (typeof canWearItem === 'function') {
-            const f = pool.filter(function (n) { try { return canWearItem(me, n) !== false; } catch (e) { return true; } });
-            if (f.length) return f;
+        const me = u_(), r = run();
+        if (!me || !r || !r.isParty || !r.partyId || !plain(r)) return;
+        const p = parties()[r.partyId];
+        const v = p && p.djPitch;
+        if (!v || !v.id || v.by === me.code || typeof window.rhythmClip !== 'function') return;
+        if (pitchSeen !== v.id) {
+            pitchSeen = v.id;
+            if (srvNow() - (Number(v.t0) || 0) > 20000 || v.res) return;              // 지난 것
+            if (document.getElementById('rg-ov')) return;                             // 다른 판을 치는 중
+            pitchWatch = v.id;
+            window.rhythmClip({ key: v.key, at: v.at, len: v.len, watch: true, label: (v.n || '') + ' 사원', startAt: v.startAt || null })
+                .then(function () { if (pitchWatch === v.id) pitchWatch = ''; });
+        }
+        if (pitchWatch === v.id) {
+            if (v.startAt && typeof window.rhythmClipStart === 'function') window.rhythmClipStart(v.startAt);
+            const pg = v.prog || {};
+            const lab = (v.n || '') + ' 사원 · 적중 ' + ((Number(pg.c) || 0) + (Number(pg.n) || 0)) + (pg.total ? ' / ' + pg.total : '')
+                + (v.res ? (v.res.ok ? ' · 행운 +2 · 회피 +1' : ' · 절반에 못 미쳤다') : '');
+            if (typeof window.rhythmClipLabel === 'function') window.rhythmClipLabel(lab);
         }
     } catch (e) { }
-    return pool;
-}
-function pitchPick(me) {
-    const pool = pitchPool(me);
-    if (!pool.length) return null;
-    const rows = pool.map(function (n) { return { n: n, w: 1 / Math.sqrt(priceOf(n)) }; });
-    const tot = rows.reduce(function (a, r) { return a + r.w; }, 0);
-    let q = Math.random() * tot;
-    for (let i = 0; i < rows.length; i++) { q -= rows[i].w; if (q <= 0) return rows[i].n; }
-    return rows[rows.length - 1].n;
-}
-C.pitchPool = pitchPool; C.pitchPick = pitchPick;
-let pitchBusy = false;
-function pitchTick() {
-    const me = u_();
-    if (!me || pitchBusy) return;
-    const e = cageOf(me);
-    const t = now();
-    if (e) {
-        const at = Number(e.at) || t;
-        const c = me.djCage;
-        if (!c || Number(c.at) !== at) { me.djCage = { at: at, until: Number(e.until) || 0, seen: t }; save({ djCage: 1 }); }
-        else if (t - (Number(c.seen) || 0) > 60000) { c.seen = t; c.until = Number(e.until) || 0; save({ djCage: 1 }); }
-        return;
-    }
-    const c = me.djCage;
-    if (!c || !c.at) return;
-    let end = t;
-    if (t - (Number(c.seen) || 0) > 150000) end = (c.until && t >= c.until) ? Number(c.until) : Number(c.seen) || Number(c.at);
-    const stay = end - Number(c.at);
-    me.djCage = null;
-    save({ djCage: 1 });
-    if (stay < C.PITCH.MIN * 60000 || !wears(me) || wOff()) return;
-    const n = pitchPick(me);
-    if (!n) return;
-    pitchBusy = true;
-    try {
-        if (!Array.isArray(me.inventory)) me.inventory = [];
-        me.inventory.push(n);
-        log_(me, '[' + NAME + '] 피치 라이딩 — 가두리에서 ' + Math.floor(stay / 60000) + '분을 버티고 나오며 「' + n + '」 을(를) 들고 나왔습니다.');
-        save({ inventory: 1, history: 1 });
-        try { if (typeof updateUI === 'function') updateUI(); } catch (err) { }
-        alert_('🎧 피치 라이딩\n\n가두리에 갇혀 있는 동안 음정을 타고 어딘가에 다녀왔습니다.\n나오는 길에 무언가를 들고 있습니다.\n\n「' + n + '」');
-    } finally { pitchBusy = false; }
-}
-setInterval(function () { try { pitchTick(); } catch (e) { } }, 2000);
+}, 400);
+window.djPitchNow = function () { const r = run(); if (r) { r._djPitch = 0; r._djPitchAt = 0; pitchGo(r); } };   // 점검용 — 지금 연다
 
 // ==========================================
 // 4 — 톤 플레이 지정 · 5 — 백스핀
@@ -673,7 +712,7 @@ const SKILLS = [
     { k: 'tone', n: '톤 플레이', d: '지정한 한 사람은 당신과 같은 어둠에 있는 동안 횟수 상관없이 쓰러지지 않는다. 하루 한 번 지정하면 다른 사람으로 바꾸지 못한다.' },
     { k: 'spin', n: '백스핀', d: '하루 한 번, 지정한 사원 한 명에게 공용시설 행운 ' + C.SPIN.LUCK + '% (' + C.SPIN.HOURS + '시간). 당신 자신도 된다.' },
     { k: 'dbl', n: '더블링', d: '음표가 장착자의 리듬을 탄다. 하루 한 번 리듬 게임 한 곡(난이도 상관없이)을 끝까지 치면 그날 모든 어둠에서 당신과 같은 어둠에 들어간 사원 모두 보정 +' + C.DBL.BON + '.' },
-    { k: 'pitch', n: '피치 라이딩', d: '가두리에서 ' + C.PITCH.MIN + '분 넘게 있다가 나오면 우주 쇼핑몰의 물건 하나를 무작위로 들고 나온다.' }
+    { k: 'pitch', n: '피치 라이딩', d: '어둠 한 판에 한 번, 탐사 도중에 리듬 게임 곡 하나가 하드로 10 초 나온다. 채보의 절반 넘게 치면 그 어둠에서 행운 +' + C.PITCH.LUCK + ' · 회피 +' + C.PITCH.EVA + '. 같은 방 사원들 화면에도 채보가 내려온다.' }
 ];
 function stat(k, me) {
     const x = useOf(me), r = run();
@@ -687,7 +726,7 @@ function stat(k, me) {
     if (k === 'tone') return x.tone ? '오늘의 톤 — ' + (x.toneN || nameOf(x.tone)) + ' 사원' : '오늘 아직 지정하지 않았다';
     if (k === 'spin') return x.spin ? '오늘 — ' + (x.spinN || nameOf(x.spin)) + ' 사원에게 돌아갔다' : '오늘 남았다';
     if (k === 'dbl') return x.dbl ? '오늘 켜졌다 — 같은 어둠의 사원 모두 보정 +' + C.DBL.BON : '오늘 아직 — 리듬 게임 한 곡을 끝까지';
-    if (k === 'pitch') { const e = cageOf(me); return e ? '가두리 안 — ' + Math.floor((now() - (Number(e.at) || now())) / 60000) + '분째' : '가두리 밖'; }
+    if (k === 'pitch') return (r && plain(r)) ? (r._djPitch ? '이 어둠 — 이미 나왔다' : '이 어둠 — 아직') : '어둠 안에서 나온다';
     return '';
 }
 function menu() {
@@ -785,7 +824,7 @@ wrap('acceptDarkResume', function (_a) {
         let n = null;
         try { n = window._pendingResume && window._pendingResume.djN; } catch (e) { }
         const out = _a.apply(this, arguments);
-        try { const r = run(); if (r && n) { r._djSelf = Number(n.s) || 0; r._djBlend = Number(n.b) || 0; } } catch (e) { }
+        try { const r = run(); if (r && n) { r._djSelf = Number(n.s) || 0; r._djBlend = Number(n.b) || 0; if (n.p) r._djPitch = 1; } } catch (e) { }
         return out;
     };
 });
@@ -822,7 +861,7 @@ window.djState = function (who) {
     console.log('%c===== ' + NAME + ' — ' + (t.name || t.code) + ' =====', 'color:#9fe7ff; font-size:13px');
     console.log('  차고 있나', wears(t), '· 봉인', sealed(t), '· 지금 꺼짐(이벤트 · 봉인)', t === u_() ? wOff() : sealed(t));
     console.log('  오늘', x);
-    console.log('  백스핀 받은 것', spinOf(t), '· 가두리', t === u_() ? cageOf(t) : '-', '· djCage', t.djCage || null);
+    console.log('  백스핀 받은 것', spinOf(t), '· 가두리', t === u_() ? cageOf(t) : '-');
     if (r && t === u_()) console.log('  이 어둠 — 확정 구출 쓴 수', r._djBlend || 0, '· 본인 에코 아웃', r._djSelf || 0, '· 지목', (parties()[r.partyId] || {}).djEcho || {});
     console.log('  연결:', ['darkDeath', 'renderRescuePrompt', 'attemptRescue', 'rollDarkBonus', 'facilityLuckMult', 'useInventoryItem', 'acceptDarkResume'].map(function (n) { return n + ' ' + ((typeof window[n] === 'function' && window[n]._dj) ? 'O' : '✗'); }).join(' · '));
 };
