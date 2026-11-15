@@ -38,6 +38,20 @@
 //   · Esc 는 피아노 창만 닫는다 (전에는 광장이 통째로 닫혔다)
 //   · 피아노 판 위를 다른 창(리듬 게임 · 요리 판 · 앱 화면)이 덮고 있으면 자판은 그 창의 것이다 (kbFront)
 //   마우스가 있는 화면(PC)에서는 건반마다 누를 글자를 적어 주고 밑에 한 줄 안내를 단다 — 손가락 화면은 전과 같다.
+//
+// ★ 🎹 MIDI 건반 — 전 음역 · 누르는 세기 · 페달 (2026-11-15 사용자
+//   「혹시 실제 피아노 키보드로 연결하면 모든 음역대가 들리게도 가능한가?」 「누르는 세기와 페달도 반영해줘.」)
+//   피아노 창 밑의 [🎹 MIDI 건반 연결] — 브라우저가 건반을 직접 읽는다 (Web MIDI · 크롬 · 엣지 · 파이어폭스 · 안드로이드 크롬.
+//   사파리 · 아이폰 · 아이패드는 지원하지 않아 단추가 안 뜬다). 한 번 연결하면 다음부터는 피아노를 열 때 저절로 붙는다.
+//     · 전 음역     A0 ~ C8 (21 ~ 108) — 화면의 건반은 전처럼 C3 ~ C6, 그 밖은 소리만
+//     · 누르는 세기  세게 칠수록 크고 밝다 (velocity 1 ~ 127)
+//     · 길이        누르고 있는 동안 울리며 천천히 사그라들고(낮은 음일수록 길다), 떼면 잦아든다
+//     · 페달        서스테인 페달(CC 64)을 밟고 있는 동안은 건반을 떼도 울린다 — 떼면 잦아든다
+//   같은 방 사람에게도 똑같이 들린다 —
+//     plazaNote/<방>/<열쇠> = { by, m, at, v: 세기, h: 1, p: 1 } 친 음 · p 는 페달을 밟고 있을 때만 (예전 화면은 v · h 를 몰라도 m 으로 그 음을 낸다)
+//                           = { by, at, x: 'o60,o64,p1' }      뗌(o<음>) · 페달(p1 밟음 · p0 뗌) — 50ms 치를 한 줄로 묶는다
+//   손가락 · 마우스 · 자판으로 치는 음은 전과 같다 (세기 없이 한 가지 크기 · 떼도 그대로 울리다 사라진다).
+//   콘솔 — lpMidiFeed(0x90, 60, 100) 건반이 없어도 MIDI 한 줄을 넣어 본다 · lpSnd() 울리는 음
 (function lpBoard() {
 'use strict';
 
@@ -63,7 +77,8 @@ const NAMES = ['도', '도#', '레', '레#', '미', '파', '파#', '솔', '솔#'
 const OCT_NAME = { '-1': '낮은 옥타브 (C3)', '0': '높은음자리표 (C4)', '1': '높은 옥타브 (C5)' };
 
 const S = { btn: null, menu: null, piano: null, disco: null, oct: 0, pick: [], on: false,
-            seat: null, ref: null, onAdd: null, mine: {}, ctx: null };
+            seat: null, ref: null, onAdd: null, mine: {}, ctx: null,
+            gc: [], gcT: 0, xq: [], xT: 0 };                  // 🎹 MIDI 건반 — 지울 줄 · 묶어 보낼 뗌 · 페달
 window.lpPianoBusy = function () { return !!S.piano || (Date.now() - (S.lastNote || 0) < 6000); };
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
@@ -215,7 +230,115 @@ function play(midi, vol) {
 }
 
 // ==========================================
-// 같은 방에 들려주기 — plazaNote/<방>/<열쇠> = { by, m, at }
+// 🎼 세기 · 길이 · 페달이 있는 소리 — MIDI 건반 (2026-11-15)
+// ==========================================
+//   위의 play 는 한 번 치면 정해진 대로 울리다 사라진다 (손가락 · 마우스 · 자판). 이쪽은 음마다 「소리 한 줄」을 쥐고 있다가
+//   건반을 떼거나 페달을 떼는 순간에 잦아들게 한다. 가운데 음역 · 보통 세기에서는 play 와 같은 음색이다.
+const SND = { MAX: 40, LOW: 21, HIGH: 108, voices: [], who: {}, bus: null, busCtx: null, hits: 0 };
+// 여러 음이 겹쳐도 깨지지 않게 한데 모아 눌러 준다
+function busOut(c) {
+    if (SND.bus && SND.busCtx === c) return SND.bus;
+    const g = c.createGain();
+    g.gain.value = 0.9;
+    let tail = g;
+    try {
+        const cp = c.createDynamicsCompressor();
+        cp.threshold.value = -16; cp.knee.value = 14; cp.ratio.value = 5; cp.attack.value = 0.004; cp.release.value = 0.22;
+        g.connect(cp); tail = cp;
+    } catch (e) { }
+    tail.connect(c.destination);
+    SND.bus = g; SND.busCtx = c;
+    return g;
+}
+function ringTime(m) { return Math.max(1.8, Math.min(11, 11 - (m - 21) * 0.105)); }      // 누르고 있을 때 울리는 길이 — 낮을수록 길다 (A0 11초 … C8 2초)
+function dampTime(m) { return Math.max(0.09, Math.min(0.32, 0.32 - (m - 21) * 0.0027)); }  // 뗐을 때 잦아드는 길이
+function voiceOn(m, vel) {
+    const c = ac();
+    if (!c) return null;
+    const t = c.currentTime;
+    const f = 440 * Math.pow(2, (m - 69) / 12);
+    const x = Math.max(0.03, Math.min(1, (Number(vel) || 0) / 127));
+    const peak = 0.04 + 0.44 * Math.pow(x, 1.6);                // 세기 → 크기
+    const T = ringTime(m);
+    const low = Math.max(0, Math.min(1, (60 - m) / 36));        // 낮은 음일수록 배음을 더 얹는다 — 작은 스피커에서도 들리게
+    const out = c.createGain();
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.exponentialRampToValueAtTime(peak, t + 0.006);
+    out.gain.exponentialRampToValueAtTime(peak * 0.42, t + 0.3);
+    out.gain.exponentialRampToValueAtTime(0.0001, t + T);
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass'; lp.Q.value = 0.4;
+    const bright = Math.min(13000, f * (3 + 9 * x));            // 세게 칠수록 밝다
+    lp.frequency.setValueAtTime(bright, t);
+    lp.frequency.exponentialRampToValueAtTime(Math.max(350, Math.min(bright, f * 2.5)), t + T * 0.7);   // 울리면서 어두워진다
+    lp.connect(out); out.connect(busOut(c));
+    const parts = [[1, 'triangle', 1], [2, 'sine', 0.35 + low * 0.35], [3, 'sine', 0.12 + low * 0.3]];
+    if (low > 0) parts.push([4, 'sine', low * 0.18]);
+    if (m >= 36) parts.push([0.5, 'sine', 0.08]);
+    const osc = [];
+    parts.forEach(function (h) {
+        if (f * h[0] > 18000) return;
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = h[1]; o.frequency.value = f * h[0];
+        g.gain.value = h[2];
+        o.connect(g); g.connect(lp);
+        o.start(t); o.stop(t + T + 0.1);
+        osc.push(o);
+    });
+    const v = { m: m, out: out, osc: osc, end: t + T, off: false };
+    SND.voices = SND.voices.filter(function (q) { return q.end > t; });      // 다 울린 것은 치운다
+    SND.voices.push(v);
+    while (SND.voices.length > SND.MAX) voiceOff(SND.voices.shift(), 0.04);   // 너무 많이 겹치면 가장 오래된 것부터 걷는다
+    SND.hits++;
+    return v;
+}
+function voiceOff(v, rel) {
+    if (!v || v.off) return;
+    v.off = true;
+    const c = S.ctx;
+    if (!c) return;
+    const t = c.currentTime;
+    if (v.end <= t) return;                                     // 이미 다 울렸다
+    const r = rel || dampTime(v.m);
+    try {
+        const g = v.out.gain;
+        if (g.cancelAndHoldAtTime) g.cancelAndHoldAtTime(t);
+        else { const cur = Math.max(0.0001, g.value); g.cancelScheduledValues(t); g.setValueAtTime(cur, t); }
+        g.exponentialRampToValueAtTime(0.0001, t + r);
+    } catch (e) { }
+    v.osc.forEach(function (o) { try { o.stop(t + r + 0.05); } catch (e) { } });
+    v.end = t + r + 0.05;
+}
+// 치는 사람마다 — 누르고 있는 음(held) · 페달이 붙들고 있는 음(sus) · 페달
+function whoOf(id) { return SND.who[id] || (SND.who[id] = { ped: false, held: {}, sus: [] }); }
+function strike(id, m, vel) {
+    S.lastNote = Date.now();                                    // 🎃 배경 음악은 피아노 소리가 나는 동안 쉰다 (event-bgm.js)
+    const w = whoOf(id);
+    // 다 울린 것은 치운다 (남의 「뗌」이 안 닿았을 때 쌓이지 않게)
+    const t = S.ctx ? S.ctx.currentTime : 0;
+    Object.keys(w.held).forEach(function (k) { if (w.held[k].end <= t) delete w.held[k]; });
+    w.sus = w.sus.filter(function (q) { return q.end > t; });
+    // 같은 건반을 다시 쳤다 — 울리던 것은 짧게 걷고 새로 친다
+    if (w.held[m]) { voiceOff(w.held[m], 0.06); delete w.held[m]; }
+    for (let i = w.sus.length - 1; i >= 0; i--) if (w.sus[i].m === m) { voiceOff(w.sus[i], 0.06); w.sus.splice(i, 1); }
+    const v = voiceOn(m, vel);
+    if (v) w.held[m] = v;
+}
+function release(id, m) {
+    const w = whoOf(id), v = w.held[m];
+    if (!v) return;
+    delete w.held[m];
+    if (w.ped) w.sus.push(v);                                   // 페달을 밟고 있다 — 페달을 뗄 때까지 울린다
+    else voiceOff(v);
+}
+function pedalSet(id, on) {
+    const w = whoOf(id);
+    w.ped = !!on;
+    if (!on) { w.sus.forEach(function (v) { voiceOff(v); }); w.sus = []; }
+}
+
+// ==========================================
+// 같은 방에 들려주기 — plazaNote/<방>/<열쇠> = { by, m, at }  (MIDI 건반은 머리말 — v · h · x)
 // ==========================================
 // 탐사 중인가 — 어둠 탐사 · 솔로 · EPIC · K 의 방(darkRun) · 재난 기록 소실 창(#dz-ov)
 //   탐사에 들어간 사람에게는 같은 방에서 친 피아노 소리를 내지 않는다 (2026-10-23)
@@ -239,15 +362,21 @@ function listen(seat) {
         if (Date.now() < armAt) return;                                      // 붙을 때 이미 있던 것
         if (Math.abs(now() - (Number(v.at) || 0)) > 30000) return;          // 아주 묵은 것만 거른다
         if (exploring()) return;                                             // 탐사 중이면 안 들린다
+        if (typeof v.x === 'string') { remoteX(v.by, v.x); return; }         // 🎹 MIDI 건반 — 뗌 · 페달 (소리를 새로 내지 않는다)
         const m = Number(v.m);
-        if (!(m >= 36 && m <= 96)) return;
+        if (!(m >= SND.LOW && m <= SND.HIGH)) return;                        // A0 ~ C8 (전에는 C2 ~ C7 — MIDI 건반의 전 음역을 받는다)
         pbOn(false);                                                         // 아이폰 무음 스위치를 넘어 들리게
         if (!audible() || S.pbWant) {                                        // 아직 화면을 안 눌러 소리 장치가 닫혀 있다
             wake(S.ctx);
             if (!S.hinted) { S.hinted = true; toast('🎹 누군가 피아노를 칩니다 — 화면을 한 번 누르면 들립니다'); }
             if (!S.ctx || S.ctx.state !== 'running') return;
         }
-        play(m);                                                             // 친 사람과 똑같은 소리 · 같은 크기 (2026-10-23)
+        if (v.h && v.v != null) {                                            // 🎹 MIDI 건반 — 세기 · 길이가 있는 음
+            const id = 'r:' + v.by;
+            if (whoOf(id).ped !== !!v.p) pedalSet(id, !!v.p);                // 페달은 친 음마다 같이 실려 온다 — 「뗌」 한 줄이 안 닿았어도 맞춰진다
+            strike(id, m, Number(v.v));
+        }
+        else play(m);                                                        // 친 사람과 똑같은 소리 · 같은 크기 (2026-10-23)
     };
     S.ref.on('child_added', S.onAdd);
 }
@@ -262,6 +391,46 @@ function send(midi) {
         const r = d.ref(LP.NOTE + '/' + st.seat).push({ by: u.code, m: midi, at: now() });
         setTimeout(function () { try { r.remove(); } catch (e) { } }, LP.NOTE_LIFE);
     } catch (e) { }
+}
+// 🎹 MIDI 건반 — 남이 뗀 것 · 밟은 것
+function remoteX(by, x) {
+    const id = 'r:' + by;
+    String(x).split(',').slice(0, 64).forEach(function (tok) {
+        const k = tok.charAt(0), n = Number(tok.slice(1));
+        if (k === 'o' && n >= SND.LOW && n <= SND.HIGH) release(id, n);
+        else if (k === 'p') pedalSet(id, n === 1);
+    });
+}
+// 🎹 MIDI 건반 — 보낸다. 친 음은 바로 한 줄, 뗌 · 페달은 50ms 치를 한 줄로 묶는다.
+//   묶음은 다음 친 음보다 먼저 보낸다 (같은 건반을 빨리 다시 칠 때 「뗌」이 새 음을 꺼 버리지 않게).
+//   지우기도 음마다 따로 쓰지 않고 1초에 한 번 묶어 지운다 — 빠르게 치면 쓰기가 음의 네 배로 늘기 때문이다.
+function pushNote(rec) {
+    const d = db_(), u = u_(), st = stage();
+    if (!d || !u || !st || !st.seat) return;
+    try {
+        rec.by = u.code; rec.at = now();
+        const r = d.ref(LP.NOTE + '/' + st.seat).push(rec);
+        if (r && r.key) {
+            S.gc.push([st.seat, r.key, Date.now()]);
+            if (!S.gcT) S.gcT = setInterval(gcRun, 1000);
+        } else setTimeout(function () { try { r.remove(); } catch (e) { } }, LP.NOTE_LIFE);
+    } catch (e) { }
+}
+function gcRun() {
+    const d = db_(), t = Date.now(), by = {}, left = [];
+    S.gc.forEach(function (e) { if (t - e[2] >= LP.NOTE_LIFE) (by[e[0]] = by[e[0]] || {})[e[1]] = null; else left.push(e); });
+    S.gc = left;
+    if (d) Object.keys(by).forEach(function (seat) { try { d.ref(LP.NOTE + '/' + seat).update(by[seat]); } catch (e) { } });
+    if (!S.gc.length) { clearInterval(S.gcT); S.gcT = 0; }
+}
+function sendOn(m, vel) { flushX(); const r = { m: m, v: vel, h: 1 }; if (MIDI.ped) r.p = 1; pushNote(r); }
+function sendX(tok) { S.xq.push(tok); if (!S.xT) S.xT = setTimeout(flushX, 50); }
+function flushX() {
+    clearTimeout(S.xT); S.xT = 0;
+    if (!S.xq.length) return;
+    const x = S.xq.join(',');
+    S.xq = [];
+    pushNote({ x: x });
 }
 
 // ==========================================
@@ -316,6 +485,15 @@ function send(midi) {
         '.lp-keys.wide .w .kk{font-size:11px;}',
         '.lp-sheet .lp-kb{margin-top:7px;font-size:10.5px;color:#a69ec6;text-align:center;white-space:normal;line-height:1.5;}',
         '.lp-sheet .lp-kb b{color:#d6ceff;font-weight:normal;}',
+        // 🎹 MIDI 건반 줄
+        '.lp-sheet .lp-midi{margin-top:7px;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;',
+        '  font-size:10.5px;color:#a69ec6;line-height:1.5;}',
+        '.lp-sheet .lp-midi:empty{display:none;}',
+        '.lp-sheet .lp-midi button{font:inherit;font-size:11px;padding:5px 11px;border-radius:999px;cursor:pointer;white-space:nowrap;',
+        '  color:#efeaff;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.18);}',
+        '.lp-sheet .lp-midi .on{color:#b9f5c8;}',
+        '.lp-sheet .lp-midi .ped{font-style:normal;padding:2px 9px;border-radius:999px;border:1px solid rgba(255,255,255,.2);opacity:.45;}',
+        '.lp-sheet .lp-midi .ped.dn{opacity:1;background:#5a4aa8;border-color:#c3b8ff;color:#fff;}',
         // 디스코
         '.lp-cols{display:grid;grid-template-columns:repeat(10,1fr);gap:6px;}',
         '.lp-cols button{position:relative;aspect-ratio:1;border-radius:50%;cursor:pointer;padding:0;',
@@ -432,7 +610,8 @@ function openPiano() {
         + '<button class="plaza-keep" data-o="1" title="한 옥타브 위">▲</button><span class="sp"></span>'
         + '<button class="plaza-keep" data-x="1">닫기</button></div><div class="lp-keys"></div>'
         + (kbShow() ? '<div class="lp-kb">⌨ 자판으로도 칩니다 — 건반에 적힌 글자 · 검은 건반은 <b>Shift</b> 와 함께 · '
-            + '화면 밖 낮은 음 <b>1 ~ 7</b> · 높은 음 <b>Z ~ M</b> · <b>Esc</b> 닫기</div>' : '');
+            + '화면 밖 낮은 음 <b>1 ~ 7</b> · 높은 음 <b>Z ~ M</b> · <b>Esc</b> 닫기</div>' : '')
+        + '<div class="lp-midi"></div>';
     keep(p);
     // 말하기 칸에 글자 자리가 남아 있으면 자판이 건반이 못 된다 — 피아노를 열거나 건반 판을 누르면 걷는다
     kbBlur();
@@ -445,7 +624,13 @@ function openPiano() {
         S.oct = Math.max(-1, Math.min(1, S.oct + Number(b.dataset.o)));
         paintKeys();
     });
+    p.querySelector('.lp-midi').addEventListener('click', function (e) {
+        const b = e.target.closest('button'); if (!b) return;
+        if (b.dataset.midi === 'on') midiConnect(true); else midiOff();
+    });
     paintKeys();
+    paintMidi();
+    midiAuto();                                                // 전에 연결해 둔 사람은 열 때 저절로 붙는다
     fxSync();
 }
 // ★ 화면 폭에 맞춰 한 번에 보이는 옥타브 수 (2026-10-23)
@@ -518,6 +703,7 @@ window.addEventListener('resize', function () {
     S._rz = setTimeout(function () { if (S.piano && octCount() !== S._n) paintKeys(); }, 120);
 });
 function closePiano(quiet) {
+    midiHush();                                                // 🎹 누르고 있던 음 · 페달을 놓는다 (같은 방에도 알린다)
     if (S.piano && S.piano.remove) S.piano.remove();
     S.piano = null;
     kbClear();
@@ -588,7 +774,10 @@ function kbLift(code) {
     const el = kbEl(m); if (el) el.classList.remove('dn');
 }
 function kbClear() { Object.keys(KB.down).forEach(kbLift); KB.down = {}; }
-function kbRelight() { Object.keys(KB.down).forEach(function (c) { const el = kbEl(KB.down[c]); if (el) el.classList.add('dn'); }); }
+function kbRelight() {
+    Object.keys(KB.down).forEach(function (c) { const el = kbEl(KB.down[c]); if (el) el.classList.add('dn'); });
+    Object.keys(MIDI.down).forEach(function (m) { const el = kbEl(m); if (el) el.classList.add('dn'); });
+}
 function kbKey(e) {
     if (!S.piano || !S.piano.isConnected) { if (e.type === 'keyup') kbLift(e.code); return; }
     if (e.type === 'keyup') { if (KB.down[e.code] != null) { kbLift(e.code); e.stopPropagation(); } return; }
@@ -614,6 +803,126 @@ function kbKey(e) {
 window.addEventListener('keydown', kbKey, true);
 window.addEventListener('keyup', kbKey, true);
 window.addEventListener('blur', kbClear);
+
+// ==========================================
+// 🎹 MIDI 건반 (2026-11-15) — 머리말에 적어 두었다
+// ==========================================
+const MIDI = { ok: !!(typeof navigator !== 'undefined' && navigator.requestMIDIAccess), access: null, asking: false,
+               state: 'off', names: [], ped: false, down: {} };
+function midiLive() { return !!(S.piano && S.piano.isConnected); }        // 피아노 창이 열려 있을 때만 친다
+function midiOn(m, vel) {
+    if (!midiLive() || !(m >= SND.LOW && m <= SND.HIGH)) return;
+    MIDI.down[m] = 1;
+    const el = kbEl(m); if (el) el.classList.add('dn');
+    pbOn(false);
+    strike('me', m, vel);
+    sendOn(m, vel);
+}
+function midiUp(m) {
+    if (!MIDI.down[m]) return;                                  // 피아노가 닫혀 있을 때 누른 것 따위
+    delete MIDI.down[m];
+    const el = kbEl(m); if (el) el.classList.remove('dn');
+    release('me', m);
+    sendX('o' + m);
+}
+function midiPed(on) {
+    on = !!on;
+    if (MIDI.ped === on) return;
+    if (on && !midiLive()) return;
+    MIDI.ped = on;
+    pedalSet('me', on);
+    sendX('p' + (on ? 1 : 0));
+    paintMidi();
+}
+// 누르고 있던 것을 다 놓는다 — 피아노를 닫을 때 · 연결을 끊을 때 · 건반이 「모든 음 끄기」 를 보낼 때
+function midiHush() {
+    Object.keys(MIDI.down).forEach(function (m) { midiUp(Number(m)); });
+    if (MIDI.ped) midiPed(false);
+    flushX();
+}
+// MIDI 한 줄 — 상태 · 값 둘 (0x9n 누름 · 0x8n 뗌 · 0xBn 64 페달)
+function midiFeed(st, d1, d2) {
+    const cmd = st & 0xf0;
+    d1 = Number(d1) || 0; d2 = Number(d2) || 0;
+    if (cmd === 0x90 && d2 > 0) midiOn(d1, d2);
+    else if (cmd === 0x80 || cmd === 0x90) midiUp(d1);          // 세기 0 인 누름은 뗌이다
+    else if (cmd === 0xb0 && d1 === 64) midiPed(d2 >= 64);
+    else if (cmd === 0xb0 && (d1 === 120 || d1 === 123)) midiHush();
+}
+function midiMsg(e) {
+    const d = e && e.data;
+    if (!d || d.length < 2) return;
+    try { midiFeed(d[0], d[1], d.length > 2 ? d[2] : 0); } catch (x) { }
+}
+function midiBind() {
+    const a = MIDI.access;
+    if (!a) return;
+    const names = [];
+    try {
+        a.inputs.forEach(function (inp) {
+            if (inp.state === 'disconnected') return;
+            inp.onmidimessage = midiMsg;
+            names.push(inp.name || 'MIDI 건반');
+        });
+    } catch (e) { }
+    MIDI.names = names;
+    MIDI.state = names.length ? 'on' : 'none';
+    if (!names.length) midiHush();                              // 건반이 빠졌다 — 누르고 있던 것을 놓는다
+    paintMidi();
+}
+function midiConnect(fromUser) {
+    if (!MIDI.ok) return;
+    if (MIDI.access) { midiBind(); return; }
+    if (MIDI.asking) return;
+    MIDI.asking = true; MIDI.state = 'ask';
+    paintMidi();
+    const fail = function () {
+        MIDI.asking = false; MIDI.state = 'deny';
+        paintMidi();
+        if (fromUser) toast('브라우저가 MIDI 사용을 허락하지 않았습니다');
+    };
+    let pr;
+    try { pr = navigator.requestMIDIAccess({ sysex: false }); } catch (e) { fail(); return; }
+    pr.then(function (a) {
+        MIDI.asking = false;
+        MIDI.access = a;
+        try { localStorage.setItem('lpMidi', '1'); } catch (e) { }
+        try { a.onstatechange = function () { midiBind(); }; } catch (e) { }
+        midiBind();
+        if (fromUser) toast(MIDI.names.length ? '🎹 ' + MIDI.names[0] + ' 연결됨' : '🎹 건반을 꽂으면 바로 잡힙니다');
+    }, fail);
+}
+function midiOff() {
+    const a = MIDI.access;
+    if (a) { try { a.inputs.forEach(function (inp) { inp.onmidimessage = null; }); a.onstatechange = null; } catch (e) { } }
+    midiHush();
+    MIDI.access = null; MIDI.asking = false; MIDI.state = 'off'; MIDI.names = [];
+    try { localStorage.removeItem('lpMidi'); } catch (e) { }
+    paintMidi();
+}
+function midiAuto() {
+    if (!MIDI.ok) return;
+    if (MIDI.access) { midiBind(); return; }
+    let want = false;
+    try { want = localStorage.getItem('lpMidi') === '1'; } catch (e) { }
+    if (want) midiConnect(false);
+}
+function paintMidi() {
+    const p = S.piano;
+    if (!p || !p.querySelector) return;
+    const box = p.querySelector('.lp-midi');
+    if (!box) return;
+    const pc = kbShow();
+    let h = '';
+    if (!MIDI.ok) h = pc ? '<span>🎹 이 브라우저는 MIDI 건반 연결을 지원하지 않습니다 (크롬 · 엣지에서 됩니다)</span>' : '';
+    else if (MIDI.state === 'on') h = '<span class="on">🎹 ' + esc(MIDI.names.join(' · ')) + ' 연결됨' + (pc ? ' — 전 음역 · 누르는 세기 · 페달' : '') + '</span>'
+        + '<i class="ped' + (MIDI.ped ? ' dn' : '') + '">페달</i><button class="plaza-keep" data-midi="off">끊기</button>';
+    else if (MIDI.state === 'none') h = '<span>🎹 MIDI 건반을 찾지 못했습니다 — 꽂으면 바로 잡힙니다</span><button class="plaza-keep" data-midi="off">그만 찾기</button>';
+    else if (MIDI.state === 'ask') h = '<span>🎹 MIDI 건반을 찾는 중… 브라우저가 물으면 허용을 눌러 주세요</span>';
+    else if (MIDI.state === 'deny') h = '<span>🎹 브라우저가 MIDI 사용을 막았습니다 — 주소창의 권한에서 허용해 주세요</span><button class="plaza-keep" data-midi="on">다시 연결</button>';
+    else h = '<button class="plaza-keep" data-midi="on">🎹 MIDI 건반 연결</button>' + (pc ? '<span>실제 건반을 꽂으면 전 음역 · 누르는 세기 · 페달로 칩니다</span>' : '');
+    if (box._h !== h) { box.innerHTML = h; box._h = h; }
+}
 
 // ==========================================
 // 🪩 디스코
@@ -692,6 +1001,7 @@ function tick() {
     const st = stage();
     if (!st || !st.ov) {
         if (S.ref) unlisten();
+        if (S.piano) { try { midiHush(); kbClear(); } catch (e) { } }   // 광장을 닫았다 — 누르고 있던 음을 놓는다
         S.menu = S.piano = S.disco = null; S.btn = null; S.on = false;
         return;
     }
@@ -718,5 +1028,17 @@ window.lpState = function () {
     return o;
 };
 window.lpPlay = function (m) { play(Number(m) || 60); };
+// 🎹 MIDI 건반
+window.lpMidiFeed = function (st, d1, d2) { midiFeed(Number(st) || 0, d1, d2); };
+window.lpSnd = function () {
+    const t = S.ctx ? S.ctx.currentTime : 0;
+    const who = {};
+    Object.keys(SND.who).forEach(function (id) {
+        const w = SND.who[id];
+        who[id] = { 페달: w.ped, 누름: Object.keys(w.held).map(Number), 붙듦: w.sus.filter(function (v) { return !v.off && v.end > t; }).map(function (v) { return v.m; }) };
+    });
+    return { 울림: SND.voices.filter(function (v) { return v.end > t; }).length, 친수: SND.hits, 사람: who,
+             MIDI: { 지원: MIDI.ok, 상태: MIDI.state, 건반: MIDI.names.slice(), 페달: MIDI.ped, 누름: Object.keys(MIDI.down).map(Number) } };
+};
 
 })();
