@@ -727,7 +727,7 @@ function stampSafe(ov) {
         //   발을 바꿔 디뎌도 그 사람 칸만 다시 그리고, 뒤의 큰 방 그림까지
         //   다시 칠하지 않는다.
         '.plaza-one{position:absolute;left:0;top:0;pointer-events:none;will-change:transform;}',
-        // 🛹 노트 보드 — 리듬 게임 하얀 노트(바)와 같은 빛깔 · 테 · 윗줄 하이라이트 · 둘레 빛 (rhythm.js key()) · 2026-11-15
+        // 🛹 리듬 보드 — 리듬 게임 하얀 노트(바)와 같은 빛깔 · 테 · 윗줄 하이라이트 · 둘레 빛 (rhythm.js key()) · 2026-11-15
         //   ★ 이름은 plaza-nboard — plaza-board 는 사내 게시판 자리(.plaza-spot · board.js)가 이미 쓴다
         '.plaza-nboard{position:absolute;left:50%;pointer-events:none;box-sizing:border-box;',
         '  background:linear-gradient(180deg,#ffffff 0%,#eef1f8 60%,#b8c2d6 100%);border:1px solid rgba(40,50,80,.55);',
@@ -2636,8 +2636,8 @@ function makeOne(user, label, k, other) {
     // 🍍 잎 우산을 달았나 — 작은 사람이 머리 위 대신 잎 위를 걷는다 (leafSurf)
     try { const L = window.dotLook(user, null, !!other); one.leaf = !tiny && (L.tops || []).indexOf(LEAF.SHEET) >= 0; } catch (e) { one.leaf = false; }
     if (one.leaf) leafLoad();
-    // 🛹 노트 보드 — 보통 크기일 때만 (🍍 작아지면 안 탄다). 칸 맨 아래 발바닥 줄에 깔고, 사람은 putOne 이 그 두께만큼 올린다
-    try { const LB = window.dotLook(user, null, !!other); one.board = !tiny && LB.ride === 'note'; } catch (e) { one.board = false; }
+    // 🛹 리듬 보드 — 칸 맨 아래 발바닥 줄에 깔고, 사람은 putOne 이 그 두께만큼 올린다. 🍍 작아져도 탄다 (보드도 같이 작아진다 · k 에 TINY 가 곱해져 있다)
+    try { const LB = window.dotLook(user, null, !!other); one.board = LB.ride === 'note'; } catch (e) { one.board = false; }
     if (one.board) {
         const b = boardEl(k);
         b.el.style.top = Math.round(h - one.foot) + 'px';
@@ -2814,7 +2814,7 @@ function zz() { return (run && run.z) || 1; }
 
 function putOne(one, x, y, lift) {
     const z = zz();
-    lift = (lift || 0) + potLift(one) + boardLift(one);                      // 🍲 냄비 속 — 머리와 어깨만 국 위로 · 🛹 노트 보드 두께만큼 올라선다
+    lift = (lift || 0) + potLift(one) + boardLift(one);                      // 🍲 냄비 속 — 머리와 어깨만 국 위로 · 🛹 리듬 보드 두께만큼 올라선다
     const L = Math.round(x * z - one.w / 2);
     const T = Math.round(y * z - (one.h - (one.foot || 0)) - (lift || 0));   // 🍍 lift — 점프로 떠 있는 높이(px)
     if (one.trail && one._bOn) trailMark(one, x * z, T + (one.h - (one.foot || 0)));   // 🛹 지나온 자리 (보드 윗면 · 방 그림 px)
@@ -2881,19 +2881,22 @@ function jumpPaint() {
         if (b._bot !== want) { b.style.bottom = want; b._bot = want; }
     }
     if (on) {                                                   // 🛹 보드 탄 사람은 보드 그림으로
-        const ic = run.me.tiny ? '🍍' : '🛹';
+        const ic = boardOn(run.me) ? '🛹' : '🍍';
         if (b._ic !== ic && b.firstChild && b.firstChild.nodeType === 3) { b.firstChild.nodeValue = ic + ' 점프'; b._ic = ic; }
     }
     if (jumpShown !== on) { b.classList.toggle('on', on); jumpShown = on; }
 }
 
 // ==========================================
-// 🛹 노트 보드 — 리듬 게임 하얀 노트(바)를 탈것으로 (2026-11-15 사용자)
+// 🛹 리듬 보드 — 리듬 게임 하얀 노트(바)를 탈것으로 (2026-11-15 사용자 · 처음 이름은 「노트 보드」)
 // ==========================================
 //   「발 밑에 스케이트보드 처럼 미끄러지게 하자. 대신 기존의 위치에서 발 밑에 두는 게 아니라 그 만큼 캐릭터가 위로 올라가는 식으로.
 //    그리고 움직이면 롱 노트 꼬리처럼 반투명한 잔상이 끌리게 하고 점프 키를 누르면 낮게 점프도 가능하게 해줘. 그때도 잔상이 끌리게.」
-//   · 옷장 악세 「탈것」 의 노트 보드(closet.js · ride 'note')를 달면 탄다. 보통 크기일 때만 (🍍 작아지면 안 탄다) ·
-//     퀴즈쇼 · 토크쇼 무대(fullRoom)에서도 안 탄다. 받는 곳은 리듬 게임 듀엣 (rhythm.js).
+//   · 옷장 악세 「탈것」 의 리듬 보드(closet.js · ride 'note')를 달면 탄다. 퀴즈쇼 · 토크쇼 무대(fullRoom)에서는 안 탄다.
+//     받는 곳은 리듬 게임 듀엣 (rhythm.js) · 밀실 거래로 주고받을 수 있다.
+//   ★ 2026-11-15 사용자 「그리고 파인애플이 되어도 탈 수 있게 해주고 거래도 가능하게 해줘. 이름은 리듬 보드로 바꿔주고.」
+//     🍍 작아져도 탄다 — 보드도 같은 배로 작아진다. 머리 · 잎 위에서도 타고 있다. 손 위에 앉았을 때 · 냄비 속에서는 안 보인다.
+//     점프 높이는 🍍 점프 그대로(제 키의 두 배)이되 선 채로 뛴다. 빠르기 두 배는 땅에서 걸을 때만 (머리 위는 그대로).
 //   · 보드는 원래 발 자리(땅)에 깔리고 사람은 그 두께만큼 올라선다 (putOne 의 lift · boardLift).
 //   · 움직여도 걷는 동작을 안 한다 — 선 채로 미끄러진다 (actor.moving 을 끈다).
 //   · 움직이거나 뛰면 지나온 자리에 롱 노트 꼬리 같은 반투명한 띠가 남았다가 BOARD.TRAIL_MS 안에 사라진다 (화면 한 장 · #plaza-trail).
@@ -2904,7 +2907,7 @@ function jumpPaint() {
 //     소원권 물약 · 숨바꼭질 술래의 두 배와는 곱해진다.
 const BOARD = { W: 150, H: 16, JX: 0.2, TRAIL_MS: 420, A0: 0.55, SPD: 2 };      // 잔상 — 밝은 바닥에서도 보이게 둘레에 푸른 빛을 조금 두른다
 function boardEl(k) {
-    const w = Math.max(24, Math.round(BOARD.W * k)), h = Math.max(4, Math.round(BOARD.H * k));
+    const w = Math.max(12, Math.round(BOARD.W * k)), h = Math.max(3, Math.round(BOARD.H * k));     // 🍍 작은 사람도 보이게 — 가장 작아도 12 × 3
     const el = document.createElement('div');
     el.className = 'plaza-nboard';
     el.style.width = w + 'px'; el.style.height = h + 'px';
@@ -2913,7 +2916,15 @@ function boardEl(k) {
     return { el: el, w: w, h: h };
 }
 window.plazaBoardEl = boardEl;                                  // 옷장 미리 보기도 같은 모양 (closet.js paintDoll)
-function boardOn(one) { return !!(one && one.board && !fullRoom()); }
+function boardOn(one) {
+    if (!one || !one.board || fullRoom()) return false;
+    if (one.tiny && one.code) {                                   // 🍍 손 위 · 냄비 속에서는 보드를 감춘다
+        if (potted(one.code)) return false;
+        const c = carrierOf(one.code);
+        if (c && c.k === 'hand') return false;
+    }
+    return true;
+}
 function boardLift(one) {
     if (!one || !one.board) return 0;
     const on = boardOn(one);
@@ -5598,7 +5609,7 @@ function tick(ts) {
     let dx = run.vx, dy = run.vy;
     // 🫣 숨바꼭질 — 술래는 두 배 빠르게 (2026-11-03 사용자 · hideseek.js PLAZA_HS.speed)
     const SPD = P.SPEED * (Number(hsCall('speed')) || 1) * (wfOf(myCode()) ? 2 : 1)    // 🪄 소원권 물약은 두 배
-        * (boardOn(run.me) ? BOARD.SPD : 1);                                               // 🛹 노트 보드도 두 배
+        * (boardOn(run.me) ? BOARD.SPD : 1);                                               // 🛹 리듬 보드도 두 배
 
     if (ix || iy) { run.tx = null; run.ty = null; run.tseg = null; }
     else if (run.tx != null) {
@@ -5734,7 +5745,7 @@ function tick(ts) {
     });
 
     if (carryPaint(dt)) busy = true;
-    if (trailPaint()) busy = true;          // 🛹 노트 보드 잔상 — 사라질 때까지 쉬지 않는다
+    if (trailPaint()) busy = true;          // 🛹 리듬 보드 잔상 — 사라질 때까지 쉬지 않는다
     if (run.sayAt && now() - run.sayAt > P.SAY_MS) { bubble(run.me, ''); run.sayAt = 0; }
 
     // ★ 아무것도 안 움직이면 **쉰다** (배터리).

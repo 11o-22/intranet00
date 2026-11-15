@@ -2416,11 +2416,15 @@ function duelCol(name, r, win) {
         + '<div class="cnt"><b style="color:#ff9ccf">CHARMING</b> ' + r.c + '<br><b style="color:#7ec8ff">NORMAL</b> ' + r.n + ' · <b style="color:#a3a3b3">MISS</b> ' + r.m + '<br>MAX COMBO ' + r.mc
         + (ac ? '<br><b style="color:#ffc1e3">ALL CHARMING</b>' : fc ? '<br><b style="color:#ffe066">ALL COMBO</b>' : '') + '</div></div>';
 }
-// ★ 듀엣 — 하드로 곡을 끝까지 함께 쳐서 둘 다 A 랭크 이상이면 승패 대신 DUET · 노트 보드를 준다 (2026-11-15 사용자)
+// ★ 듀엣 — 하드로 곡을 끝까지 함께 쳐서 둘 다 A 랭크 이상이면 승패 대신 DUET · 리듬 보드를 준다 (2026-11-15 사용자 · 처음 이름은 노트 보드)
 //   「리듬게임 듀얼 보상으로 하고, 조건은 곡 전체 다 하드 모드로 두명이 A 랭크 이상일 경우. 이 경우에는 듀얼이 아니라 듀엣으로 하자.」
 //   · 랭크는 듀얼 결과 화면의 제 파트 랭크 그대로 (L · SS · S · A). 상대가 끝까지 쳐서 기록을 보내온 판만 — 도중에 나가
 //     「본 만큼으로 셈한」 판은 안 된다 (늦게라도 기록이 닿으면 그때 듀엣이 된다).
-//   · 노트 보드(closet.js · 악세 「탈것」 · 거래 안 됨)는 각자 제 화면이 저에게 준다. 이미 있으면 다시 주지 않는다.
+//   · 리듬 보드(closet.js · 악세 「탈것」 · 밀실 거래 됨)는 각자 제 화면이 저에게 준다.
+//   ★ 2026-11-15 사용자 「그리고 한 명당 하나씩만 얻을 수 있게 해줘. 한 계정당.」
+//     듀엣으로 받는 것은 한 계정에 평생 한 번 — users/<사번>/rhythmBoardGot (처음 얻은 때). 거래로 넘겨도 다시 받지 못한다.
+//     이 표시가 생기기 전에 받은 사람(옷장에 있거나 · 기록에 「보드를 받았습니다」 가 남은 사람)도 받은 것으로 친다.
+//     한 계정이 둘을 갖는 일은 없다 — 옷장은 있다/없다 뿐이고 밀실 거래도 이미 가진 사람에게는 못 넘긴다 (p2p-wear.js).
 const DUET_RANK = 90;                     // A 랭크 (RANKS)
 function duetOk(r) {
     if (!r) return false;
@@ -2428,17 +2432,34 @@ function duetOk(r) {
     return rankOf(r.s, ac)[1] >= DUET_RANK;
 }
 function duetOf(my) { return !!(my && my.diff === 'hard' && my.myRes && my.oppRes && duetOk(my.myRes) && duetOk(my.oppRes)); }
+function boardGot(u) {
+    if (!u) return false;
+    if (u.rhythmBoardGot) return true;
+    if (u.wardrobe && u.wardrobe['note-board']) return true;
+    try {
+        const h = u.history;
+        const list = Array.isArray(h) ? h : (h && typeof h === 'object' ? Object.keys(h).map(function (k) { return h[k]; }) : []);
+        return list.some(function (x) { return /듀엣 .*(노트|리듬) 보드를 받았습니다/.test(typeof x === 'string' ? x : JSON.stringify(x)); });
+    } catch (e) { return false; }
+}
 function duetGrant(my) {
     if (my.duetDone) return my.duetNew;
     my.duetDone = true; my.duetNew = false;
     const u = u_(); if (!u) return false;
     if (!u.wardrobe || typeof u.wardrobe !== 'object') u.wardrobe = {};
-    if (u.wardrobe['note-board']) return false;
+    if (boardGot(u)) {
+        if (!u.rhythmBoardGot) {                                   // 전에 받은 사람 — 표시만 남긴다
+            u.rhythmBoardGot = Date.now();
+            try { if (typeof saveFields === 'function') saveFields({ rhythmBoardGot: 1 }); } catch (e) { }
+        }
+        return false;
+    }
     u.wardrobe['note-board'] = 1;
+    u.rhythmBoardGot = Date.now();
     my.duetNew = true;
     const s = SONGS.find(function (x) { return x.key === my.song; }) || {};
-    try { if (typeof addHistoryLog === 'function') addHistoryLog(u, '[🎵 리듬 게임] 듀엣 「' + (s.title || my.song) + '」 HARD · ' + my.oppName + ' 님과 — 노트 보드를 받았습니다'); } catch (e) { }
-    try { if (typeof saveFields === 'function') saveFields({ wardrobe: 1, history: 1 }); } catch (e) { }
+    try { if (typeof addHistoryLog === 'function') addHistoryLog(u, '[🎵 리듬 게임] 듀엣 「' + (s.title || my.song) + '」 HARD · ' + my.oppName + ' 님과 — 리듬 보드를 받았습니다'); } catch (e) { }
+    try { if (typeof saveFields === 'function') saveFields({ wardrobe: 1, history: 1, rhythmBoardGot: 1 }); } catch (e) { }
     try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
     return true;
 }
@@ -2455,7 +2476,7 @@ function duelResultPaint() {
         + '<div style="font-size:13px;color:#aab;">' + esc(s.title) + ' · <b style="color:' + d[3] + '">' + d[1] + ' ' + lv + '</b> · ' + (duet ? 'DUET' : 'DUEL') + '</div>'
         + '<div class="rg-vs">' + duelCol(myName(), a, v === 'WIN' || duet) + duelCol(my.oppName, b, v === 'LOSE' || duet) + '</div>'
         + '<div data-v="verdict" style="font-family:Georgia,serif;font-size:26px;font-weight:900;letter-spacing:6px;color:' + vc + ';text-shadow:0 0 18px ' + vc + ';min-height:32px;">' + v + '</div>'
-        + (duet ? '<div data-v="duet" style="font-size:12px;color:#ffd9ee;line-height:1.6;text-align:center;">' + (got ? '🎵 노트 보드를 받았습니다<br><small style="color:#b9a9c4;">옷장 · 악세 · 탈것</small>' : '🎵 노트 보드는 이미 가지고 있습니다') + '</div>' : '')
+        + (duet ? '<div data-v="duet" style="font-size:12px;color:#ffd9ee;line-height:1.6;text-align:center;">' + (got ? '🎵 리듬 보드를 받았습니다<br><small style="color:#b9a9c4;">옷장 · 악세 · 탈것</small>' : '🎵 리듬 보드는 한 계정에 하나만 받을 수 있습니다') + '</div>' : '')
         + (my.oppLost && !my.oppRes ? '<div style="font-size:11px;color:#889;">상대 기록이 닿지 않아 본 만큼으로 셈했습니다</div>' : '')
         + '<div style="display:flex;gap:10px;"><button class="rg-btn" data-k="re">한 번 더</button><button class="rg-btn" data-k="q">곡 고르기</button></div></div></div>';
     UI.querySelector('[data-k="q"]').onclick = function () { duelDrop(); P = null; menu(); };
