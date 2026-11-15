@@ -26,6 +26,18 @@
 //
 // ★ 2026-10-31 사용자 — 피아노 칠 땐 배경 음악이 안 들리게: window.lpPianoBusy() 를 event-bgm.js 가 본다
 //   (피아노 창이 열려 있거나, 이 방에서 피아노 소리가 난 지 6초가 안 됐으면 참)
+//
+// ★ ⌨ 자판으로 치기 (2026-11-15 사용자 「피아노 (LP판) PC로 할 때 키보드 자판으로도 가능하게 하고」)
+//   피아노 창이 열려 있는 동안 자판이 건반이 된다 — 흔히 쓰는 「버추얼 피아노」 배열 (악보가 이 글자로 돌아다닌다).
+//     흰 건반   1 2 3 4 5 6 7 8 9 0 q w e r t y u i o p a s d f g h j k l z x c v b n m   →  C2 … C7 (서른여섯)
+//     검은 건반  Shift + 그 왼쪽 흰 건반 (Shift+t = C#4 · 미 · 시처럼 반음 위가 없는 건반은 Shift 를 눌러도 제 음)
+//   화면의 건반은 전처럼 C3 ~ C6 (8 … l) — 그 밖(1 ~ 7 · z ~ m)은 소리만 난다. 듣는 쪽은 처음부터 C2 ~ C7 을 받는다 (listen).
+//   · 글자가 아니라 **자판 자리**(e.code)로 본다 — 한글 자판 · Caps Lock 이어도 같다
+//   · 말하기 칸처럼 글을 치는 중에는 건반이 아니다 · Ctrl · Alt · ⌘ 와 같이 누른 것은 건드리지 않는다
+//   · 광장의 걷기(w a s d)는 피아노 창이 열려 있는 동안 건반이 가져간다 — 방향키 · 스페이스(점프)는 그대로
+//   · Esc 는 피아노 창만 닫는다 (전에는 광장이 통째로 닫혔다)
+//   · 피아노 판 위를 다른 창(리듬 게임 · 요리 판 · 앱 화면)이 덮고 있으면 자판은 그 창의 것이다 (kbFront)
+//   마우스가 있는 화면(PC)에서는 건반마다 누를 글자를 적어 주고 밑에 한 줄 안내를 단다 — 손가락 화면은 전과 같다.
 (function lpBoard() {
 'use strict';
 
@@ -296,6 +308,14 @@ function send(midi) {
         '.lp-keys .b{position:absolute;top:0;height:92px;z-index:2;border-radius:0 0 5px 5px;',
         '  background:linear-gradient(#2c2840,#0d0b16);border:1px solid #000;box-sizing:border-box;}',
         '.lp-keys .b.dn{background:linear-gradient(#5a4aa8,#2d2260);}',
+        // ⌨ 자판 글자 (PC) — 흰 건반은 검은 건반 바로 밑, 검은 건반은 아래 끝
+        '.lp-keys .kk{position:absolute;left:0;right:0;text-align:center;font-family:ui-monospace,Menlo,Consolas,monospace;',
+        '  font-style:normal;font-weight:bold;line-height:1;pointer-events:none;}',
+        '.lp-keys .w .kk{top:100px;font-size:12px;color:#5a4fb0;}',
+        '.lp-keys .b .kk{bottom:5px;font-size:10px;color:#d9d2ff;}',
+        '.lp-keys.wide .w .kk{font-size:11px;}',
+        '.lp-sheet .lp-kb{margin-top:7px;font-size:10.5px;color:#a69ec6;text-align:center;white-space:normal;line-height:1.5;}',
+        '.lp-sheet .lp-kb b{color:#d6ceff;font-weight:normal;}',
         // 디스코
         '.lp-cols{display:grid;grid-template-columns:repeat(10,1fr);gap:6px;}',
         '.lp-cols button{position:relative;aspect-ratio:1;border-radius:50%;cursor:pointer;padding:0;',
@@ -410,8 +430,13 @@ function openPiano() {
     p.innerHTML = '<div class="lp-h"><span class="lp-clef">𝄞</span><b>피아노</b><span class="sp"></span>'
         + '<button class="plaza-keep" data-o="-1" title="한 옥타브 아래">▼</button><span class="lp-oct"></span>'
         + '<button class="plaza-keep" data-o="1" title="한 옥타브 위">▲</button><span class="sp"></span>'
-        + '<button class="plaza-keep" data-x="1">닫기</button></div><div class="lp-keys"></div>';
+        + '<button class="plaza-keep" data-x="1">닫기</button></div><div class="lp-keys"></div>'
+        + (kbShow() ? '<div class="lp-kb">⌨ 자판으로도 칩니다 — 건반에 적힌 글자 · 검은 건반은 <b>Shift</b> 와 함께 · '
+            + '화면 밖 낮은 음 <b>1 ~ 7</b> · 높은 음 <b>Z ~ M</b> · <b>Esc</b> 닫기</div>' : '');
     keep(p);
+    // 말하기 칸에 글자 자리가 남아 있으면 자판이 건반이 못 된다 — 피아노를 열거나 건반 판을 누르면 걷는다
+    kbBlur();
+    p.addEventListener('pointerdown', kbBlur);
     st.ov.appendChild(p);
     S.piano = p;
     p.querySelector('.lp-h').addEventListener('click', function (e) {
@@ -450,17 +475,19 @@ function paintKeys() {
     }
     W.push(12 * n);                                            // 맨 끝 도
     let h = '';
+    const kk = kbShow() ? function (m) { const c = kbLabel(m); return c ? '<i class="kk">' + esc(c) + '</i>' : ''; } : function () { return ''; };
     W.forEach(function (x) {
         const m = base + x;
         const oc = Math.floor(m / 12) - 1;
-        h += '<div class="w' + (m === LP.BASE ? ' c0' : '') + '" data-m="' + m + '">' + NAMES[x % 12] + (x % 12 === 0 ? oc : '') + '</div>';
+        h += '<div class="w' + (m === LP.BASE ? ' c0' : '') + '" data-m="' + m + '">' + kk(m) + NAMES[x % 12] + (x % 12 === 0 ? oc : '') + '</div>';
     });
     const kw = 100 / W.length;
     B.forEach(function (x) {
         const left = (x[1] + 1) * kw;
-        h += '<div class="b" data-m="' + (base + x[0]) + '" style="left:calc(' + left + '% - ' + (kw * 0.32) + '%);width:' + (kw * 0.64) + '%;"></div>';
+        h += '<div class="b" data-m="' + (base + x[0]) + '" style="left:calc(' + left + '% - ' + (kw * 0.32) + '%);width:' + (kw * 0.64) + '%;">' + kk(base + x[0]) + '</div>';
     });
     box.innerHTML = h;
+    kbRelight();                                               // 자판으로 누르고 있던 건반 — 다시 그렸으니 불을 다시 켠다
     if (box._wired) return;
     box._wired = true;
     const down = {};
@@ -493,8 +520,100 @@ window.addEventListener('resize', function () {
 function closePiano(quiet) {
     if (S.piano && S.piano.remove) S.piano.remove();
     S.piano = null;
+    kbClear();
     if (!quiet) fxSync();
 }
+
+// ==========================================
+// ⌨ 자판으로 치기 (2026-11-15) — 머리말에 배열을 적어 두었다
+// ==========================================
+const KB = {
+    ROW: '1234567890qwertyuiopasdfghjklzxcvbnm',              // 흰 건반 서른여섯 — C2 … C7
+    SHIFT: { '1': '!', '2': '@', '3': '#', '4': '$', '5': '%', '6': '^', '7': '&', '8': '*', '9': '(', '0': ')' },
+    WHITE: [0, 2, 4, 5, 7, 9, 11],                              // 흰 건반의 음 (도 레 미 파 솔 라 시)
+    SHARP: { 0: 1, 2: 1, 5: 1, 7: 1, 9: 1 },                    // 반음 위에 검은 건반이 있는 흰 건반
+    LOW: 36, HIGH: 96,                                          // C2 ~ C7
+    CODE: {},                                                   // 자판 자리(e.code) → 몇 번째 흰 건반
+    down: {}                                                    // 누르고 있는 자판 자리 → 그 음
+};
+(function () {
+    for (let i = 0; i < KB.ROW.length; i++) {
+        const ch = KB.ROW[i];
+        KB.CODE[/[0-9]/.test(ch) ? 'Digit' + ch : 'Key' + ch.toUpperCase()] = i;
+    }
+})();
+function kbMidi(code, shift) {
+    const i = KB.CODE[code];
+    if (i == null) return null;
+    const pc = KB.WHITE[i % 7];
+    const m = KB.LOW + Math.floor(i / 7) * 12 + pc;
+    return (shift && KB.SHARP[pc] && m + 1 <= KB.HIGH) ? m + 1 : m;
+}
+// 이 음을 내는 자판 글자 — 흰 건반은 그 글자, 검은 건반은 Shift 와 누른 글자 (T · * …)
+function kbLabel(m) {
+    if (!(m >= KB.LOW && m <= KB.HIGH)) return '';
+    const pc = (m - KB.LOW) % 12, oct = Math.floor((m - KB.LOW) / 12);
+    const wi = KB.WHITE.indexOf(pc);
+    if (wi >= 0) return KB.ROW[oct * 7 + wi] || '';
+    const ch = KB.ROW[oct * 7 + KB.WHITE.indexOf(pc - 1)] || '';
+    return KB.SHIFT[ch] || ch.toUpperCase();
+}
+// 마우스가 있는 화면인가 — 글자 · 안내는 여기에만 적는다 (자판 자체는 어디서든 듣는다)
+function kbShow() {
+    try { return !!(window.matchMedia && !window.matchMedia('(pointer: coarse)').matches); } catch (e) { return false; }   // 손가락 화면이 아니다 (plaza.js 와 같은 잣대)
+}
+function kbTyping() {
+    const ae = document.activeElement;
+    return !!(ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || ae.isContentEditable));
+}
+function kbBlur() { try { if (kbTyping()) document.activeElement.blur(); } catch (e) { } }
+// 피아노 판이 맨 앞에 보이는가 — 다른 창(리듬 게임 · 요리 · 앱 화면 …)이 위를 덮고 있으면 자판은 그 창의 것이다
+function kbFront() {
+    const p = S.piano;
+    if (!p || !p.isConnected || !p.getBoundingClientRect) return false;
+    const r = p.getBoundingClientRect();
+    if (!(r.width > 0 && r.height > 0)) return false;
+    try {
+        const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return !!(el && p.contains(el));
+    } catch (e) { return false; }
+}
+function kbEl(m) { return (S.piano && S.piano.querySelector) ? S.piano.querySelector('.lp-keys [data-m="' + m + '"]') : null; }
+function kbLift(code) {
+    const m = KB.down[code];
+    if (m == null) return;
+    delete KB.down[code];
+    // 같은 음을 다른 자리로도 누르고 있으면(없지만) 불을 남긴다
+    if (Object.keys(KB.down).some(function (c) { return KB.down[c] === m; })) return;
+    const el = kbEl(m); if (el) el.classList.remove('dn');
+}
+function kbClear() { Object.keys(KB.down).forEach(kbLift); KB.down = {}; }
+function kbRelight() { Object.keys(KB.down).forEach(function (c) { const el = kbEl(KB.down[c]); if (el) el.classList.add('dn'); }); }
+function kbKey(e) {
+    if (!S.piano || !S.piano.isConnected) { if (e.type === 'keyup') kbLift(e.code); return; }
+    if (e.type === 'keyup') { if (KB.down[e.code] != null) { kbLift(e.code); e.stopPropagation(); } return; }
+    if (kbTyping()) return;                                     // 글을 치는 중 — 건반이 아니다
+    if (e.ctrlKey || e.metaKey || e.altKey) return;             // 브라우저 단축키
+    if (e.key !== 'Escape' && KB.CODE[e.code] == null) return;  // 건반이 아닌 자리 — 방향키 · 스페이스는 광장이 받는다
+    if (!kbFront()) return;                                     // 다른 창이 위를 덮었다 — 그 창의 자판이다
+    if (e.key === 'Escape') {                                   // 피아노 창만 닫는다 (광장은 그대로)
+        e.preventDefault(); e.stopPropagation();
+        closePiano(); paintMenu();
+        return;
+    }
+    e.preventDefault(); e.stopPropagation();                    // 걷기(w a s d) · 다른 단축키로 새지 않게
+    if (e.repeat || KB.down[e.code] != null) return;            // 누르고 있는 동안 되풀이되는 것
+    const m = kbMidi(e.code, e.shiftKey);
+    if (m == null) return;
+    KB.down[e.code] = m;
+    const el = kbEl(m); if (el) el.classList.add('dn');
+    pbOn(true);
+    play(m);
+    send(m);
+}
+window.addEventListener('keydown', kbKey, true);
+window.addEventListener('keyup', kbKey, true);
+window.addEventListener('blur', kbClear);
 
 // ==========================================
 // 🪩 디스코
