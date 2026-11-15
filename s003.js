@@ -1356,8 +1356,9 @@ function s003RegroupPick(n, v) {
     if (!darkRun) return;
     const myStep = darkRun.step;
 
-    if (v === 'call' && darkRun.taleRole === 'ariel') { breakTaboo('소리를 냄'); if (!darkRun || darkRun._dead) return; }
-    if (v === 'ahead' && darkRun.taleRole === 'momo') { breakTaboo('동료를 두고 먼저 감'); if (!darkRun || darkRun._dead) return; }
+    // 금기로 쓰러질 자리를 보호로 넘겼으면 여기서 멈춘다 (넘긴 화면을 덮지 않게 · dark.js tabooStopped · 2026-11-15)
+    if (v === 'call' && darkRun.taleRole === 'ariel') { breakTaboo('소리를 냄'); if (!darkRun || darkRun._dead || tabooStopped()) return; }
+    if (v === 'ahead' && darkRun.taleRole === 'momo') { breakTaboo('동료를 두고 먼저 감'); if (!darkRun || darkRun._dead || tabooStopped()) return; }
 
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const kind = { call:'rejoin', page:'sense', ahead:'hide' }[v];

@@ -11291,6 +11291,7 @@ function s010Result(title, roll, bonus, DC, ok, txt) {
             `그걸 저쪽도 알아차렸다.<br><br>` +
             `몰려온다. 이번에는 한 방향이 아니다.`
         );
+        if (darkRun && !darkRun._dead) darkRun._s010Streak = 0;     // 넘겼으면 연속 어긋남을 0 으로 (위 s003Result 와 같은 까닭 · 2026-11-15)
         return;
     }
 
@@ -14525,6 +14526,10 @@ function attachTaleCast() {
     });
 }
 
+function tabooStopped() {
+    if (darkRun && darkRun._tabooSaved) { darkRun._tabooSaved = false; return true; }
+    return false;
+}
 function breakTaboo(reason) {
     if (!darkRun || !darkRun.taleRole) return;
     const role = TALE_ROLES[darkRun.taleRole];
@@ -14541,6 +14546,10 @@ function breakTaboo(reason) {
     if (darkRun.tabooCount >= 2) {
         darkRun.fail += 2;
         darkDeath(role.death);
+        // ★ 보호(장비 · 🎧 에코 아웃 · 톤 플레이 등)로 넘겼으면 그 고름은 여기서 멈춘다 (2026-11-15 사용자 「동화에서 에코아웃이 죽을 상황이 아닌데도 써져서」)
+        //   전에는 넘긴 화면(「숨을 고른다」)을 뒤따르는 판정 · 「하마터면」 화면이 곧바로 덮어 써서, 죽을 자리가 아닌데 쓰인 것처럼 보였다.
+        //   부르는 쪽은 tabooStopped() 를 보고 멈춘다 — 「숨을 고른다」를 누르면 그 장면을 다시 고른다.
+        if (darkRun && !darkRun._dead) darkRun._tabooSaved = true;
         return;
     }
 
@@ -14938,7 +14947,7 @@ function pickTale(round, idx) {
     if (o.taboo) {
         darkRun.log.push(`[${role.name} ${round}장] 금기 — ${o.v}`);
         breakTaboo(o.v);
-        if (darkRun._dead) return;
+        if (!darkRun || darkRun._dead || tabooStopped()) return;
 
         darkBodyEl().innerHTML = darkBox(`${role.name}의 장`,
             `<span style="color:#ff6b6b;">— 하마터면.</span><br><br>
@@ -15240,7 +15249,7 @@ function submitLoreCheck() {
     const c = darkRun._loreQ;
     const safe = c.good ? checkQuizAnswer(v, c.good) : false;
 
-    if (darkRun.taleRole === 'alice') breakTaboo('답함');
+    if (darkRun.taleRole === 'alice') { breakTaboo('답함'); if (!darkRun || darkRun._dead || tabooStopped()) return; }
 
     let txt;
     if (safe) {
@@ -15290,6 +15299,10 @@ function s003Result(title, roll, bonus, DC, ok, txt) {
             `문장이 앞서가고, 따라가지 못한 것은 문단 밖으로 밀린다.<br><br>` +
             `밀린 자리에는 아무것도 적히지 않는다.`
         );
+        // ★ 보호(장비 · 🎧 에코 아웃 등)로 넘겼으면 연속 어긋남을 0 으로 (2026-11-15 사용자 「동화에서 에코아웃이 죽을 상황이 아닌데도 써져서」)
+        //   전에는 셋째 어긋남을 넘긴 뒤에도 수가 3 에 남아, 다음 판정이 **한 번만** 어긋나도 「세 번째다」로 또 쓰러졌다 — 그때마다 에코 아웃이 쓰였다.
+        //   (이해도 · 감염도를 한계 아래로 내리는 것과 같은 까닭)
+        if (darkRun && !darkRun._dead) darkRun._s003Streak = 0;
         return;
     }
 
@@ -15327,7 +15340,7 @@ function s003Resolve(title, cfg, pick) {
     // 배역 금기
     if (o.taboo && o.taboo.includes(darkRun.taleRole)) {
         breakTaboo(o.tabooWhy || pick);
-        if (!darkRun || darkRun._dead) return;
+        if (!darkRun || darkRun._dead || tabooStopped()) return;
     }
 
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
