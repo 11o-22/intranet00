@@ -804,6 +804,7 @@ window.rhythmOpen = open;
 //   「피치 라이딩 어둠 도중에 리듬 게임에 있는 리듬에서 아무거나 하드로 10 초 정도 나오게 하고
 //    채보의 절반 이상 쳤을 경우 행운 +2, 회피 +1이 친 당사자한테 적용되게 해줘.」
 //   물어서 정한 것 — 장착자만 친다 · 채보가 내려오는 것은 같은 방 사람들도 본다 · 곡은 아티스트 「광시」 것을 뺀다 · 어둠 한 판에 한 번.
+//   ★ 2026-11-16 사용자 — 같이 탐사 간 모두가 같이 친다 (dj.js 가 같은 startAt 을 모두에게 넘긴다 · 50% 이상 친 사람마다 버프). watch 는 이제 쓰지 않는다.
 //
 //   rhythmClipPick()           곡 하나 · 하드 10 초 자리 { key, title, at, len }   (광시 빼고 · 노트가 넉넉한 자리)
 //   rhythmClip(o)              o = { key, at, len, watch, label, onStart(startAt) } → Promise<{ hit, total, ok } | null>
