@@ -44,6 +44,10 @@
 //   ★ 나올 확률은 넷 다 **각각 0.2%** (2026-11-01 사용자 — 처음엔 다른 물품 무게의 5분의 1 → 0.2% → 0.02% → 다시 0.2%)
 //   이벤트 어둠(이상한 나라 · 연계판)에서는 장비가 통하지 않으므로 회수품 · 사망 몫은 꺼진다.
 //
+// ■ ★ 2026-11-16 사용자 「선물상자 이제 싹 거두자」 — 보물 찾기를 끝낸다 (OVER)
+//   상자를 더 깔지도 · 그리지도 · 열지도 않는다. 켜 둔 화면이 서버의 treasure/ 를 한 번 지운다 (남은 상자를 거둔다).
+//   이미 받은 장신구(진주 · 아쿠아마린) 효과 · 소원권 팝업 · 한정품 기록은 그대로 둔다.
+//
 // ■ 콘솔
 //   treasureState()      내 하루 몫 · 지금 방의 상자 · 한정품 남은 수
 //   treasureTable()      상품 확률표
@@ -66,6 +70,7 @@ function perRoom(key) {
     return base + (i < rem ? 1 : 0);
 }
 const PER_DAY = 3;
+const OVER = true;               // ★ 2026-11-16 — 보물 찾기 끝 (상자를 거둔다)
 const SIZE = 34;                 // 방 그림 좌표에서 상자 키 (사람 키 236)
 const NEAR = 170;                // 이만큼 가까이 서야 열린다 (가로 · 방 그림 좌표)
 const POINTS = 50000;
@@ -205,6 +210,7 @@ function listen(key) {
 //   ★ 서버 시계가 서기 전에는 깔지 않는다 — 서면 아래 시계가 다시 부른다
 //   ★ 날짜가 오늘보다 **뒤**인 상자(자정 무렵 시계가 조금 앞선 사람이 먼저 깐 것)는 그대로 둔다 — 서로 다시 깔며 다투지 않게
 function fill(key) {
+    if (OVER) return;
     if (!clockOk() || key !== curRoom) return;
     const made = Object.keys(boxes).map(function (k) { return boxes[k]; }).filter(keep);
     for (let i = 0, n = perRoom(key); i < n; i++) {
@@ -235,6 +241,7 @@ function live(b) { return fresh(b) && !b.taken; }
 let lastSig = '';
 function stage() { try { return (typeof window.plazaStage === 'function') ? window.plazaStage() : null; } catch (e) { return null; } }
 function paint(force) {
+    if (OVER) { Array.prototype.forEach.call(document.querySelectorAll('.plaza-tr'), function (e) { e.remove(); }); lastSig = ''; return; }
     const st = stage();
     if (!st || !st.el) { lastSig = ''; return; }
     const z = st.z || 1;
@@ -282,7 +289,20 @@ function near(b) {
 }
 
 // 방이 바뀌거나 다시 그려지면 따라간다
+// ★ 끝났으면 — 서버에 남은 상자를 한 번 걷고(이 화면에서 한 번) 아무것도 듣거나 그리지 않는다
+let swept = false;
 setInterval(function () {
+    if (OVER) {
+        if (ref) { try { ref.off(); } catch (e) { } ref = null; }
+        curRoom = ''; boxes = {};
+        paint(true);
+        const d = db_();
+        if (!swept && d && u_()) {
+            swept = true;
+            try { d.ref(ROOT).once('value').then(function (s) { if (s.exists()) return d.ref(ROOT).remove(); }).catch(function () { }); } catch (e) { }
+        }
+        return;
+    }
     try {
         const key = (typeof window.plazaRoomNow === 'function') ? window.plazaRoomNow() : '';
         if (key !== curRoom) listen(key);
@@ -305,7 +325,7 @@ setInterval(function () {
 let busy = false;
 function open(key, i, g) {
     const u = u_(), d = db_();
-    if (!u || !d || busy) return;
+    if (OVER || !u || !d || busy) return;
     if (leftToday() <= 0) { alert_('🎁 오늘은 보물 상자를 ' + PER_DAY + '개 다 열었습니다.\n\n내일 다시 찾아보세요.'); return; }
     busy = true;
     d.ref(ROOT + '/' + key + '/' + i).transaction(function (cur) {
@@ -670,5 +690,5 @@ window.treasureReset = function (all) {
     console.log('상자 자리를 새로 —', keys.join(', '));
 };
 
-console.log('[보물 찾기] 광장 · 포토존 모두 합쳐 상자 ' + TOTAL + '개 (방마다 고르게) · 하루 ' + PER_DAY + '개 — treasureState() · treasureTable()');
+console.log(OVER ? '[보물 찾기] 끝 — 상자를 거두었습니다 (장신구 효과는 그대로)' : '[보물 찾기] 광장 · 포토존 모두 합쳐 상자 ' + TOTAL + '개 (방마다 고르게) · 하루 ' + PER_DAY + '개 — treasureState() · treasureTable()');
 })();
