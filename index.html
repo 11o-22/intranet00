@@ -8388,7 +8388,7 @@ updateUI();
     // ★ 베팅 스테퍼 — 한도는 BET_CAPS 가 정한다 (적어 둔 것과 어긋나지 않게)
     // ==========================================
     const MAX_BET = 50;
-    const POINT_CAP = 30000000;
+    const POINT_CAP = Infinity;      // ★ 2026-11-17 사용자 「보유는 한도가 없게 해줘」 (전에는 30,000,000 — 다른 파일들은 Math.min(POINT_CAP, …) 로만 쓴다)
     const LIMITED_BETS = ['seotda-bet', 'roulette-bet', 'slot-bet', 'bj-bet'];
     const BET_CAPS = { 'slot-bet': 20000, 'bj-bet': 10000, 'seotda-bet': 10000 };
     
