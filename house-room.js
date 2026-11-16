@@ -426,6 +426,7 @@ function css() {
         '.hr-b.on{background:#6b5a36;color:#fff;}',
         '.hr-b[disabled]{opacity:.45;cursor:default;}',
         '#hr-chat{position:absolute;left:8px;bottom:8px;bottom:max(8px,env(safe-area-inset-bottom));width:min(320px,60vw);z-index:5;}',
+        '#hr-panel{position:absolute;right:8px;bottom:8px;bottom:max(8px,env(safe-area-inset-bottom));z-index:4;padding:8px 12px;font-size:13px;}',
         '#hr-feed{font-size:11px;line-height:1.45;text-shadow:0 0 3px #000,0 0 5px #000;margin-bottom:4px;pointer-events:none;}',
         '#hr-feed b{color:#ffe08a;}',
         '#hr-in{width:100%;box-sizing:border-box;background:rgba(0,0,0,.6);border:1px solid #555;border-radius:8px;color:#fff;padding:7px 9px;font-size:13px;}',
@@ -961,6 +962,7 @@ function enter(host) {
         + (mine ? '<button class="hr-b" data-k="allow" style="display:none"></button><button class="hr-b" data-k="edit">🛠 꾸미기</button><button class="hr-b" data-k="inv">💌 초대</button>' : '')
         + '<button class="hr-b" data-k="menu" title="목록">☰</button>'          // ☰ 광장과 같은 목록 (2026-11-16)
         + '<button class="hr-b" data-k="x">✕ 나가기</button></div>'
+        + '<button class="hr-b" id="hr-panel" data-k="panel" title="내 방(감금실) · 대화 · 보관함 · 주방 · 오락(테트리스)">🗂 사택 칸</button>'   // ★ 2026-11-16 사용자 「사택 감금이나 테트리스 주방같은 게 사라졌는데」 — 오른쪽 아래
         + '<div id="hr-chat"><div id="hr-feed"></div><input id="hr-in" maxlength="60" placeholder="말하기 (Enter)" autocomplete="off"></div>'
         + '<div id="hr-tool"><button class="hr-b" data-t="rot">↻ 돌리기</button><button class="hr-b" data-t="put">📦 넣기</button><button class="hr-b on" data-t="ok">✓ 놓기</button></div>'
         + '<div id="hr-hint">어디를 끌어도 가구가 따라 움직입니다 · ✓ 놓기</div>'
@@ -994,6 +996,9 @@ function enter(host) {
     // 단추
     ov.querySelector('[data-k="x"]').onclick = function () { leave(); };
     ov.querySelector('[data-k="menu"]').onclick = function (e) { e.stopPropagation(); menuOpen(); };
+    // 🗂 사택 칸 — ☰ 사택이 사택 안으로 걸어 들어가게 바뀌면서 칸(내 방의 감금실 · 대화 · 보관함 · 주방 · 오락실 테트리스)으로 가는 길이 가려졌다
+    //   → 사택 안 위쪽에 단추를 둔다. 칸은 사택 위에 뜬다 (☰ → 사택 과 같은 길 · plazaGoApp)
+    ov.querySelector('[data-k="panel"]').onclick = function (e) { e.stopPropagation(); panelOpen(); };
     const eb = ov.querySelector('[data-k="edit"]'); if (eb) eb.onclick = function () { editToggle(); };
     const ib = ov.querySelector('[data-k="inv"]'); if (ib) ib.onclick = function () { inviteModal(); };
     const ab = ov.querySelector('[data-k="allow"]'); if (ab) ab.onclick = function () { allowToggle(); };
@@ -1912,6 +1917,13 @@ window.houseGoIn = function () {
 //   · 바로 여는 것(소지품 · 사원증 · 상점 칸 · 인형 돌보기 · 마작 · 리듬 게임 …) — 사택 위에 뜬다 (사택은 광장처럼 바탕 · overPlaza)
 //   · 광장에서 걸어가야 하는 것(건물 앞 · 다른 방 · 동료 목록 · 포토존 · 엘리베이터) — 사택을 나가 광장에서 그리로 간다
 //   · 「사택」 — 이미 안이니 사택 칸(관리 · 초대받은 사택)을 띄운다
+function panelOpen() {
+    if (!S) return;
+    try { if (typeof window.plazaMenuClose === 'function') window.plazaMenuClose(); } catch (e) { }
+    try { if (typeof window.plazaGoApp === 'function') { window.plazaGoApp({ tab: 'tab-house', sub: 'house-main', n: '사택' }); return; } } catch (e) { }
+    try { if (typeof window.plazaPanel === 'function') window.plazaPanel('tab-house', 'house-main', '사택'); } catch (e) { }
+}
+window.housePanelOpen = panelOpen;
 function menuOpen() {
     if (!S) return;
     if (typeof window.plazaMenuIn !== 'function' || !window.plazaMenuIn(S.ov, menuPick)) toast('광장이 열려 있어야 목록을 쓸 수 있습니다');
