@@ -319,10 +319,10 @@ window.addEventListener('popstate', function (e) {
     tetHist = false;
     if (!ovOpen()) return;
     const t = T();
-    if (t && !t.over && t.mode === 'duel') {                                       // 대전 중 — 나가지 않는다
+    if (t && !t.over && (t.mode === 'duel' || t.mode === 'cup')) {                 // 대전 · 🏆 대회 경기 중 — 나가지 않는다 (tet-cup.js)
         e.stopImmediatePropagation();
         try { history.pushState({ tetris: 1 }, '', ''); tetHist = true; } catch (err) { }
-        say('<span style="color:#f44336;">대전 중에는 나갈 수 없습니다.</span>');
+        say('<span style="color:#f44336;">' + (t.mode === 'cup' ? '대회 경기' : '대전') + ' 중에는 나갈 수 없습니다.</span>');
         return;
     }
     try { window.exitTetris(); } catch (err) { console.warn('[테트리스] 나가기', err); }
