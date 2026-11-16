@@ -226,7 +226,7 @@ function whyNot(k, target) {
     const me = u_();
     if (!me || !wears(me)) return NAME + ' 를 차고 있어야 합니다.';
     if (k === '0') {
-        if (zeroOf(me)) return '제 零 금제가 이미 걸려 있습니다. (' + hoursLeft(zeroOf(me).until) + ' 남음)';
+        // ★ 2026-11-16 사용자 — 걸려 있는 동안(3시간)에도 두 번째를 건다 (전에는 「이미 걸려 있습니다」로 막혀 하루 한 번처럼 됐다) · 걸면 남은 시간에 3시간을 더한다
         if (used(me, 'z') >= C.ZERO.DAY) return '제 零 금제는 하루에 ' + C.ZERO.DAY + '번입니다. 오늘은 다 걸었습니다.';
         return '';
     }
@@ -242,13 +242,15 @@ function cast(k, target) {
     if (why) { alert_(why); return false; }
     const t = now(), S = BY_K[k];
     if (k === '0') {
-        me.hgZero = { at: t, until: t + C.ZERO.HOURS * HOUR };
+        const z0 = zeroOf(me);
+        const more = !!(z0 && !z0.grant);                           // 걸려 있는 동안 또 — 남은 시간에 3시간을 더한다
+        me.hgZero = more ? { at: z0.at, until: Number(z0.until) + C.ZERO.HOURS * HOUR } : { at: t, until: t + C.ZERO.HOURS * HOUR };
         bump(me, 'z');
-        log_(me, '[' + NAME + '] 제 零 금제 · 심장 — 스스로에게 걸었습니다. ' + C.ZERO.HOURS + '시간 동안, 탐사하는 어둠에 여우비가 내립니다.');
+        log_(me, '[' + NAME + '] 제 零 금제 · 심장 — 스스로에게 ' + (more ? '한 번 더 걸었습니다. 남은 시간에 ' + C.ZERO.HOURS + '시간을 더해 ' + hoursLeft(me.hgZero.until) + ' 동안' : '걸었습니다. ' + C.ZERO.HOURS + '시간 동안') + ', 탐사하는 어둠에 여우비가 내립니다.');
         badgeSync(me);
         save({ hgZero: 1, hgUse: 1, history: 1, badge: 1 });
         try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
-        alert_('⛓ 제 零 금제 · 심장\n\n스스로에게 금제를 걸었습니다. (' + C.ZERO.HOURS + '시간)\n\n그동안 탐사하는 어둠에는 여우비가 내립니다.\n'
+        alert_('⛓ 제 零 금제 · 심장\n\n' + (more ? '금제를 한 번 더 걸었습니다. (' + C.ZERO.HOURS + '시간 더 · 남은 ' + hoursLeft(me.hgZero.until) + ')' : '스스로에게 금제를 걸었습니다. (' + C.ZERO.HOURS + '시간)') + '\n\n그동안 탐사하는 어둠에는 여우비가 내립니다.\n'
             + '· 괴이의 판정에 패널티 · 사원의 즉사를 ' + C.ZERO.SAVES + '회 막습니다\n· 당신은 남을 구출하지 못하고, 사원이 건 판정 버프를 받지 않습니다\n\n오늘 남은 횟수 ' + (C.ZERO.DAY - used(me, 'z')) + ' / ' + C.ZERO.DAY);
         return true;
     }
@@ -379,7 +381,7 @@ function menu() {
         let st = '', btns = '';
         if (at) st = '⛓ ' + (at.code === me.code ? '당신' : nameOf(at.code) + ' 사원') + ' · ' + hoursLeft(at.until) + ' 남음';
         if (k === '0') {
-            st = st || '오늘 남은 ' + Math.max(0, C.ZERO.DAY - used(me, 'z')) + ' / ' + C.ZERO.DAY;
+            st = (st ? st + ' · ' : '') + '오늘 남은 ' + Math.max(0, C.ZERO.DAY - used(me, 'z')) + ' / ' + C.ZERO.DAY;
             if (!whyNot('0', me)) btns = '<button class="game-btn hg-go" data-k="0" data-t="me" style="flex:0 0 auto; margin:0; padding:7px 10px; font-size:10px;' + GOLD + '">건다</button>';
         } else if (k === '2') {
             st = (st ? st + ' · ' : '') + '탈출 ' + Math.max(0, C.TWO.OUT_DAY - used(me, 'out')) + ' / ' + C.TWO.OUT_DAY + ' · 빼돌리기 ' + Math.max(0, C.TWO.PULL_DAY - used(me, 'pull')) + ' / ' + C.TWO.PULL_DAY;
