@@ -608,12 +608,12 @@ function profOf(k, u, a) {
 function nextAttr(k, u) {
     const open = openList(k, u);
     // 🔥 재난의 길을 걷는 사원은 전용 장비에 없는 속성도 연다 — 열 가지 전부 (2026-10-30)
-    let pool = onPath(k) ? Object.keys(ATTR) : heldAttrs(u);
-    // 🌀 교란자의 길 — 전용 장비에 없는 속성을 셋까지 더 연다 (2026-11-10 「추가로 3 개 속성을 더 100레벨로」)
-    if (!onPath(k) && onJam(k)) {
+    // 🌀 교란자의 길도 — 나머지 속성 전부 (2026-11-16 사용자 「교란자의 길 걷는 사람도 나머지 속성들 다 갈 수 있게」 · 전에는 장비 밖 셋까지)
+    //   부가 특성 「교란」은 그대로 — 들어설 때 걸은 것 말고 세 속성을 더 최고 Lv 로 올리면 (JAM_MORE)
+    let pool = (onPath(k) || onJam(k)) ? Object.keys(ATTR) : heldAttrs(u);
+    if (onJam(k) && !onPath(k)) {                          // 전용 장비 속성을 먼저, 그다음 장비 밖 속성
         const held = heldAttrs(u);
-        const extra = open.filter(function (a) { return held.indexOf(a) < 0; }).length;
-        pool = extra >= JAM_MORE ? held : held.concat(Object.keys(ATTR).filter(function (a) { return held.indexOf(a) < 0; }));
+        pool = held.concat(Object.keys(ATTR).filter(function (a) { return held.indexOf(a) < 0; }));
     }
     return pool.filter(function (a) { return open.indexOf(a) < 0; })[0] || null;
 }
@@ -4497,6 +4497,7 @@ window.kroomPathState = function () {
 //            다음에 K 의 방에 들어설 때 파란 카드 『 교란자의 길로 들어서겠습니까? 』 → 들어선다 / 거절한다.
 //   ■ 들어서면 — kroom.jam = { at, by, attrs(그때 최고 Lv 이던 속성) }.
 //            「교란자는 추가로 3 개 속성을 더 100레벨로 올릴 수 있고」 — 전용 장비에 없는 속성을 셋까지 더 연다 (nextAttr).
+//            ★ 2026-11-16 「교란자의 길 걷는 사람도 나머지 속성들 다 갈 수 있게」 — 재난의 길처럼 열 가지 전부 연다 (셋 제한 없음).
 //            그 셋을 모두 최고 Lv 로 올리면 부가 특성 「교란」 (아래).
 //   kroomPath2/<사번> = { state, code, name, no, lvs, at, offeredAt, offeredBy, answeredAt }  (state 는 재난의 길과 같다)
 const J_NODE = 'kroomPath2';
@@ -4512,7 +4513,7 @@ function jamEligible(k, u, h) {
     if (pathHadHidden(k, h)) return false;
     return pathFull(k, u).length >= PATH_NEED;
 }
-// 교란자가 전용 장비 밖에서 더 연 속성 — 셋까지
+// 교란자가 전용 장비 밖에서 더 연 속성 (2026-11-16 부터 셋 제한 없음 — 나머지 전부)
 function jamExtra(k, u) {
     const held = heldAttrs(u);
     return openList(k, u).filter(function (a) { return held.indexOf(a) < 0; });
@@ -4618,7 +4619,7 @@ function jamPopup(cont) {
         + '<div class="kjam-q">『 ' + esc(JAM_NAME) + '로 들어서겠습니까? 』</div>'
         + '<div class="kjam-note">' + (more.length ? more.map(function (a) { return ATTR[a] ? ATTR[a].n : a; }).join(' · ') + ' — ' : '')
         + '세 갈래를 끝까지 걸었다.<br>'
-        + '들어서면 전용 장비에 없는 속성 셋을 더 Lv ' + LV_MAX + ' 까지 걸을 수 있다.<br>'
+        + '들어서면 전용 장비에 없는 나머지 속성도 모두 Lv ' + LV_MAX + ' 까지 걸을 수 있다.<br>'
         + '한 번 들어서면 돌아오지 않는다.</div>'
         + '<div class="kjam-btns"><button class="kjam-no">거절한다</button><button class="kjam-yes">들어선다</button></div>';
     document.body.appendChild(ov);
@@ -4636,7 +4637,7 @@ function jamPopup(cont) {
         if (darkRun && darkRun.isParty) { try { sendPartyChat(u.name + ' 사원이 ' + JAM_NAME + '로 들어섰습니다.', true); } catch (e) { } }
         ov.classList.add('done');
         ov.querySelector('.kjam-q').innerHTML = '🌀 ' + esc(JAM_NAME) + ' 🌀';
-        ov.querySelector('.kjam-note').innerHTML = '길 밖의 세 갈래가 열린다.';
+        ov.querySelector('.kjam-note').innerHTML = '길 밖의 갈래가 모두 열린다.';
         ov.querySelector('.kjam-btns').remove();
         close(true);
     };
@@ -4806,7 +4807,7 @@ window.kroomJamState = function () {
     const u = me(), k = prof(u); if (!k) return;
     console.log('%c===== 🌀 ' + JAM_NAME + ' =====', 'color:#7ab8ff; font-size:13px');
     console.log('  재난의 길: ' + (onPath(k) ? '걷는 중' : '아니오') + ' · 교란자의 길: ' + (onJam(k) ? '들어섬 (' + new Date(k.jam.at).toLocaleString() + ')' : '아니오')
-        + ' · 최고 Lv 속성 ' + jamFull(k, u).length + ' · 장비 밖 속성 ' + jamExtra(k, u).length + ' / ' + JAM_MORE + ' · 서버 상태 ' + ((jMine && jMine.state) || '없음'));
+        + ' · 최고 Lv 속성 ' + jamFull(k, u).length + ' · 장비 밖 속성 ' + jamExtra(k, u).length + ' · 서버 상태 ' + ((jMine && jMine.state) || '없음'));
     if (onJam(k)) console.log('  부가 특성 「교란」: ' + (k.jamTrait && k.jamTrait.at ? '있음' : '없음 — 세 속성 더 ' + jamMore(k, u).length + ' / ' + JAM_MORE));
 };
 
@@ -4816,7 +4817,7 @@ window.kroomJamState = function () {
 //   「교란자는 추가로 3 개 속성을 더 100레벨로 올릴 수 있고 다 올린 후에 부가 특성 '교란'을 줘.
 //    교란 - 같이 동행하는 이들의 선택지를 교란시킨다. (커스텀 장비 효과도 교란.) 이 부가 특성은 받은 본인만 알 수 있게.」
 //   ■ 얻기 — 교란자의 길에 들어설 때 끝까지 걸었던 속성(k.jam.attrs) 말고 세 속성을 더 최고 Lv → k.jamTrait = { at }
-//            (교란자는 전용 장비에 없는 속성을 셋까지 더 연다 — nextAttr)
+//            (교란자는 전용 장비에 없는 속성을 나머지 전부 연다 — nextAttr · 2026-11-16)
 //            본인 화면에만 알린다 — 기록(history) · 상담사 콘솔 · 남의 화면 어디에도 적지 않는다. K 의 방 막대에 본인만 🌀 교란.
 //   ■ 먹히는 곳 — K 의 방 파티에서만. 같은 방에 교란을 가진 사람이 있으면 그 사람 말고 다른 사원들의 화면에서
 //            ① 선택지 순서가 섞이고 글자 몇 자가 ■ 로 가려진다 (장면마다 같은 모양 — 다시 그려도 그대로)
