@@ -749,6 +749,16 @@ function toStage(cx, cy) {
     return { x: cy, y: window.innerWidth - cx };
 }
 
+// ★ 2026-11-16 사용자 「어둠에서 리듬게임 뜰 때 채보칠 때 채팅창 켜지는 거 방지해 줘」
+//   리듬 창 밖의 글칸(어둠 파티 채팅 · 장면의 답 칸 · 광장 채팅 …)이 잡혀 있으면 휴대폰은 자판이 올라와 판을 가리고,
+//   PC 는 치는 글자가 그 칸으로 들어갔다. 파티 채팅은 글이 올 때마다 다시 그리며 잡혀 있던 칸을 도로 잡는다(mountDarkChat).
+//   → 리듬 창이 열리면 밖의 글칸을 놓고, 열려 있는 동안 밖의 글칸이 잡히면 바로 놓는다 (리듬 창 안의 칸은 그대로).
+function outsideField(t) {
+    return !!(t && OV && !OV.contains(t) && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable));
+}
+function blurOut() { try { const a = document.activeElement; if (outsideField(a)) a.blur(); } catch (e) { } }
+document.addEventListener('focusin', function (e) { if (OV && outsideField(e.target)) { try { e.target.blur(); } catch (er) { } } }, true);
+
 function open() {
     if (!canPlay()) { say('아직 준비 중입니다.'); return; }
     if (OV) return;
@@ -762,6 +772,7 @@ function open() {
     STILL.key = null; STILL.clr = false;
     document.body.appendChild(OV);
     document.body.classList.add('rg-on');
+    blurOut();                                 // 밖의 글칸(채팅 등)을 놓는다 — 자판이 판을 가리지 않게
     ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'touchstart', 'touchmove', 'touchend', 'click', 'wheel', 'contextmenu'].forEach(function (t) {
         OV.addEventListener(t, function (e) { e.stopPropagation(); if (t === 'contextmenu') e.preventDefault(); }, { passive: t !== 'contextmenu' });
     });
