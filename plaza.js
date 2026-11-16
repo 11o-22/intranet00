@@ -4597,7 +4597,8 @@ function heldRoom() { const pm = potMine(); return cageMine() || (pm ? pm.r : ''
                 if (key && key !== (was && was.at)) {
                     if (now() - (Number(m.at) || 0) < 60000) {
                         sysLine('🍲 ' + (m.bn || '누군가') + ' 사원이 당신을 냄비에 넣었습니다! 아래 「나온다」 단추로 칸 맞추기에 성공하거나, 다른 사원이 꺼내 줘야 나옵니다.');
-                        try { if (typeof showCustomAlert === 'function') showCustomAlert('🍲 ' + (m.bn || '누군가') + ' 사원이 당신을 냄비에 넣었습니다!\n\n보글보글… 아래 「나온다」 단추를 눌러 칸 맞추기에 성공하면 나올 수 있습니다.\n(다른 사원이 꺼내 줄 수도 있습니다)'); } catch (e) { }
+                        // ★ 2026-11-16 사용자 「파인애플 탕에 넣을 때 뜨는 팝업 어둠 탐사때는 안 뜨게」 — 탐사 중이면 창은 띄우지 않는다 (광장 글줄은 그대로)
+                        if (!inDark()) try { if (typeof showCustomAlert === 'function') showCustomAlert('🍲 ' + (m.bn || '누군가') + ' 사원이 당신을 냄비에 넣었습니다!\n\n보글보글… 아래 「나온다」 단추를 눌러 칸 맞추기에 성공하면 나올 수 있습니다.\n(다른 사원이 꺼내 줄 수도 있습니다)'); } catch (e) { }
                     }
                 } else if (!key && was && run) {
                     // 나왔다 — 들려 나가지 않았으면 냄비 앞에 내려선다
