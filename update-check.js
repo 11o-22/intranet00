@@ -32,6 +32,7 @@ function busy(typing) {
     if (document.getElementById('fin-ov')) return '피날레';
     const mj = document.getElementById('mj-root');                // 마작 판 (mj-tile-defs 같은 그림 정의는 늘 있다)
     if (mj && mj.offsetParent !== null) return '마작';
+    if (rgOn()) return '리듬 게임';
     if (typing) {
         const a = document.activeElement;
         if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && String(a.value || '').trim()) return '쓰는 중';
@@ -53,6 +54,10 @@ function bar() {
     b.onclick = function () { const w = busy(false); if (w) { b.textContent = '✦ ' + w + ' 을(를) 마친 뒤에 눌러 주세요'; return; } reload(); };
     document.body.appendChild(b);
 }
+// 🎵 리듬 게임 창이 열려 있다 (곡 고르기 · 치는 중 · 결과 — rhythm.js 가 body 에 rg-on 을 단다)
+function rgOn() {
+    return !!(document.body && document.body.classList.contains('rg-on')) || !!document.getElementById('rg-ov');
+}
 function plOn() {
     try { if (typeof window.playlistAlive === 'function' && window.playlistAlive()) return true; } catch (e) { }
     try { return typeof window.playlistOn === 'function' && !!window.playlistOn(); } catch (e) { return false; }
@@ -62,6 +67,8 @@ function act() {
     // 🎧 플레이리스트가 도는 중(화면을 끄고 듣는 중)이면 저절로 새로 열지 않는다 — 음악이 끊긴다 (2026-11-11 · 띠를 눌러 여는 것은 된다)
     //   ★ 2026-11-13 사용자 「플레이리스트를 할 때엔 앱 자체가 안 꺼지게」 — 곡이 넘어가는 사이 · 잠깐 멈춰 둔 동안에도 (playlistAlive: 플리를 틀어 둔 동안 내내)
     if (document.visibilityState === 'hidden') { if (!busy(false) && !plOn()) reload(); return; }
+    // ★ 2026-11-16 사용자 「리듬게임 중에 새로운 판 알림 안 뜨게 하자」 — 리듬 게임 창이 열려 있는 동안은 띠를 띄우지 않는다(떠 있던 것도 걷는다) · 닫으면 다시 뜬다
+    if (rgOn()) { const ob = document.getElementById('upd-bar'); if (ob) ob.remove(); return; }
     bar();
 }
 function check() {
