@@ -6028,9 +6028,54 @@ function send(moving) {
             j: run.joinAt || t                     // 이 방에 들어온 때 — 넘치면 늦게 온 쪽이 옮긴다
         };
         if (ex) Object.keys(ex).forEach(function (k) { pk[k] = ex[k]; });
-        run.ref.child(u.code).set(pk);
+        sendPk(u.code, pk, t);
     } catch (e) { }
 }
+// ★ 데이터를 덜 먹게 (2026-11-16 사용자 「데이터를 너무 많이 먹어서 덜 먹게 최적화좀 하자. 전체적으로.」)
+//   전에는 걸음마다(0.25 초) 자리 기록을 **통째로**(이름 · 옷차림 d · 탈것 · 말 …) 다시 적었고, 같은 방 사람 모두가 그것을 통째로 받았다.
+//   이제는 지난번에 적은 것과 견주어 **바뀐 칸만** update 로 보낸다 (걸을 때는 x · y · at 정도 — 몇십 바이트).
+//   통째로 다시 적는 때 — 처음 · 방을 옮겼을 때 · 다시 접속했을 때(끊긴 사이 서버가 자리를 지웠을 수 있다) · 1 분마다 한 번(어긋남을 바로잡는다)
+const PK_FULL_MS = 60000;
+let pkConnSeen = false;
+function sendPk(code, pk, t) {
+    const key = seatKey(run.room, run.inst);
+    const last = run.sPk;
+    if (!last || run.sPkKey !== key || t - (run.sPkAt || 0) > PK_FULL_MS) {
+        run.ref.child(code).set(pk);
+        run.sPk = pkCopy(pk); run.sPkKey = key; run.sPkAt = t;
+        return;
+    }
+    const up = {};
+    let n = 0;
+    Object.keys(pk).forEach(function (k) {
+        if (pkSame(pk[k], last[k])) return;
+        up[k] = (pk[k] === undefined) ? null : pk[k]; n++;
+    });
+    Object.keys(last).forEach(function (k) {
+        if (k in pk) return;
+        if (last[k] != null) { up[k] = null; n++; }
+    });
+    if (!n) return;
+    run.ref.child(code).update(up);
+    run.sPk = pkCopy(pk);
+}
+function pkSame(a, b) {
+    if (a === b) return true;
+    if (a == null && b == null) return true;
+    if (typeof a !== 'object' || typeof b !== 'object' || !a || !b) return false;
+    try { return JSON.stringify(a) === JSON.stringify(b); } catch (e) { return false; }
+}
+function pkCopy(pk) { try { return JSON.parse(JSON.stringify(pk)); } catch (e) { return null; } }
+// 다시 접속했으면 다음에는 통째로 (끊긴 사이 onDisconnect 가 자리를 지웠을 수 있다)
+(function pkConn() {
+    const iv = setInterval(function () {
+        const d = db_();
+        if (!d || pkConnSeen) return;
+        pkConnSeen = true;
+        clearInterval(iv);
+        try { d.ref('.info/connected').on('value', function (s) { if (s.val() === true && run) { run.sPk = null; run.sent = 0; } }); } catch (e) { }
+    }, 1000);
+})();
 
 // ==========================================
 // ★ 방 나누기 — 한 장소에 CAP(10)명까지
@@ -6510,6 +6555,7 @@ function watchRoom() {
     if (!d || !u) return;
     offRoom();
     run.ref = d.ref(P.PATH + '/' + seatKey(run.room, run.inst));
+    run.sPk = null;                                  // 새 자리 — 처음은 통째로 적는다 (sendPk)
     // ★ 로그아웃하며 광장을 닫은 뒤(run = null)에도 마지막 소식이 올 수 있다 — 그때는 안 본다
     run.onAdd = function (s) { if (!run) return; onSeat(s.key, s.val(), true); };
     run.onChg = function (s) { if (!run) return; onSeat(s.key, s.val(), false); };
@@ -6659,6 +6705,7 @@ function leaveRoom() {
     } catch (e) { }
     try { run.ref.child(u.code).onDisconnect().cancel(); } catch (e) { }
     try { run.ref.child(u.code).remove(); } catch (e) { }
+    run.sPk = null;                                  // 다시 들어오면 통째로 적는다 (sendPk)
     offRoom();
     run.ref = null;
 }
