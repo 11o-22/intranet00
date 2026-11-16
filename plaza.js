@@ -5501,13 +5501,9 @@ function goApp(s) {
     try {
         // 엘리베이터 — 층을 고르는 판을 띄운다
         if (s.lift) { liftSheet(); return; }
-        // 🏠 사택 — 칸을 띄우지 않고 캐릭터가 사택 안으로 옮겨 간다 (2026-11-16 사용자 「사택 입장 시 맵 이동 처럼 캐릭터 자체가 이동하는 형식으로」)
-        //   ☰ 사택 · 엘리베이터 2F 사택 모두. 못 들어가는 사택(A 등급 미만)이거나 이미 사택 안이면 전처럼 사택 칸을 띄운다 (house-room.js houseGoIn)
-        if (s.tab === 'tab-house' && s.sub === 'house-main' && typeof window.houseGoIn === 'function') {
-            let went = false;
-            try { went = !!window.houseGoIn(); } catch (e) { went = false; }
-            if (went) { closeSheet(); return; }
-        }
+        // 🏠 사택 — (2026-11-16 낮) 칸을 띄우지 않고 바로 사택 안으로 옮겨 가게 했다가
+        //   같은 날 사용자 「사택 다시 들어가서 눌러야 들어가지게 바꾸자. 대신 사택에 들어가면 광장 메뉴 기능을 쓸 수 있게 하고.」
+        //   → 전처럼 사택 칸을 띄우고, 칸의 「사택 안으로 들어가기」를 눌러야 들어간다 (들어가면 광장에서 빠지고 · 안에서 ☰ 광장 목록을 쓴다 — house-room.js)
         // 방으로 들어가는 입구 — 광장을 닫지 않고 그 방으로 건너간다
         if (s.go) {
             closeSheet(); goRoom(s.go, null, s.golv);
@@ -7805,13 +7801,7 @@ function pickMenu(m) {
     }
     if (m && m.sheet === 'mates') { matesSheet(); return; }
     if (m && m.sheet === 'photo') { photoSheet(); return; }
-    // 🏠 사택 — 건물 엘리베이터까지 걸어가지 않고 바로 사택 안으로 옮겨 간다 (2026-11-16 사용자 「사택 입장 시 맵 이동 처럼 캐릭터 자체가 이동하는 형식으로」)
-    //   못 들어가는 사택(A 등급 미만)이면 전처럼 백일몽 엘리베이터로 데려간다 → 2F 사택 칸
-    if (m && m.tab === 'tab-house' && m.sub === 'house-main' && typeof window.houseGoIn === 'function') {
-        let went = false;
-        try { went = !!window.houseGoIn(); } catch (e) { went = false; }
-        if (went) { closeSheet(); return; }
-    }
+    // 🏠 사택 — 전처럼 백일몽 엘리베이터로 데려가 2F 사택 칸을 띄운다 (2026-11-16 사용자 「사택 다시 들어가서 눌러야 들어가지게」 · 낮에는 바로 사택 안으로 옮겨 갔다)
     if (skipTake) {
         const take = skipTake;
         skipTake = null;
