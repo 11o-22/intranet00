@@ -171,7 +171,8 @@ function bankSettle() {
             if ((b.deposit || 0) > 0 && !b.blacklist) {
                 let d = b.deposit;
                 for (let i = 0; i < Math.min(days, 30); i++) d *= (1 + gr.rate);
-                b.deposit = Math.min(cap, Math.max(b.deposit, Math.floor(d)));
+                // ★ 2026-11-16 — 한도를 넘겨 맡겨 둔 예금(🪈 영원의 단소를 차고 넣은 것 등)은 이자 때문에 깎이지 않는다 (불지만 않는다)
+                b.deposit = Math.max(b.deposit, Math.min(cap, Math.floor(d)));
             }
             b.lastInterest = (b.lastInterest || now) + days * BANK_DAY;
         }
