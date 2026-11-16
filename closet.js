@@ -1798,6 +1798,9 @@ function actor(user, opt) {
     // ★ held — 화면 밖에 나간 사람은 **걷는 것까지** 멈춘다 (hold).
     const calm = !!o.calm;
     let held = false;
+    // ★ 졸음 (2026-11-16 사용자 「자몽 물약은 24시간 내내 졸음 상태로 하고, 눈 감고 있게 해줘」 · plaza.js zzPaint → sleep(on))
+    //   머리는 늘 눈 감은 칸(서기 줄 BLINK_SHUT) — 걸을 때는 걸음 칸 머리처럼 홀수 칸에서 4 내려 그린다 (재 보면 걷기 줄 머리는 홀수 칸만 4 아래)
+    let sleepy = false;
     let walking = false, dir = 1, timers = [];
     const put = function (el, col, row) {
         if (el._seq) return;                                // 스물네 칸짜리 장은 제 시계로 (seqPaint)
@@ -1805,6 +1808,11 @@ function actor(user, opt) {
             if (el === bodyEl) return;                      // 간지럽히는 동안 몸판은 tickle 이 칠한다
             if (el === head && tkShut()) { col = D.BLINK_SHUT; row = 1; }   // 1~6 동안은 눈 감은 얼굴 (깜빡임 시계가 칠해도)
             else if (row === 0) { col = 0; row = 1; }       // 걷거나 멈춰 세워도 옷은 서 있는 모습 — 간지럽히기 몸이 서 있는 그림이다
+        }
+        if (sleepy && el === head && tk == null) {
+            const dy = (row === 0 && (col % 2) === 1) ? 4 : 0;
+            el.style.backgroundPosition = '-' + (D.BLINK_SHUT * D.W * k) + 'px ' + (dy * k - D.H * k) + 'px';
+            return;
         }
         if (st != null && el === stripEl) return;            // 벗기는 장은 strip 이 칠한다 (다 벗긴 뒤에는 숨어 있다)
         if (typeof st === 'number' && tk == null) {
@@ -1912,6 +1920,8 @@ function actor(user, opt) {
     return {
         el: box,
         moving: function (on) { on = !!on; if (on === walking) return; walking = on; if (!on) seqStopNow = true; start(); },
+        // 💤 졸음 — 눈을 감은 채로 둔다 (null · false 면 다시 깜빡인다)
+        sleep: function (on) { on = !!on; if (on === sleepy) return; sleepy = on; if (head) put(head, 0, walking ? 0 : 1); },
         // 한 칸에 멈춰 세운다 — col (걷는 줄의 몇 번째 칸, 0부터) · null 이면 풀어서 원래 움직임으로
         pose: function (c) { const v = (c == null) ? null : Number(c); if (v === posed) return; posed = v; start(); },
         // 화면 밖이면 시계를 멈추고, 다시 들어오면 그때 모습으로 다시 돌린다

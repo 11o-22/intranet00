@@ -2965,6 +2965,7 @@ function boardOff(one) {
 function zzPaint(one, on) {
     if (!one || !one.wrap) return;
     on = !!on;
+    try { if (one.actor && typeof one.actor.sleep === 'function') one.actor.sleep(on); } catch (e) { }   // 눈을 감고 있다 (2026-11-16 · closet.js sleep)
     if (one._zz === on) return;
     one._zz = on;
     let el = one.wrap.querySelector(':scope > .plaza-zz');

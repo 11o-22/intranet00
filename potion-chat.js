@@ -18,7 +18,9 @@
 //     무엇을 쳐도 「네.」로 나간다. 물음이 없으면 하고 싶은 말을 그대로 한다. (내가 한 물음은 세지 않는다 — 내 말에 「네.」로 답하게 되지 않게)
 //     둘 다 마셨으면 「네.」에 레몬이 붙어 「넹.」
 //   · 🍊 자몽맛 (24 시간) — 졸음 상태: 광장에서 머리 위에 💤 가 뜬다 (남에게도).
-//     3 시간에 한 번 「음냐음냐」 · 「커억」 · 「드르렁」 가운데 하나를 저절로 말한다 (광장 말풍선 · 지금 채팅 칸).
+//     ★ 2026-11-16 사용자 「자몽 물약은 24시간 내내 졸음 상태로 하고, 눈 감고 있게 해줘. 말풍선은 30분에 한 번씩 나오게 하고.」
+//       → 24 시간 내내 💤 · 광장 캐릭터가 눈을 감고 있다 (서 있을 때도 걸을 때도 — closet.js sleep) · 잠꼬대는 30 분에 한 번 (처음엔 3 시간)
+//     30 분에 한 번 「음냐음냐」 · 「커억」 · 「드르렁」 가운데 하나를 저절로 말한다 (광장 말풍선 · 지금 채팅 칸).
 //     그때 광장에 없으면 다음에 광장에 들어왔을 때 한 번 한다 (밀린 만큼 몰아서 하지는 않는다).
 //   · 바뀌는 채팅 — 광장(서버 · 맵 · 귓속말) · 사내 채팅 · 어둠 파티 채팅 · 사택 채팅 · 관전 채팅. 시스템이 보내는 알림 줄은 안 바뀐다.
 //
@@ -31,7 +33,7 @@
 
 const LEMON = '레몬맛 물약', BLUE = '블루베리맛 물약', GRAPE = '자몽맛 물약';
 const SLEEP_TALK = ['음냐음냐', '커억', '드르렁'];
-const TALK_EVERY = 3 * 3600 * 1000;
+const TALK_EVERY = 30 * 60 * 1000;     // ★ 2026-11-16 사용자 「말풍선은 30분에 한 번씩」 (처음엔 3 시간)
 const RECENT = 20;
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
@@ -54,7 +56,7 @@ window.potionDrowsy = function (u) { return effOn(u || u_(), GRAPE); };
     function put() {
         if (typeof ITEM_CATALOG === 'undefined') return false;
         if (!ITEM_CATALOG[GRAPE]) ITEM_CATALOG[GRAPE] = { price: 4000, usable: true, targetable: true, effect: 'p_grape',
-            desc: '마신 사람은 24 시간 동안 졸음 상태가 되어, 3 시간에 한 번씩 잠꼬대를 한다 (음냐음냐 · 커억 · 드르렁).' };
+            desc: '마신 사람은 24 시간 내내 졸음 상태가 되어 눈을 감고 있고, 30 분에 한 번씩 잠꼬대를 한다 (음냐음냐 · 커억 · 드르렁).' };
         if (!ITEM_CATALOG[LEMON]) ITEM_CATALOG[LEMON] = { price: 4000, usable: true, targetable: true, effect: 'p_lemon',
             desc: '마신 사람은 3 시간 동안 하는 말마다 받침에 ㅇ 이 들어간다 (보내는 순간).' };
         // 블루베리맛 — 설명을 실제 규칙에 맞춘다
@@ -78,10 +80,10 @@ window.potionDrowsy = function (u) { return effOn(u || u_(), GRAPE); };
             const cat = (typeof ITEM_CATALOG !== 'undefined') ? ITEM_CATALOG[itemName] : null;
             const eff = cat && cat.effect;
             if (eff !== 'p_grape' && eff !== 'p_lemon') return f.apply(this, arguments);
-            const a = eff === 'p_grape' ? [GRAPE, '졸음 — 3 시간에 한 번씩 잠꼬대 (음냐음냐 · 커억 · 드르렁)', 24]
+            const a = eff === 'p_grape' ? [GRAPE, '졸음 — 눈을 감고 30 분에 한 번씩 잠꼬대 (음냐음냐 · 커억 · 드르렁)', 24]
                                         : [LEMON, '하는 말마다 받침에 ㅇ 이 들어감', 3];
             addTimedEffect(targetUser, a[0], a[1], a[2]);
-            if (eff === 'p_grape' && targetUser) targetUser.zzLast = Date.now();      // 잠꼬대는 마신 때부터 3 시간마다
+            if (eff === 'p_grape' && targetUser) targetUser.zzLast = Date.now();      // 잠꼬대는 마신 때부터 30 분마다
             showCustomAlert(isOthers ? targetUser.name + ' 사원에게 ' + a[0] + '을 사용했습니다.' : a[0] + '\n\n' + a[1]);
             return true;
         };
@@ -168,7 +170,7 @@ hookSends();
 setInterval(hookSends, 2000);                       // 다른 파일이 뒤에 다시 감싸도 맨 바깥에 선다
 
 // ==========================================
-// 🍊 잠꼬대 — 3 시간에 한 번 (광장에 있을 때)
+// 🍊 잠꼬대 — 30 분에 한 번 (광장에 있을 때 · 2026-11-16 처음 3 시간에서 바꿈)
 // ==========================================
 function talkTick(force) {
     const u = u_();
