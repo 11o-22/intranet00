@@ -35,6 +35,8 @@
 //            예전: 하루 3번 — 선녀탕 · 상담실에 갇힌 사원을 꺼낸다. 나는 10,000~20,000 P · 그 사원은 오염도 0~20% 로 나온다 (옥방울 소리)
 //            치성(★ 다섯 · 하루 세 번) — 다음 탐사 한 번: 죽어서 선녀탕 · 상담실로 가게 되면 녹존의 선물(유쾌 · ??? · 우주 물품 하나)을 들고 바로 나온다
 //            (2026-11-08 사용자 「하루 세 번 가능하게 · 장착자가 나오면서 선물 들고 나오게」 — 치성을 세 번까지 겹쳐 걸고, 판마다 하나씩 쓴다)
+//            (2026-11-16 사용자 「이거 타인이 아니라 치성 드린 본인이 나올 수 있게」 — 남을 꺼내던 구출 자리에:
+//             치성을 드린 본인이 이미 선녀탕 · 상담실에 갇혀 있으면 걸린 치성 하나를 써서 녹존의 선물을 들고 스스로 나온다 · 갇힌 화면의 🔔 단추)
 //   ④ 문곡  하루 1번 — 「청한다」를 눌러 두면 다음 생환 때 그 구역 회수품 셋 중 하나를 확정으로 고른다 (🎻 신성의 바이올린은 안 나온다)
 //            고르고 나면 그날 회수품 확률 ×1.5~2.5 · 치성(★ 셋) — 셋 중 둘
 //   ⑤ 염정  열 가지 속성(회피 · 파괴 · 치유 · 행운 · 감각 · 은신 · 연결 · 응시 · 보정 · 굳건) 중 하나를 준다 — 탐사 중 D 로 함께한다
@@ -393,8 +395,9 @@ function menu() {
                 + '<div>' + btn('치성 (★1)', "chilJi('geo')", (s.geo || 0) >= CHIL.GEO_DAY || sc < CHIL.JI.geo, true)
                 + tag('치성 ' + (s.geo || 0) + ' / ' + CHIL.GEO_DAY + ' · 걸린 보호 ' + (s.geoArm || 0), (s.geoArm || 0) > 0) + '</div>';
         } else if (g.k === 'nok') {
-            body = line('치성(★ 다섯 · 하루 세 번) — 다음 탐사 한 번: 죽어서 선녀탕 · 상담실로 가게 되면 녹존의 선물을 들고 바로 나온다. 세 번까지 겹쳐 걸어 두면 탐사마다 하나씩 쓴다.')
-                + line('<span style="color:#8a7a5a;">남의 선녀탕 · 상담실 · 가두리에는 관여할 수 없다 — 갇힌 사원을 꺼내 주던 구출은 닫혔다.</span>')
+            body = line('치성(★ 다섯 · 하루 세 번) — 치성을 드린 본인에게: 다음 탐사 한 번, 죽어서 선녀탕 · 상담실로 가게 되면 녹존의 선물을 들고 바로 나온다. 세 번까지 겹쳐 걸어 두면 탐사마다 하나씩 쓴다.')
+                + line('이미 선녀탕 · 상담실에 갇혀 있으면 — 걸린 치성 하나를 써서 녹존의 선물을 들고 스스로 나온다 (갇힌 화면의 🔔 단추).')
+                + line('<span style="color:#8a7a5a;">남은 꺼내 줄 수 없다 — 치성을 드린 본인만 나온다.</span>')
                 + '<div>' + btn('치성 (★5)', "chilJi('nok')", (s.nokJi || 0) >= CHIL.NOK_JI_DAY || sc < CHIL.JI.nok, true)
                 + tag('치성 ' + (s.nokJi || 0) + ' / ' + CHIL.NOK_JI_DAY + ' · 걸린 선물 ' + (s.nokArm || 0), (s.nokArm || 0) > 0) + '</div>';
         } else if (g.k === 'mun') {
@@ -515,7 +518,7 @@ window.chilJi = function (k) {
         const s2 = st(u);
         let msg = '';
         if (k === 'geo') { s2.geo = (s2.geo || 0) + 1; s2.geoArm = (s2.geoArm || 0) + 1; msg = '다음 홀로 탐사 한 번 — 즉사를 한 번 피하고, 그래도 죽으면 오염도 0 으로 귀환합니다.'; }
-        if (k === 'nok') { s2.nokJi = (s2.nokJi || 0) + 1; s2.nokArm = (s2.nokArm || 0) + 1; msg = '다음 탐사 한 번 — 죽어서 선녀탕 · 상담실로 가게 되면 녹존의 선물을 들고 바로 나옵니다.\n(걸린 치성 ' + s2.nokArm + ' · 오늘 ' + s2.nokJi + ' / ' + CHIL.NOK_JI_DAY + ')'; }
+        if (k === 'nok') { s2.nokJi = (s2.nokJi || 0) + 1; s2.nokArm = (s2.nokArm || 0) + 1; msg = '다음 탐사 한 번 — 죽어서 선녀탕 · 상담실로 가게 되면 녹존의 선물을 들고 바로 나옵니다.\n이미 갇혀 있을 때는 갇힌 화면의 🔔 단추로 걸린 치성 하나를 써서 스스로 나옵니다.\n(걸린 치성 ' + s2.nokArm + ' · 오늘 ' + s2.nokJi + ' / ' + CHIL.NOK_JI_DAY + ')'; }
         if (k === 'mun') { s2.munJi = 1; s2.munArm = 1; msg = '다음 생환 때 회수품 셋 중 둘을 고릅니다.'; }
         if (k === 'yeom') { s2.yeomJi = 1; msg = '오늘 하루 염정성군의 속성이 L 로 굳고, 두 개까지 드릴 수 있습니다.'; }
         if (k === 'mug') { s2.mugJi = 1; s2.mugArm = 1; msg = '다음 탐사 한 번 — 살아 나오면 ×7, 같이 간 파티원은 ×5.'; }
@@ -1102,7 +1105,7 @@ function geoGuard(reasonText, nextFn) {
 })();
 
 // ==========================================
-// ③ 녹존 — 갇힌 사원을 꺼낸다
+// ③ 녹존 — 치성을 드린 본인이 갇혀 있으면 스스로 나온다
 // ==========================================
 function inQ(u) {
     if (!u) return false;
@@ -1113,29 +1116,10 @@ function inQ(u) {
 function foodQ(x) {
     try { return typeof window.quarFood === 'function' && !!window.quarFood(x); } catch (e) { return false; }
 }
-// ★ 2026-10-31 사용자 — 커스텀 장비는 남의 상담실 · 선녀탕 · 가두리에 관여하지 못한다 (🎐 여우 신도만 예외). 구출은 닫는다.
-const NOK_SHUT = '녹존성군께 남을 꺼내 달라 청할 수 없습니다.\n\n남의 상담실 · 선녀탕 · 가두리에는 관여할 수 없습니다 — 갇힌 본인만 나올 수 있습니다.';
-window.chilNokList = function () {
-    const u = me();
-    if (!u || !wears(u)) return;
-    alert_(NOK_SHUT); return;
-    const s = st(u);
-    if ((s.nok || 0) >= CHIL.NOK_DAY) { alert_('오늘 녹존성군께 청할 수 있는 구출은 다 썼습니다.'); return; }
-    const list = users().filter(function (x) { return x.code !== u.code && inQ(x); });
-    const rows = list.map(function (x) {
-        const bath = (x.quarantineDest || 'fox') === 'bath';
-        const mins = Math.max(0, Math.round((Number(x.quarantineUntil) - Date.now()) / 60000));
-        return '<div style="display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px dashed #3a2e14;">'
-            + '<div style="flex:1; min-width:0; font-size:12px;">' + (bath ? '♨ ' : '🦊 ') + esc(x.name)
-            + ' <span style="font-size:10px; color:#9a8a6a;">' + (bath ? '선녀탕' : '상담실') + ' · ' + Math.floor(mins / 60) + '시간 ' + (mins % 60) + '분 남음</span>'
-            + (foodQ(x) ? '<div style="font-size:9.5px; color:#ffb74d; margin-top:2px;">🍽 음식으로 갇힘 — 꺼내도 포인트 없음</div>' : '') + '</div>'
-            + '<button class="game-btn" style="margin:0; padding:6px 11px; font-size:11px;' + GOLD + '" onclick="chilNokGo(\'' + esc(x.code) + '\')">꺼낸다</button></div>';
-    }).join('');
-    box('<div style="' + HEAD + '">🔔 녹존성군 — 갇힌 사원</div>'
-        + '<div style="font-size:10px; color:#9a8a6a; margin-bottom:8px;">오늘 남은 구출 ' + (CHIL.NOK_DAY - (s.nok || 0)) + ' / ' + CHIL.NOK_DAY + '</div>'
-        + '<div style="' + SCROLL + '">' + (rows || '<div style="font-size:11px; color:#8a7a5a;">지금 선녀탕 · 상담실에 갇힌 사원이 없습니다.</div>') + '</div>'
-        + '<button class="game-btn" style="width:100%; margin:0; padding:10px; font-size:12px;" onclick="chilMenu()">돌아간다</button>');
-};
+// ★ 2026-10-31 사용자 — 커스텀 장비는 남의 상담실 · 선녀탕 · 가두리에 관여하지 못한다 (🎐 여우 신도만 예외). 남을 꺼내는 구출은 닫았다.
+// ★ 2026-11-16 사용자 「이거 타인이 아니라 치성 드린 본인이 나올 수 있게」
+//   그 자리에 — 치성을 드린 본인(차고 있는 사람)이 선녀탕 · 상담실에 갇혀 있으면,
+//   걸린 치성(걸린 선물) 하나를 써서 녹존의 선물을 들고 오염도 0~20% 로 스스로 나온다. 가두리는 그대로 둔다.
 function cleanBadge(x) {
     if (x && x.badge && typeof x.badge.notes === 'string') {
         const a = x.badge.notes.split(' | ').filter(function (n) {
@@ -1146,49 +1130,53 @@ function cleanBadge(x) {
     }
     return false;
 }
-let nokBusy = false;
-window.chilNokGo = function (code) {
+function nokOutLeft(u) { return (u && wears(u) && inQ(u)) ? (st(u).nokArm || 0) : 0; }
+let nokOutBusy = false;
+function nokSelfOut() {
     const u = me();
-    if (!u || !wears(u) || nokBusy) return;
-    alert_(NOK_SHUT); return;
-    if ((st(u).nok || 0) >= CHIL.NOK_DAY) { alert_('오늘 녹존성군께 청할 수 있는 구출은 다 썼습니다.'); return; }
-    nokBusy = true;
-    shut();
-    const go = function (srv) {
-        nokBusy = false;
-        const s = st(u);
-        if ((s.nok || 0) >= CHIL.NOK_DAY) return;
-        const local = userOf(code), cur = srv || local;
-        if (!cur || !inQ(cur)) { alert_('그 사원은 이미 나왔습니다.'); return; }
-        const now = Date.now();
-        const bath = (cur.quarantineDest || 'fox') === 'bath';
+    if (!u || nokOutBusy || !wears(u) || !inQ(u)) return;
+    const s = st(u);
+    if ((s.nokArm || 0) <= 0) { alert_('걸린 치성이 없습니다.\n\n녹존성군께 치성을 드린 본인만 — 걸린 치성 하나로 나올 수 있습니다.'); return; }
+    nokOutBusy = true;
+    try {
+        const where = (u.quarantineDest || 'fox') === 'bath' ? '선녀탕' : '상담실';
         const poll = rint(CHIL.NOK_POLL[0], CHIL.NOK_POLL[1]);
-        const x = { badge: cur.badge ? JSON.parse(JSON.stringify(cur.badge)) : undefined, history: Array.isArray(cur.history) ? cur.history.slice() : [] };
-        const food = foodQ(cur);
-        const f = { quarantineUntil: 0, quarantineExitPollution: 0, quarantineHospital: false, quarantineDest: null,
-                    pollution: poll, lastPollutionTime: now, foxRoomAnswered: false, quarCause: null, quarFood: null,
-                    chilFreed: { by: u.code, byName: u.name || '', at: now }, hasItemUsedOnMe: true };
-        if (cleanBadge(x)) f.badge = x.badge;
-        log_(x, '[🌟 녹존성군] 옥방울 소리 — ' + (u.name || '') + ' 사원의 청으로 ' + (bath ? '선녀탕' : '상담실') + '에서 나왔습니다. (오염도 ' + poll + '%)');
-        f.history = x.history;
-        if (local) Object.keys(f).forEach(function (k) { local[k] = f[k]; });
-        try { if (typeof updateUserFields === 'function') updateUserFields(code, Object.assign({}, f)); } catch (e) { }
-        // ★ 음식으로 오른 오염도로 갇혔던 사람 — 꺼내 주고 횟수는 쓰지만 포인트는 없다
-        const got = food ? 0 : rint(CHIL.NOK_PT[0], CHIL.NOK_PT[1]);
-        if (got) pay(got);
-        s.nok = (s.nok || 0) + 1;
-        log_(u, '[🌟 녹존성군] ' + (cur.name || nameOf(code)) + ' 사원을 ' + (bath ? '선녀탕' : '상담실') + '에서 꺼냈습니다 ('
-            + (food ? '음식으로 갇힘 — 포인트 없음' : '+' + won(got)) + ')');
-        save({ history: 1 });
+        const g = giftOf();
+        if (g) { if (!Array.isArray(u.inventory)) u.inventory = []; u.inventory.push(g); }
+        s.nokArm = (s.nokArm || 0) - 1;
+        const f = { };
+        if (cleanBadge(u)) f.badge = 1;
+        if (u.quarCause != null) { u.quarCause = null; f.quarCause = 1; }
+        if (u.quarFood != null) { u.quarFood = null; f.quarFood = 1; }
+        log_(u, '[🌟 녹존성군] 옥방울 소리 — 치성으로 ' + where + '에서 나왔습니다 (오염도 ' + poll + '%)' + (g ? ' · 선물 「' + g + '」' : '') + ' · 남은 걸린 치성 ' + s.nokArm);
+        freeSelf(poll);
+        save(f);
+        SHUT_ROOMS.forEach(function (id) { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+        try { document.body.style.overflow = ''; } catch (e) { }
+        try { hasShownFoxAlert = false; } catch (e) { }
+        try { const b = document.getElementById('chil-nok-out'); if (b) b.remove(); } catch (e) { }
         ui();
-        alert_('🔔 옥방울 소리가 들려온다.\n\n' + (cur.name || nameOf(code)) + ' 사원이 ' + (bath ? '선녀탕' : '상담실') + '에서 나왔습니다. (오염도 ' + poll + '%)\n\n'
-            + (food ? '음식으로 오른 오염도로 갇혔던 사원이라 포인트는 들어오지 않습니다.' : '+' + won(got))
-            + '\n\n오늘 남은 구출 ' + (CHIL.NOK_DAY - s.nok) + ' / ' + CHIL.NOK_DAY);
-    };
-    const d = db_();
-    if (!d) { go(null); return; }
-    d.ref('users/' + code).once('value').then(function (sn) { go(sn && sn.val ? sn.val() : null); }).catch(function () { go(null); });
-};
+        alert_('🔔 옥방울 소리가 들려온다.\n\n녹존성군이 업장을 거두었습니다.\n' + where + '에서 나왔습니다. (오염도 ' + poll + '%)'
+            + (g ? '\n\n녹존의 선물 — 「' + g + '」' : '') + '\n\n남은 걸린 치성 ' + s.nokArm);
+    } finally { nokOutBusy = false; }
+}
+window.chilNokOut = nokSelfOut;
+// 갇힌 화면 — 걸린 치성이 있으면 🔔 단추
+setInterval(function () {
+    try {
+        const ID = 'chil-nok-out', old = document.getElementById(ID);
+        const left = nokOutLeft(me());
+        if (left <= 0) { if (old) old.remove(); return; }
+        const txt = '🔔 녹존성군 — 치성으로 나온다 (' + left + ')';
+        if (old) { if (old.textContent !== txt) old.textContent = txt; return; }
+        const b = document.createElement('button');
+        b.id = ID; b.className = 'game-btn';
+        b.style.cssText = 'position:fixed; left:50%; transform:translateX(-50%); bottom:182px; z-index:99998; padding:11px 18px; font-size:12px; border-radius:22px; box-shadow:0 4px 14px rgba(0,0,0,0.5); white-space:nowrap;' + GOLD;
+        b.textContent = txt;
+        b.onclick = nokSelfOut;
+        document.body.appendChild(b);
+    } catch (e) { }
+}, 1500);
 // 구출받은 쪽 — 방을 닫고 알린다 (자리에 없었으면 들어올 때)
 setInterval(function () {
     try {
