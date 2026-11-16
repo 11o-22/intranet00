@@ -412,9 +412,12 @@ function fallen(text) {
         try { g = (typeof window.gearRoomOf === 'function') ? window.gearRoomOf() : null; } catch (e) { }
         const mult = (g && g.mult > 0) ? g.mult : 1;
         const solo = g ? !!g.solo : ((Number(r.memberCount) || 1) <= 1);
+        // ★ 2026-11-16 사용자 — 🎻 바이올린만은 거꾸로: 커스텀 장비로 만들지 않은 방이 ×0.1 · 커스텀 장비로 만든 방(여럿)은 그대로 (violin.js roomMult)
+        const vMult = (typeof window.violinRoomMult === 'function') ? window.violinRoomMult(g) : ((g && g.room) ? 1 : 0.1);
         loot.forEach(function (l) {
-            if (solo && /바이올린/.test(String(l.name || ''))) return;
-            if (Math.random() < l.chance * mult) { currentUser.inventory.push(l.name); gained.push(l.name); }
+            const isV = /바이올린/.test(String(l.name || ''));
+            if (solo && isV) return;
+            if (Math.random() < l.chance * (isV ? vMult : mult)) { currentUser.inventory.push(l.name); gained.push(l.name); }
         });
         // ★ 조합 재료 — 10판을 뛰면 하나는 꼭 (craft-pity.js · 2026-11-14) · 커스텀 장비로 만든 방은 한 판을 0.1 판으로
         if (typeof window.craftPityAfter === 'function') {

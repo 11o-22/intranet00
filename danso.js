@@ -8,9 +8,11 @@
 //    조건은 신성의 바이올린과 같고 능력은 슬롯 한도(하루 벌 수 있는 금액) 해제 및 은행 한도 (예금 한도) 해제.」
 //
 // ■ 나오는 곳 · 확률 — 🎻 신성의 바이올린(violin.js)과 같다
-//   Qtrew-S-003 「동화의 뒷면」 정산(renderDarkResult)에서 **0.001%**.
-//   배율(대성공 ×3 · 행운 ×2 · 에메랄드 · 감지하는 눈 · 토크쇼 · K.LEE …)은 타되 다 겹쳐도 **0.072%** 까지.
-//   사람 하나로 든 탐사(커스텀 장비 솔로)는 굴리지 않는다 · 커스텀 장비로 만든 방에 여럿이면 ×0.1 (gear-room.js).
+//   Qtrew-S-003 「동화의 뒷면」 정산(renderDarkResult)에서 **0.0001%**. (2026-11-16 사용자 「10배 더 낮춰줘」 — 처음엔 0.001%)
+//   배율(대성공 ×3 · 행운 ×2 · 에메랄드 · 감지하는 눈 · 토크쇼 · K.LEE …)은 타되 다 겹쳐도 **0.0072%** 까지.
+//   사람 하나로 든 탐사(커스텀 장비 솔로)는 굴리지 않는다.
+//   ★ 2026-11-16 사용자 「커스텀 장비로 만든 방을 여럿이서 돌 때에 ×0.1이 아니라, 커스텀 장비로 만들지 않은 방을 돌 때로」
+//     → 커스텀 장비로 만들지 않은 방(보통 단체)이 ×0.1 · 커스텀 장비로 만든 방에 여럿이면 그대로 (gear-room.js room)
 //   구역 회수품 표(DARK_LOOT_BY_ZONE)에는 넣지 않고 정산 뒤에 따로 굴린다 — 그래야 배율 뚜껑이 지켜지고,
 //   회수품 표에서 고르는 것들(문곡성군 · 덧쓰기 · 확정 승인서)에 섞여 나오지 않는다.
 //
@@ -31,8 +33,9 @@
 
 const NAME = '🪈 영원의 단소';
 const ZONE = 'Qtrew-S-003';
-const RATE = 0.00001;                 // 0.001% — 바이올린과 같다
-const RATE_CAP = 0.00072;             // 0.072% — 배율을 다 겹쳐도
+const RATE = 0.000001;                // 0.0001% — 바이올린과 같다 (2026-11-16 · 처음 0.001% 에서 10배 낮춤)
+const RATE_CAP = 0.000072;            // 0.0072% — 배율을 다 겹쳐도
+function roomMult(g) { return (g && g.room) ? 1 : 0.1; }   // 커스텀 장비로 만든 방(여럿)은 그대로 · 그렇지 않은 방은 ×0.1
 const OWNER = 'dansoOwner';
 const ADMIN = 'kario0987';
 const WOOD = '#7fd48a';
@@ -116,7 +119,7 @@ function gearOf() {
             const r = (typeof darkRun !== 'undefined') ? darkRun : null;
             const inZone = !!(r && r.zone === ZONE && !r._dead && !r._settled);
             const g = inZone ? gearOf() : null;
-            const rate = (inZone && !g.solo) ? Math.min(RATE_CAP, RATE * lootMult(me())) * (g.mult > 0 ? g.mult : 1) : 0;
+            const rate = (inZone && !g.solo) ? Math.min(RATE_CAP, RATE * lootMult(me())) * roomMult(g) : 0;
             const out = _r.apply(this, arguments);
             if (rate > 0) { try { tryRoll(rate); } catch (e) { console.warn('[🪈]', e); } }
             return out;
@@ -412,7 +415,7 @@ window.dansoGive = function (who) {
         });
     });
 };
-window.dansoDebug = { wears: wears, rate: function () { return Math.min(RATE_CAP, RATE * lootMult(me())); }, tryRoll: tryRoll };
+window.dansoDebug = { wears: wears, rate: function () { return Math.min(RATE_CAP, RATE * lootMult(me())) * roomMult(gearOf()); }, tryRoll: tryRoll };
 
 console.log('[🪈] 영원의 단소 — ' + ZONE + ' · ' + (RATE * 100) + '% · dansoWho() · dansoGive(사번)');
 })();

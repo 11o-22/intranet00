@@ -18,7 +18,8 @@
 //
 // ■ 무엇이 바뀌나
 //   구역 회수품표의 확률 ×0.1 — 정산(index.html renderDarkResult) · 신도에게 쓰러질 때(a214-kill.js)
-//   🎻 바이올린(violin.js) — 사람 하나로 든 탐사는 굴리지 않는다 · 커스텀 장비로 만든 방에 여럿이면 ×0.1 · 그 밖의 단체는 그대로
+//   🎻 바이올린(violin.js) · 🪈 단소(danso.js) — 사람 하나로 든 탐사는 굴리지 않는다
+//     ★ 2026-11-16 사용자 — 거꾸로: 커스텀 장비로 만들지 않은 방(보통 단체)이 ×0.1 · 커스텀 장비로 만든 방에 여럿이면 그대로 (roomMult)
 //
 // ■ 콘솔
 //   gearRoomOf()   지금 탐사 — { room, solo, n, mult, why }
@@ -223,5 +224,5 @@ function info() {
 window.gearRoomOf = info;
 window.gearRoomMult = function () { try { return info().mult; } catch (e) { return 1; } };
 
-console.log('[장비 방] 커스텀 장비로 만든 방 — 회수품 ×' + MULT + ' · 솔로는 바이올린 0%');
+console.log('[장비 방] 커스텀 장비로 만든 방 — 회수품 ×' + MULT + ' · 솔로는 바이올린 · 단소 0% (바이올린 · 단소는 보통 방이 ×0.1)');
 })();
