@@ -21,6 +21,8 @@
 //   물어서 정한 것 (같은 날)
 //     에코 아웃   지목한 4명이 **저마다 4번씩** 즉사를 면한다 (모두 16번) · 본인은 따로 4번
 //     톤 플레이   지정한 사람은 **장착자와 같은 어둠에 있을 때만** 무조건 산다
+//                 ★ 2026-11-16 사용자 「톤 플레이 지정한 사람 하루동안 횟수 상관 없이 어둠 들어갈 때 쓰러지지 않게」
+//                   → 장착자와 같은 어둠이 아니어도 (혼자 들어가도) 그날 들어가는 어둠에서는 횟수 상관없이 쓰러지지 않는다.
 //     백스핀      공용시설 행운 200% (×3) · 24시간
 //     피치 라이딩 (처음 것 — 없앰) 값이 쌀수록 잘 나온다 · 한정품은 뺀다
 //
@@ -184,14 +186,14 @@ function crewOf(p) {
     ['members', 'alive', 'crew'].forEach(function (k) { Object.keys((p && p[k]) || {}).forEach(function (c) { o[c] = 1; }); });
     return Object.keys(o);
 }
-// 같은 어둠의 장착자 가운데 오늘 나를 톤 플레이로 지정한 사람
+// 오늘 나를 톤 플레이로 지정한 장착자 — 같은 어둠이 아니어도 된다 (2026-11-16 · 전에는 같은 방에 있을 때만)
+//   장착자가 지금 차고 있고 봉인되지 않았을 때 · 지정은 그날 하루 (djUse.d)
 function toneBy(me, r) {
-    if (!r || !r.isParty || !r.partyId) return null;
-    const p = parties()[r.partyId];
-    if (!p) return null;
-    const c = crewOf(p).filter(function (x) {
+    if (!r || !me) return null;
+    const book = users();
+    const c = Object.keys(book).filter(function (x) {
         if (x === me.code) return false;
-        const u = userOf(x);
+        const u = book[x];
         return !!(u && wears(u) && !sealed(u) && useOf(u).tone === me.code);
     })[0];
     return c || null;
@@ -212,7 +214,7 @@ function toneSave(me, r) {
     log_(me, '[' + NAME + '] 톤 플레이 — ' + who + ' 사원이 지정한 사람이라 쓰러지지 않았습니다.');
     save({ history: 1 });
     chat('🎧 ' + who + ' 사원의 톤 플레이 — ' + (me.name || '') + ' 사원은 쓰러지지 않습니다.');
-    return '「 귀에 익은 톤이 끼어든다. 쓰러지려던 박자가 그 소리에 다시 맞춰진다.<br>' + esc(who) + ' 사원이 고른 톤이다. 이 판에서 당신은 끊기지 않는다. 」';
+    return '「 귀에 익은 톤이 끼어든다. 쓰러지려던 박자가 그 소리에 다시 맞춰진다.<br>' + esc(who) + ' 사원이 고른 톤이다. 오늘 당신은 끊기지 않는다. 」';
 }
 function echoSave(me, r) {
     const v = echoOf(r, me.code);
@@ -659,7 +661,7 @@ function toneSet(target) {
     setUse(me, 'toneN', target.name || target.code);
     log_(me, '[' + NAME + '] 톤 플레이 — 오늘의 톤은 ' + (target.name || target.code) + ' 사원입니다.');
     save({ djUse: 1, history: 1 });
-    alert_('🎧 톤 플레이\n\n오늘의 톤 — ' + (target.name || target.code) + ' 사원.\n당신과 같은 어둠에 있는 동안 이 사원은 쓰러지지 않습니다.\n\n오늘은 바꿀 수 없습니다.');
+    alert_('🎧 톤 플레이\n\n오늘의 톤 — ' + (target.name || target.code) + ' 사원.\n오늘 하루 이 사원은 어둠에 들어가면 횟수 상관없이 쓰러지지 않습니다. (당신과 같은 어둠이 아니어도)\n\n오늘은 바꿀 수 없습니다.');
     return true;
 }
 function spinGo(target) {
@@ -715,7 +717,7 @@ const SKILLS = [
     { k: 'blend', n: '블렌딩', d: '매 어둠마다 확정 구출 ' + C.BLEND.SURE + '회 (구조 화면에 칸이 붙는다). 그 뒤로는 그 어둠에서 당신이 하는 구출 판정 +' + C.BLEND.BON + '.' },
     { k: 'echo', n: '에코 아웃', d: '매 어둠마다 ' + C.ECHO.PICK + '명을 지목해 저마다 즉사를 ' + C.ECHO.EACH + '번 면하게 한다 (어둠 안 위쪽 🎧 단추). 당신도 그 어둠에서 ' + C.ECHO.SELF + '번 죽음에서 벗어난다.' },
     { k: 'rev', n: '리버스 플레이백', d: '하루 한 번 가두리에서 나올 수 있다 (가두리 위 🎧 단추).' },
-    { k: 'tone', n: '톤 플레이', d: '지정한 한 사람은 당신과 같은 어둠에 있는 동안 횟수 상관없이 쓰러지지 않는다. 하루 한 번 지정하면 다른 사람으로 바꾸지 못한다.' },
+    { k: 'tone', n: '톤 플레이', d: '지정한 한 사람은 그날 하루 어둠에 들어가면 횟수 상관없이 쓰러지지 않는다 (당신과 같은 어둠이 아니어도). 하루 한 번 지정하면 다른 사람으로 바꾸지 못한다.' },
     { k: 'spin', n: '백스핀', d: '하루 한 번, 지정한 사원 한 명에게 공용시설 행운 ' + C.SPIN.LUCK + '% (' + C.SPIN.HOURS + '시간). 당신 자신도 된다.' },
     { k: 'dbl', n: '더블링', d: '음표가 장착자의 리듬을 탄다. 하루 한 번 리듬 게임 한 곡(난이도 상관없이)을 끝까지 치면 그날 모든 어둠에서 당신과 같은 어둠에 들어간 사원 모두 보정 +' + C.DBL.BON + '.' },
     { k: 'pitch', n: '피치 라이딩', d: '어둠 한 판에 한 번, 탐사 도중에 리듬 게임 곡 하나의 하드 10 초가 열린다 — 같이 들어간 사람 모두가 같이 친다. 채보의 절반(50%) 이상을 친 사람마다 그 어둠에서 행운 +' + C.PITCH.LUCK + ' · 회피 +' + C.PITCH.EVA + '.' }
@@ -759,7 +761,7 @@ function menu() {
 }
 window.djMenu = menu;
 function askTone() {
-    const w = box(head('🎧 톤 플레이', '오늘의 톤으로 누구를 지정합니까. 당신과 같은 어둠에 있는 동안 이 사원은 쓰러지지 않습니다.<br>하루 한 번 — 지정하면 오늘은 바꾸지 못합니다.')
+    const w = box(head('🎧 톤 플레이', '오늘의 톤으로 누구를 지정합니까. 오늘 하루 이 사원은 어둠에 들어가면 횟수 상관없이 쓰러지지 않습니다 (당신과 같은 어둠이 아니어도).<br>하루 한 번 — 지정하면 오늘은 바꾸지 못합니다.')
         + '<input id="dj-who" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="사번 또는 이름" style="width:100%; padding:10px; font-size:13px; margin-bottom:10px; box-sizing:border-box;">'
         + '<button id="dj-ok" class="game-btn" style="' + BTN + NEON + '">지정한다</button>'
         + '<button id="dj-no" class="game-btn" style="' + BTN + GREY + '">뒤로</button>');
