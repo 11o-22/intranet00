@@ -5353,6 +5353,48 @@ let skipTake = null;
 window.plazaSkipArm = function (take) { skipTake = take || function () { return true; }; };
 window.plazaSkipOn = function () { return !!skipTake; };
 window.plazaMenu = function () { if (run) menuSheet(); };
+// 🏠 사택 화면(house-room.js)이 쓰는 ☰ — 그 화면 위에 같은 목록을 띄우고, 고른 것은 사택이 받는다 (2026-11-16)
+window.plazaMenuIn = function (host, pick) { if (!run) return false; menuSheet(host, pick); return true; };
+window.plazaMenuPick = function (m) { pickMenu(m); };
+window.plazaGoApp = function (m) { closeSheet(); goApp(m); };          // 자리 없이 바로 연다 (사택 안에서 「사택」 → 사택 칸)
+// 고르면 광장에서 걸어가야 하는 것 (건물 앞 · 다른 방 · 엘리베이터 · 동료 목록 · 포토존) — 사택에서는 나가서 한다
+window.plazaMenuWalk = function (m) { try { return !!(m && (m.sheet === 'mates' || m.sheet === 'photo' || m.go || m.lift || placeOf(m))); } catch (e) { return false; } };
+window.plazaMenuClose = function () { closeSheet(); };
+// ★ 🏠 사택에 가 있는 동안 — 광장 맵에서 빠진다 (2026-11-16 사용자 「사택 입장 시 맵 이동 처럼 캐릭터 자체가 이동하는 형식으로」)
+//   들어가면 광장의 내 자리를 지우고(남의 광장에서 사라진다) · 나오면 들어가기 전 그 방 · 그 자리에 다시 선다.
+//   갇혀 있거나(가두리) 냄비 속 · 숨바꼭질 중이면 못 나간다 — 그 까닭을 돌려준다 (plazaAwayBlock)
+window.plazaAwayBlock = function () {
+    if (!run) return '';
+    try { if (cageMine()) return '🔒 가두리에 갇혀 있어 사택에 갈 수 없습니다.'; } catch (e) { }
+    try { if (potMine()) return '🍲 냄비 안에 있어 사택에 갈 수 없습니다.'; } catch (e) { }
+    try { if (HS()) return '🫣 숨바꼭질 중에는 사택에 갈 수 없습니다.'; } catch (e) { }
+    return '';
+};
+window.plazaAway = function (on) {
+    if (!run) return false;
+    on = !!on;
+    if (!!run.away === on) return true;
+    if (on) {
+        run.away = { room: run.room, x: run.x, y: run.y, lv: run.lv || 0 };
+        try { closeSheet(); } catch (e) { }
+        run.keys = {}; run.ax = 0; run.ay = 0; run.tx = null; run.tseg = null;
+        try { leaveRoom(); } catch (e) { }                 // 내 자리를 지운다 — 남의 광장에서 사라진다
+        return true;
+    }
+    const a = run.away;
+    run.away = null;
+    try {
+        if (a && R[a.room]) {
+            goRoom(a.room, null, a.lv);
+            if (run.room === a.room) { run.x = a.x; run.y = a.y; run.tx = null; try { putOne(run.me, run.x, run.y, 0); } catch (e) { } }
+        } else goRoom(run.room || P.START, null, run.lv || 0);
+    } catch (e) { }
+    run.sent = 0;
+    try { send(false); } catch (e) { }
+    try { wake(); } catch (e) { }
+    return true;
+};
+window.plazaIsAway = function () { return !!(run && run.away); };
 
 // ★ 옷이나 얼굴이 바뀌었을 때 — 서 있는 사람을 그 자리에서 갈아입힌다.
 //   방을 다시 열지 않는다 (자리·카메라를 그대로 두고 모습만 다시 만든다).
@@ -5456,6 +5498,13 @@ function goApp(s) {
     try {
         // 엘리베이터 — 층을 고르는 판을 띄운다
         if (s.lift) { liftSheet(); return; }
+        // 🏠 사택 — 칸을 띄우지 않고 캐릭터가 사택 안으로 옮겨 간다 (2026-11-16 사용자 「사택 입장 시 맵 이동 처럼 캐릭터 자체가 이동하는 형식으로」)
+        //   ☰ 사택 · 엘리베이터 2F 사택 모두. 못 들어가는 사택(A 등급 미만)이거나 이미 사택 안이면 전처럼 사택 칸을 띄운다 (house-room.js houseGoIn)
+        if (s.tab === 'tab-house' && s.sub === 'house-main' && typeof window.houseGoIn === 'function') {
+            let went = false;
+            try { went = !!window.houseGoIn(); } catch (e) { went = false; }
+            if (went) { closeSheet(); return; }
+        }
         // 방으로 들어가는 입구 — 광장을 닫지 않고 그 방으로 건너간다
         if (s.go) {
             closeSheet(); goRoom(s.go, null, s.golv);
@@ -5513,6 +5562,8 @@ function goApp(s) {
 //     들어가자마자 또 오른쪽 끝에 서고 그대로 다음 방으로 밀려 갔다.
 function goRoom(key, way, lv) {
     if (!run || !R[key]) return;
+    // 🏠 사택에 가 있다가 광장 쪽 일로 옮겨졌다(퀴즈쇼 · 행맨 · 이벤트 …) — 사택 화면을 닫고 그리로 간다 (2026-11-16)
+    if (run.away) { run.away = null; try { if (typeof window.houseLeave === 'function') window.houseLeave(true); } catch (e) { } }
     if (HS() && R[key].photo && !hsCall('photoOk')) { sysLine('🫣 숨바꼭질 중에는 포토존에 갈 수 없습니다.'); return; }
     // 🎉 이벤트 맵 — 상담사가 초대한 사람만 (어느 길로 오든 · 따라가기 · 끌려가기 · 동료 목록 포함)
     //   ★ 새로고침 직후에는 초대 목록(evInv)을 아직 못 읽었을 수 있다 — 그때는 일단 들여보내고, 읽은 뒤 초대가 없으면 evListen 이 광장으로 내보낸다.
@@ -7541,9 +7592,9 @@ try {
 } catch (e) { }
 
 //   바깥(어두운 자리)을 누르면 닫힌다. 안쪽을 눌러도 안 닫힌다.
-function sheet(kind, title, inner) {
+function sheet(kind, title, inner, host) {
     closeSheet();
-    const ov = document.getElementById('plaza-ov');
+    const ov = (host && host.nodeType === 1) ? host : document.getElementById('plaza-ov');     // host — 🏠 사택 화면 위에 띄울 때 (2026-11-16)
     if (!ov) return null;
     const s = document.createElement('div');
     s.id = 'plaza-sheet';
@@ -7609,7 +7660,11 @@ function anyNew() {
 })();
 
 // ── ☰ 메뉴
-function menuSheet() {
+function menuSheet(host, pick) {
+    // ★ 🏠 사택에서도 같은 목록 (2026-11-16 사용자 「광장에서 쓸 수 있는 메뉴칸 기능들을 사택에서도 쓸 수 있게」)
+    //   host — 띄울 판 (사택 화면 · 없으면 광장) · pick — 고른 것을 받을 곳 (없으면 광장의 pickMenu)
+    host = (host && host.nodeType === 1) ? host : null;
+    pick = (typeof pick === 'function') ? pick : pickMenu;
     const list = P.MENU.filter(spotOk);
     // ★ 갈래(GROUPS)대로 묶어 그린다 — 스무 칸이 한 덩어리로 깔려 있으면
     //   무엇이 어디 있는지 눈으로 못 찾는다.
@@ -7639,10 +7694,10 @@ function menuSheet() {
         + (isAdm() ? '광장 나가기' : '단말 종료') + '</button></div>';
     // ❄ 날씨 자료 출처 (2026-11-15) — 여우비가 눈으로 바뀌는 기온은 Open-Meteo 의 공개 자료다. 출처를 적는 것이 쓰는 조건이다 (CC BY 4.0)
     html += '<div style="margin-top:10px;font-size:9.5px;color:#7f7a96;text-align:center;line-height:1.5;">날씨 자료 · Open-Meteo.com (CC BY 4.0)</div>';
-    const s = sheet('menu', '목록', html);
+    const s = sheet('menu', '목록', html, host);
     if (!s) return;
     Array.prototype.forEach.call(s.querySelectorAll('.plaza-grid button[data-i]'), function (b) {
-        b.onclick = function () { pickMenu(list[Number(b.dataset.i)]); };
+        b.onclick = function () { pick(list[Number(b.dataset.i)]); };
     });
     // 열어 둔 사이에 와도 바로 켜진다 (창이 닫히면 저절로 그친다)
     const dotIv = setInterval(function () {
@@ -7747,6 +7802,13 @@ function pickMenu(m) {
     }
     if (m && m.sheet === 'mates') { matesSheet(); return; }
     if (m && m.sheet === 'photo') { photoSheet(); return; }
+    // 🏠 사택 — 건물 엘리베이터까지 걸어가지 않고 바로 사택 안으로 옮겨 간다 (2026-11-16 사용자 「사택 입장 시 맵 이동 처럼 캐릭터 자체가 이동하는 형식으로」)
+    //   못 들어가는 사택(A 등급 미만)이면 전처럼 백일몽 엘리베이터로 데려간다 → 2F 사택 칸
+    if (m && m.tab === 'tab-house' && m.sub === 'house-main' && typeof window.houseGoIn === 'function') {
+        let went = false;
+        try { went = !!window.houseGoIn(); } catch (e) { went = false; }
+        if (went) { closeSheet(); return; }
+    }
     if (skipTake) {
         const take = skipTake;
         skipTake = null;
@@ -8350,6 +8412,7 @@ function open() {
     window.addEventListener('pointermove', run.onWake, true);
     run.onKey = function (e) {
         if (!run) return;
+        if (run.away) return;                     // 🏠 사택 안 — 자판은 사택이 받는다 (Esc 가 광장을 닫거나 방향키가 광장 사람을 움직이지 않게 · 2026-11-16)
         if (document.activeElement && document.activeElement.id === 'plaza-in') {
             // ★ Enter 는 입력칸 자신의 keydown 이 보낸다 (chatSheet) — 여기서 또 보내면 한글 조합 중(keyCode 229 · isComposing)의
             //   Enter 까지 잡아 조합 중인 글을 보내거나 비웠다 (2026-10-30 · 어떤 자판에서는 한글을 아예 못 쓰는 것으로 보였다)

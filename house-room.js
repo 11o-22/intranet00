@@ -920,12 +920,21 @@ function rpsPaint() {
 // ==========================================
 // 사택 화면은 광장 위에 떠야 한다 — 사원 쪽 광장은 바탕(z-index 1)이라 괜찮지만, 상담사의 광장 · 새로 만들어져 바탕 표가 떨어진 광장은
 //   덮개(999995)로 떠 있어 사택(999990)을 가린다. 그러면 「들어가기를 눌러도 그대로 광장」으로 보인다 → 그럴 때는 광장 바로 위로 올린다
+// ★ 2026-11-16 사용자 「광장에서 쓸 수 있는 메뉴칸 기능들을 사택에서도 쓸 수 있게」 — 광장이 바탕(plaza-base · z-index 1)이면 사택도 1 로 내린다.
+//   광장 뒤(같은 1 · 문서에서 뒤에 있으니 광장 위)에 서고, ☰ 로 연 칸(z-index 2) · 창(10000 ~)이 사택 위로 뜬다 (shell.js 쌓임 차례와 같다).
+//   광장이 나중에 새로 만들어져 문서에서 사택보다 뒤에 오면 사택을 맨 뒤로 옮겨 다시 위에 선다.
 function overPlaza(ov) {
     try {
         if (!ov) return;
         const pl = document.querySelector('#plaza-ov');
-        const pz = pl ? (parseInt(getComputedStyle(pl).zIndex, 10) || 0) : 0;
-        const want = pz >= 999990 ? String(pz + 1) : '';
+        let want = '';
+        if (pl && pl.classList.contains('plaza-base')) {
+            want = '1';
+            if (pl.compareDocumentPosition(ov) & Node.DOCUMENT_POSITION_PRECEDING) document.body.appendChild(ov);
+        } else {
+            const pz = pl ? (parseInt(getComputedStyle(pl).zIndex, 10) || 0) : 0;
+            want = pz >= 999990 ? String(pz + 1) : '';
+        }
         if (ov.style.zIndex !== want) ov.style.zIndex = want;
     } catch (e) { }
 }
@@ -936,7 +945,9 @@ function enter(host) {
     if (!canEnter(mem)) { try { showCustomAlert('🏠 그 사택에는 들어갈 수 없습니다.\n(사는 사원 · 초대받은 사원만)'); } catch (e) { } return; }
     if (!gradeOk(mem)) { try { showCustomAlert('🏠 사택 안은 A 등급 이상 사택부터 들어갈 수 있습니다.\n(지금 ' + gradeOf(mem) + ' 등급)'); } catch (e) { } return; }
     if (typeof window.dotActor !== 'function') { try { showCustomAlert('🏠 사람 그림을 아직 못 불렀습니다. 잠시 뒤에 다시 해 주십시오.'); } catch (e) { } return; }
-    if (S) leave();
+    // 🔒 가두리 · 🍲 냄비 · 🫣 숨바꼭질 중이면 광장을 떠날 수 없다 (plaza.js plazaAwayBlock)
+    if (!S) { let why = ''; try { why = typeof window.plazaAwayBlock === 'function' ? window.plazaAwayBlock() : ''; } catch (e) { } if (why) { try { showCustomAlert(why); } catch (e) { } return; } }
+    if (S) leave(true);                                       // 다른 사택으로 — 광장으로 나가지 않고 바로 옮긴다
     css();
     const ov = document.createElement('div');
     ov.id = 'hr-ov';
@@ -948,6 +959,7 @@ function enter(host) {
         + '</div></div>'
         + '<div id="hr-top"><div id="hr-title"></div>'
         + (mine ? '<button class="hr-b" data-k="allow" style="display:none"></button><button class="hr-b" data-k="edit">🛠 꾸미기</button><button class="hr-b" data-k="inv">💌 초대</button>' : '')
+        + '<button class="hr-b" data-k="menu" title="목록">☰</button>'          // ☰ 광장과 같은 목록 (2026-11-16)
         + '<button class="hr-b" data-k="x">✕ 나가기</button></div>'
         + '<div id="hr-chat"><div id="hr-feed"></div><input id="hr-in" maxlength="60" placeholder="말하기 (Enter)" autocomplete="off"></div>'
         + '<div id="hr-tool"><button class="hr-b" data-t="rot">↻ 돌리기</button><button class="hr-b" data-t="put">📦 넣기</button><button class="hr-b on" data-t="ok">✓ 놓기</button></div>'
@@ -957,6 +969,10 @@ function enter(host) {
         + '<div id="hr-load">🏠 사택에 들어가는 중…</div>';
     document.body.appendChild(ov);
     overPlaza(ov);
+    // ★ 맵을 옮기듯 — 광장의 내 자리를 지우고(남의 광장에서 사라진다) 사택 안에 선다 · 화면은 살짝 밝아지며 바뀐다 (2026-11-16)
+    try { if (typeof window.plazaAway === 'function') window.plazaAway(true); } catch (e) { }
+    ov.style.opacity = '0';
+    requestAnimationFrame(function () { ov.style.transition = 'opacity .28s ease'; ov.style.opacity = '1'; });
     S = {
         host: hk, hk: hk, mem: mem, member: mine, mine: mine, md: {}, sh: {}, migr: {}, region: 'C', ov: ov,
         carry: [], on: null, dn: {}, cv: 0, scv: 0, sm: false, wk: 0, cm: null, goto: null, menu: null, rps: {}, view: ov.querySelector('#hr-view'), world: ov.querySelector('#hr-world'),
@@ -977,6 +993,7 @@ function enter(host) {
     });
     // 단추
     ov.querySelector('[data-k="x"]').onclick = function () { leave(); };
+    ov.querySelector('[data-k="menu"]').onclick = function (e) { e.stopPropagation(); menuOpen(); };
     const eb = ov.querySelector('[data-k="edit"]'); if (eb) eb.onclick = function () { editToggle(); };
     const ib = ov.querySelector('[data-k="inv"]'); if (ib) ib.onclick = function () { inviteModal(); };
     const ab = ov.querySelector('[data-k="allow"]'); if (ab) ab.onclick = function () { allowToggle(); };
@@ -1008,10 +1025,13 @@ function enter(host) {
 }
 const KEY = { ArrowLeft: 'l', ArrowRight: 'r', ArrowUp: 'u', ArrowDown: 'd', a: 'l', d: 'r', w: 'u', s: 'd', A: 'l', D: 'r', W: 'u', S: 'd' };
 
-function leave() {
+// keep — 다른 사택으로 바로 옮기거나 광장 쪽에서 옮겨진 것 — 광장 자리는 건드리지 않는다
+function leave(keep) {
     const s = S;
     if (!s) return;
     S = null;
+    try { const sh = s.ov.querySelector('#plaza-sheet'); if (sh) sh.remove(); } catch (e) { }
+    if (!keep) { try { if (typeof window.plazaAway === 'function') window.plazaAway(false); } catch (e) { } }   // 들어가기 전 광장 그 자리로
     try { cancelAnimationFrame(s.raf); } catch (e) { }
     s.refs.forEach(function (r) { try { r.off(); } catch (e) { } });
     try { if (s.myRef) { s.myRef.onDisconnect().cancel(); s.myRef.remove(); } } catch (e) { }
@@ -1252,7 +1272,11 @@ function loop() {
     // 지금 서 있는 자리(내 방 · 거실 · 남의 방) — 벽지 · 바닥지 칸과 「룸메 꾸미기 허용」 단추가 이것을 따른다
     const reg = regionAt(S.x, S.y);
     if (reg !== S.region) { S.region = reg; if (S.editEl && editTab !== 'furn') editPaint(); allowPaint(); }
-    if (t - (S.ozAt || 0) > 1000) { S.ozAt = t; overPlaza(S.ov); }          // 광장이 다시 덮개로 올라왔으면 그 위로
+    if (t - (S.ozAt || 0) > 1000) {
+        S.ozAt = t; overPlaza(S.ov);
+        // 광장이 닫혔다 다시 열렸으면(마작 · 탐사 등이 광장을 새로 띄움) 다시 광장 맵에서 빠진다 (2026-11-16)
+        try { if (typeof window.plazaIsAway === 'function' && typeof window.plazaRoomNow === 'function' && window.plazaRoomNow() && !window.plazaIsAway()) window.plazaAway(true); } catch (e) { }
+    }          // 광장이 다시 덮개로 올라왔으면 그 위로
     // 룸메이트가 바뀌었다 (월요일 재배정 등) — 집이 달라졌으니 나온다
     if (S.member && t - (S.hkAt || 0) > 3000) {
         S.hkAt = t;
@@ -1870,7 +1894,38 @@ function boxPaint() {
 
 // 다른 화면에서 쓰게
 window.houseEnter = function (host) { enter(host); };
-window.houseLeave = function () { leave(); };
+window.houseLeave = function (keep) { leave(keep === true); };
+// ☰ 광장 · 엘리베이터의 「사택」 — 내 사택 안으로 걸어 들어간다 (들어가면 true · 못 들어가는 사택이거나 이미 안이면 false → 전처럼 사택 칸)
+window.houseGoIn = function () {
+    if (S) return false;
+    const u = u_(); if (!u) return false;
+    const mem = memOf(u.code);
+    if (!gradeOk(mem) || !canEnter(mem)) return false;
+    enter(u.code);
+    return !!S;
+};
+
+// ==========================================
+// ☰ 목록 — 광장과 같은 것 (2026-11-16 사용자 「광장에서 쓸 수 있는 메뉴칸 기능들을 사택에서도 쓸 수 있게 해주고」)
+// ==========================================
+//   사택 화면 위에 광장의 ☰ 목록을 그대로 띄운다 (plaza.js plazaMenuIn).
+//   · 바로 여는 것(소지품 · 사원증 · 상점 칸 · 인형 돌보기 · 마작 · 리듬 게임 …) — 사택 위에 뜬다 (사택은 광장처럼 바탕 · overPlaza)
+//   · 광장에서 걸어가야 하는 것(건물 앞 · 다른 방 · 동료 목록 · 포토존 · 엘리베이터) — 사택을 나가 광장에서 그리로 간다
+//   · 「사택」 — 이미 안이니 사택 칸(관리 · 초대받은 사택)을 띄운다
+function menuOpen() {
+    if (!S) return;
+    if (typeof window.plazaMenuIn !== 'function' || !window.plazaMenuIn(S.ov, menuPick)) toast('광장이 열려 있어야 목록을 쓸 수 있습니다');
+}
+function menuPick(m) {
+    if (!m || !S) return;
+    try { if (typeof window.plazaMenuClose === 'function') window.plazaMenuClose(); } catch (e) { }
+    if (m.sheet === 'tags') { try { window.plazaTags(!window.plazaTags()); } catch (e) { } menuOpen(); return; }
+    if (m.tab === 'tab-house' && m.sub === 'house-main') { try { window.plazaGoApp(m); } catch (e) { } return; }   // 이미 안 — 사택 칸(관리 · 초대받은 사택)
+    let walk = false;
+    try { walk = typeof window.plazaMenuWalk === 'function' && window.plazaMenuWalk(m); } catch (e) { }
+    if (walk) { leave(); setTimeout(function () { try { window.plazaMenuPick(m); } catch (e) { } }, 80); return; }
+    try { window.plazaMenuPick(m); } catch (e) { }
+}
 window.houseRoomState = function () {
     return S ? { host: S.host, hk: S.hk, mem: S.mem, mine: S.mine, side: mySide(), sides: shared().side || {}, region: S.region, allow: shared().allow || {},
                  z: S.z, x: Math.round(S.x), y: Math.round(S.y), cell: cellAt(S.x, S.y), edit: S.edit, sel: S.sel,
