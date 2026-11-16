@@ -891,6 +891,8 @@ function snapClear(me) {
         const wrapped = function () {
             const me = u_();
             if (!me || !wears(me)) return _p.apply(this, arguments);
+            // 💅 가넷 네일의 확정 입고(garnet.js)는 대결이 아니다 — 되돌리기를 묻지 않는다 (2026-11-16)
+            if (window._alienForced) return _p.apply(this, arguments);
             alienDay(me);
 
             // 「승부를 보기 전」은 판 하나가 아니라 묶음 하나 전이다.
