@@ -9,7 +9,8 @@
 //   users/<사번>/kroom/dream 에 트랜잭션으로 더한다 (덮어쓰지 않는다).
 //
 // ■ 은행 보관
-//   사내 은행 「예금」 아래 「꿈결 보관」. 맡기기 · 찾기. 한 사람에 500,000 D 까지.
+//   사내 은행 「예금」 아래 「꿈결 보관」. 맡기기 · 찾기. 한 사람에 10,000,000 D 까지 (2026-11-16 사용자 「꿈결은 1000만까지」 · 전에는 500,000).
+//   ★ 2026-11-16 사용자 「꿈결도 일괄 출금 입금 기능」 — 예금 칸과 같은 「전액 입금액 · 전액 출금액 · 지움」 단추 (allamount.js 와 같은 꼴)
 //   맡긴 꿈결은 K 의 방에서 쓰러져도 잃지 않는다 (쓰러짐은 손에 든 꿈결만 걷는다).
 //   거래 정지(블랙리스트) 중에는 맡길 수 없다 — 찾기는 된다 (예금과 같다).
 //     bank/<사번>/dream = 맡긴 꿈결
@@ -21,7 +22,7 @@
 (function dreamBank() {
 
 const ADMIN = 'kario0987';
-const CAP = 500000;
+const CAP = 10000000;
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function db_() { return (typeof database !== 'undefined') ? database : null; }
@@ -30,6 +31,11 @@ function fmt(n) { return (Number(n) || 0).toLocaleString('ko-KR'); }
 function num(v) { v = Math.floor(Number(v)); return isFinite(v) ? v : 0; }
 function myDream() { const u = u_(); return Math.max(0, num(u && u.kroom && u.kroom.dream)); }
 function banked() { try { return Math.max(0, num(bankState && bankState.dream)); } catch (e) { return 0; } }
+// 한 번에 넣을 수 있는 최대 (가진 꿈결과 남은 한도 중 작은 쪽) · 뺄 수 있는 최대 (맡긴 것 전부)
+function maxIn() { return Math.max(0, Math.min(myDream(), CAP - banked())); }
+function maxOut() { return banked(); }
+window.dreamMaxIn = maxIn;
+window.dreamMaxOut = maxOut;
 
 // 손에 든 꿈결을 서버에서 빼고 더한다 — 모자라면 그만둔다 (committed=false)
 function dreamTx(code, delta, floor0) {
@@ -118,6 +124,14 @@ window.dreamWithdraw = function () {
     }).catch(function (e) { alert_('처리하지 못했습니다.\n\n' + (e && e.message)); });
 };
 
+// 칸에 수를 채운다 (allamount.js fillAmt 와 같다)
+window.dreamFill = function (v) {
+    const el = document.getElementById('bank-dream-amt');
+    if (!el) return;
+    el.value = Math.max(0, Math.floor(Number(v) || 0));
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+};
+
 // 은행 화면 — 「예금」 칸 바로 아래에 끼운다
 function section() {
     const box = document.getElementById('bank-body');
@@ -134,6 +148,11 @@ function section() {
         + '<div style="font-size:18px; font-weight:bold; color:#d9c4ff;">' + fmt(banked()) + ' D</div>'
         + '<div style="font-size:10px; color:#888; margin:4px 0 11px 0; line-height:1.6;">한도 ' + fmt(CAP) + ' D · 이자 없음 · 가진 꿈결 ' + fmt(myDream()) + ' D<br>K 의 방에서 쓰러져도 잃지 않습니다.</div>'
         + '<input type="number" id="bank-dream-amt" min="1" placeholder="꿈결 (D)" style="width:100%; text-align:center; margin-bottom:8px; box-sizing:border-box;">'
+        + '<div id="bank-dream-allbtn" style="display:flex; gap:5px; margin:0 0 5px 0;">'
+        + '<button class="game-btn" style="flex:1; margin:0; padding:8px; font-size:11px;" onclick="dreamFill(dreamMaxIn())">전액 입금액</button>'
+        + '<button class="game-btn" style="flex:1; margin:0; padding:8px; font-size:11px;" onclick="dreamFill(dreamMaxOut())">전액 출금액</button>'
+        + '<button class="game-btn" style="flex:0 0 58px; margin:0; padding:8px; font-size:11px;" onclick="dreamFill(0)">지움</button></div>'
+        + '<div style="font-size:10px; color:#888; margin:0 0 8px 0; line-height:1.6;">넣을 수 있는 최대 <b style="color:#4CAF50;">' + fmt(maxIn()) + ' D</b> · 뺄 수 있는 최대 <b style="color:#d9c4ff;">' + fmt(maxOut()) + ' D</b></div>'
         + '<div style="display:flex; gap:6px;">'
         + '<button class="game-btn" style="flex:1; margin:0; padding:10px;" onclick="dreamDeposit()"' + (black ? ' disabled' : '') + '>맡긴다</button>'
         + '<button class="game-btn" style="flex:1; margin:0; padding:10px;" onclick="dreamWithdraw()">찾는다</button></div>';

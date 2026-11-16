@@ -8,7 +8,7 @@ const BANK_GRADES = [
     { g:4, min:300, cap:200000,   rate:0.003, loan:1000,  fee:0.12, label:'4등급' },
     { g:5, min:0,   cap:50000,    rate:0.002, loan:0,     fee:0,    label:'5등급' }
 ];
-const BANK_VIP = { cap: 30000000, label: 'VIP' };
+const BANK_VIP = { cap: 50000000, label: 'VIP' };      // ★ 2026-11-16 사용자 「장기 은행 VIP 예금 한도를 5000만원까지」 (전에는 3,000만)
 // ★ VIP 자동 승급 (2026-11-14 사용자 「VIP 그냥 심사 없이 천만원 차면 자동 등급 되게 해줘」)
 //   예금이 이만큼(1등급 예금 한도) 차면 심사 없이 VIP 가 된다 — bankAutoVip()
 //   · 블랙리스트는 안 된다 · 한 번 되면 예금이 줄어도 그대로다 (심사로 된 VIP 와 같다)
