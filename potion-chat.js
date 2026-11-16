@@ -32,7 +32,7 @@
 'use strict';
 
 const LEMON = '레몬맛 물약', BLUE = '블루베리맛 물약', GRAPE = '자몽맛 물약';
-const SLEEP_TALK = ['음냐음냐', '커억', '드르렁'];
+const SLEEP_TALK = ['음냐음냐', '커억', '드르렁', '쿨쿨'];          // 쿨쿨 — 2026-11-16 사용자 「잠꼬대 쿨쿨도 넣어줘」
 const TALK_EVERY = 30 * 60 * 1000;     // ★ 2026-11-16 사용자 「말풍선은 30분에 한 번씩」 (처음엔 3 시간)
 const RECENT = 20;
 
@@ -56,7 +56,7 @@ window.potionDrowsy = function (u) { return effOn(u || u_(), GRAPE); };
     function put() {
         if (typeof ITEM_CATALOG === 'undefined') return false;
         if (!ITEM_CATALOG[GRAPE]) ITEM_CATALOG[GRAPE] = { price: 4000, usable: true, targetable: true, effect: 'p_grape',
-            desc: '마신 사람은 24 시간 내내 졸음 상태가 되어 눈을 감고 있고, 30 분에 한 번씩 잠꼬대를 한다 (음냐음냐 · 커억 · 드르렁).' };
+            desc: '마신 사람은 24 시간 내내 졸음 상태가 되어 눈을 감고 있고, 30 분에 한 번씩 잠꼬대를 한다 (음냐음냐 · 커억 · 드르렁 · 쿨쿨).' };
         if (!ITEM_CATALOG[LEMON]) ITEM_CATALOG[LEMON] = { price: 4000, usable: true, targetable: true, effect: 'p_lemon',
             desc: '마신 사람은 3 시간 동안 하는 말마다 받침에 ㅇ 이 들어간다 (보내는 순간).' };
         // 블루베리맛 — 설명을 실제 규칙에 맞춘다
@@ -80,7 +80,7 @@ window.potionDrowsy = function (u) { return effOn(u || u_(), GRAPE); };
             const cat = (typeof ITEM_CATALOG !== 'undefined') ? ITEM_CATALOG[itemName] : null;
             const eff = cat && cat.effect;
             if (eff !== 'p_grape' && eff !== 'p_lemon') return f.apply(this, arguments);
-            const a = eff === 'p_grape' ? [GRAPE, '졸음 — 눈을 감고 30 분에 한 번씩 잠꼬대 (음냐음냐 · 커억 · 드르렁)', 24]
+            const a = eff === 'p_grape' ? [GRAPE, '졸음 — 눈을 감고 30 분에 한 번씩 잠꼬대 (음냐음냐 · 커억 · 드르렁 · 쿨쿨)', 24]
                                         : [LEMON, '하는 말마다 받침에 ㅇ 이 들어감', 3];
             addTimedEffect(targetUser, a[0], a[1], a[2]);
             if (eff === 'p_grape' && targetUser) targetUser.zzLast = Date.now();      // 잠꼬대는 마신 때부터 30 분마다
