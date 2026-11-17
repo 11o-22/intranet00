@@ -65,6 +65,13 @@
 //   · 나를 누르면: 깔 수 있는 셔츠를 입었으면 [까기]
 //   · 벗기는 중에는 모두의 사택 화면에서 그 사람 옷이 7~12 로 벗겨진다 (stripAt) · 옷이 바뀐 사람은 houseRedress 로 다시 그려 알린다
 //
+// ■ 🎨 가구 색 (2026-11-17 사용자 「가구 색상 변경 가능하게 하자」)
+//   꾸미기에서 내 가구를 고르면 도구 줄에 ［🎨 색］ — 옷 물들이기와 같은 컬러 팔레트 창(palette.js dotPaletteFor)이 그 가구로 열린다.
+//   값도 옷과 같다 — 물들일 때 [ 🎨 컬러 팔레트 ] 한 개 · 원래대로는 공짜. 내가 산(놓은) 가구만 (동거인 것은 못 바꾼다).
+//   가구 기록에 h(색 — '#rrggbb' · dotHue 꼴)를 더 적는다 → 돌리거나 옮겨도 · 좌우 뒤집혀도 색은 따라간다 (normF · mirrorV · furnWrite).
+//   그리기 — furn.webp 에서 그 가구 네 방향(480x120)만 떼어 recolor.js 의 dotPaintImg 로 칠해 쟁여 두고(TINT) 그 장을 깐다.
+//   그늘 · 테두리는 그대로 두고 색만 바꾼다 (옷과 같은 셈). 누르기(furnAt)는 투명도만 보므로 그대로.
+//
 // ■ 콘솔
 //   houseRoomState()
 (function houseRoom() {
@@ -187,7 +194,9 @@ function hkOf(c) { return memOf(c).join('_'); }
 function mirrorV(v) {
     const d2 = v.d === 1 ? 3 : (v.d === 3 ? 1 : v.d);
     const b = FB[v.t][v.d], b2 = FB[v.t][d2];
-    return { t: v.t, d: d2, x: 1032 - v.x - b[2] - b2[0], y: v.y };
+    const o = { t: v.t, d: d2, x: 1032 - v.x - b[2] - b2[0], y: v.y };
+    if (v.h != null) o.h = v.h;                                // 🎨 색은 따라간다
+    return o;
 }
 function me_() { const u = u_(); return u ? String(u.code) : ''; }
 function shared() { return (S && S.sh) || {}; }
@@ -221,7 +230,13 @@ function floorNo(reg) { return skinOf(reg || curReg(), 'f'); }
 function myStore() { return mineOf(me_()); }
 function ownWall(n) { const d = myStore(); return n === 1 || !!(d.ow && d.ow[n]); }
 function ownFloor(n) { const d = myStore(); return n === 1 || !!(d.of && d.of[n]); }
-function normF(x) { x = x || {}; return { t: x.t | 0, d: (x.d | 0) & 3, x: Number(x.x) || 0, y: Number(x.y) || 0 }; }
+function hueOf(v) { try { return (typeof window.dotHue === 'function') ? window.dotHue(v) : null; } catch (e) { return null; } }
+function normF(x) {
+    x = x || {};
+    const o = { t: x.t | 0, d: (x.d | 0) & 3, x: Number(x.x) || 0, y: Number(x.y) || 0 };
+    const h = hueOf(x.h); if (h != null) o.h = h;             // 🎨 가구 색 (2026-11-17)
+    return o;
+}
 // 지금 집에 놓인 가구 전부 — 두 사람의 방(왼쪽 기준 → 그 사람 자리로) + 같이 쓰는 자리
 function furnList() {
     const out = [];
@@ -964,7 +979,7 @@ function enter(host) {
         + '<button class="hr-b" data-k="x">✕ 나가기</button></div>'
         + '<button class="hr-b" id="hr-panel" data-k="panel" title="내 방(감금실) · 대화 · 보관함 · 주방 · 오락(테트리스)">🗂 사택 칸</button>'   // ★ 2026-11-16 사용자 「사택 감금이나 테트리스 주방같은 게 사라졌는데」 — 오른쪽 아래
         + '<div id="hr-chat"><div id="hr-feed"></div><input id="hr-in" maxlength="60" placeholder="말하기 (Enter)" autocomplete="off"></div>'
-        + '<div id="hr-tool"><button class="hr-b" data-t="rot">↻ 돌리기</button><button class="hr-b" data-t="put">📦 넣기</button><button class="hr-b on" data-t="ok">✓ 놓기</button></div>'
+        + '<div id="hr-tool"><button class="hr-b" data-t="rot">↻ 돌리기</button><button class="hr-b" data-t="col">🎨 색</button><button class="hr-b" data-t="put">📦 넣기</button><button class="hr-b on" data-t="ok">✓ 놓기</button></div>'
         + '<div id="hr-hint">어디를 끌어도 가구가 따라 움직입니다 · ✓ 놓기</div>'
         + '<div id="hr-joy"><i></i></div>'
         + (mine ? '<div id="hr-zoom"><button class="hr-b" data-z="-1">－</button><span></span><button class="hr-b" data-z="1">＋</button></div>' : '')
@@ -1113,11 +1128,68 @@ function paintDeco() {
     if (S.editEl) editPaint();
     allowPaint();
 }
+// ==========================================
+// 🎨 가구 색 (2026-11-17) — 가구마다 네 방향 한 줄(480x120)을 떼어 칠해 둔다
+// ==========================================
+const TINT = {};                     // '가구@색' → 그림 주소 ('none' — 못 칠함 · 원래 그림)
+const TINT_Q = {};                   // 칠할 차례 '가구@색' → { t, h }
+let fImg = null, fImgOk = false;
+function withFurnImg(fn) {
+    if (fImgOk) { fn(); return; }
+    if (!fImg) {
+        fImg = new Image();
+        fImg.onload = function () { fImgOk = true; (fImg._w || []).splice(0).forEach(function (f) { try { f(); } catch (e) { } }); };
+        fImg.src = DIR + 'furn.webp';
+    }
+    (fImg._w = fImg._w || []).push(fn);
+}
+function furnTint(t, h) {
+    const k = t + '@' + h;
+    if (TINT[k]) return TINT[k];
+    if (!TINT_Q[k]) { TINT_Q[k] = { t: t, h: h }; withFurnImg(tintRun); }
+    return TINT[k] || null;                                     // 그림을 이미 받아 두었으면 방금 칠했다
+}
+function tintRun() {
+    const ks = Object.keys(TINT_Q);
+    if (!ks.length) return;
+    ks.forEach(function (k) {
+        const q = TINT_Q[k]; delete TINT_Q[k];
+        let url = null;
+        try {
+            const c = document.createElement('canvas'); c.width = 480; c.height = 120;
+            c.getContext('2d').drawImage(fImg, (q.t % 2) * 480, ((q.t / 2) | 0) * 120, 480, 120, 0, 0, 480, 120);
+            url = (typeof window.dotPaintImg === 'function') ? window.dotPaintImg(c, q.h) : null;
+        } catch (e) { }
+        TINT[k] = url || 'none';
+    });
+    try { if (S && S.fel) S.flist.forEach(function (v) { const el = S.fel[v.id]; if (el && v.h != null) furnPaint(el, v); }); } catch (e) { }
+}
+// 팔레트 창 미리보기 — 고른 방향 하나를 그림 자리만큼 떼어 크게
+function furnPreview(box, t, d, hue) {
+    withFurnImg(function () {
+        if (!box || !box.isConnected) return;
+        const b = FB[t][d], w = b[2] - b[0], hh = b[3] - b[1];
+        const c = document.createElement('canvas'); c.width = w; c.height = hh;
+        c.getContext('2d').drawImage(fImg, ((t % 2) * 4 + d) * 120 + b[0], ((t / 2) | 0) * 120 + b[1], w, hh, 0, 0, w, hh);
+        const url = (hueOf(hue) != null && typeof window.dotPaintImg === 'function') ? (window.dotPaintImg(c, hue) || c.toDataURL()) : c.toDataURL();
+        const k = Math.max(1, Math.floor(Math.min(104 / w, 150 / hh)));
+        box.innerHTML = '<div style="position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px;">'
+            + '<img src="' + url + '" style="width:' + (w * k) + 'px;height:' + (hh * k) + 'px;image-rendering:pixelated;"></div>';
+    });
+}
 function furnPaint(el, v) {
     const z = S.z, r = (v.t / 2) | 0, c = (v.t % 2) * 4 + v.d;
     el.style.width = (120 * z) + 'px'; el.style.height = (120 * z) + 'px';
+    const tu = (v.h != null) ? furnTint(v.t, v.h) : null;     // 🎨 물든 가구 — 칠한 줄(480x120) · 아직이면 원래 그림을 깔아 둔다
+    const bg = (tu && tu !== 'none') ? 'url("' + tu + '")' : 'url("' + DIR + 'furn.webp")';
+    if (el._bg !== bg) { el.style.backgroundImage = bg; el._bg = bg; }
+    if (tu && tu !== 'none') {
+        el.style.backgroundSize = (480 * z) + 'px ' + (120 * z) + 'px';
+        el.style.backgroundPosition = '-' + (v.d * 120 * z) + 'px 0px';
+    } else {
     el.style.backgroundSize = (960 * z) + 'px ' + (1200 * z) + 'px';
     el.style.backgroundPosition = '-' + (c * 120 * z) + 'px -' + (r * 120 * z) + 'px';
+    }
     el.style.transform = 'translate3d(' + (v.x * z) + 'px,' + (v.y * z) + 'px,0)';
     el.style.zIndex = String(Math.round(baseOf(v)) * 2);
     el.classList.toggle('sel', S.sel === v.id);
@@ -1737,10 +1809,14 @@ function furnWrite(v, done) {
     let id;
     if (tgt === 'm') {
         const c = sd === 'R' ? mirrorV(v) : v;
-        up['houseMine/' + me + '/room/furn/' + v.key] = { t: c.t, d: c.d, x: c.x, y: c.y };
+        const rec = { t: c.t, d: c.d, x: c.x, y: c.y };
+        if (c.h != null) rec.h = c.h;                          // 🎨 가구 색
+        up['houseMine/' + me + '/room/furn/' + v.key] = rec;
         id = 'm.' + me + '.' + v.key;
     } else {
-        up['houseShared/' + S.hk + '/furn/' + v.key] = { t: v.t, d: v.d, x: v.x, y: v.y, by: me };
+        const rec = { t: v.t, d: v.d, x: v.x, y: v.y, by: me };
+        if (v.h != null) rec.h = v.h;
+        up['houseShared/' + S.hk + '/furn/' + v.key] = rec;
         id = 's.' + v.key;
     }
     if (v.id && S.sel === v.id && id !== v.id) S.sel = id;
@@ -1763,6 +1839,8 @@ function toolPlace() {
     if (!v) { if (tool.style.display !== 'none') tool.style.display = 'none'; return; }
     const rb = tool.querySelector('[data-t="rot"]'), mineV = canTouch(v);
     if (rb && rb.style.display !== (mineV ? '' : 'none')) rb.style.display = mineV ? '' : 'none';   // 동거인 것 — 📦 넣기만
+    const cb = tool.querySelector('[data-t="col"]');                                                  // 🎨 색 — 내 가구만
+    if (cb && cb.style.display !== (mineV ? '' : 'none')) cb.style.display = mineV ? '' : 'none';
     const b = bbOf(v);
     const x = (v.x + (b[0] + b[2]) / 2) * S.z + (S.tx || 0), y = (v.y + b[1]) * S.z + (S.ty || 0) - 6;
     tool.style.display = 'flex';
@@ -1781,6 +1859,7 @@ function toolDo(k) {
         if (!canTouch(v)) toast(nameIn(v.own) + ' 사원의 보관함으로 돌려 보냈습니다');
         select(null); return;
     }
+    if (k === 'col') { furnColor(v); return; }
     if (k === 'rot') {
         if (!canTouch(v)) return;
         const a = anchorOf(v);
@@ -1788,6 +1867,26 @@ function toolDo(k) {
         const nv = Object.assign({}, v, { d: nd, x: Math.round(a.x - (nb[0] + nb[2]) / 2), y: Math.round(a.y + 1 - nb[3]) });
         furnWrite(nv);
     }
+}
+
+// 🎨 고른 가구를 컬러 팔레트 창으로 (palette.js dotPaletteFor) — 팔레트 한 개 · 원래대로는 공짜 (옷과 같다)
+function furnColor(v0) {
+    if (!S || !v0 || !canTouch(v0)) return;
+    if (typeof window.dotPaletteFor !== 'function') { toast('컬러 팔레트를 열 수 없습니다'); return; }
+    const key = v0.key, own = v0.own, t = v0.t, nm = FURN[t].n;
+    const find = function () { return (S && S.flist || []).filter(function (q) { return q.key === key && q.own === own; })[0] || null; };
+    window.dotPaletteFor({
+        name: '🪑 ' + nm, what: '사택 가구 「' + nm + '」',
+        cur: function () { const q = find(); return q && q.h != null ? q.h : null; },
+        ok: function () { const q = find(); if (!q || !canTouch(q)) { toast('그 가구가 그 자리에 없습니다'); return false; } return true; },
+        preview: function (box, hue) { const q = find() || v0; furnPreview(box, t, q.d, hue); },
+        set: function (hue) {
+            const q = find(); if (!q || !canTouch(q)) return;
+            const nv = Object.assign({}, q), h = hueOf(hue);
+            if (h == null) delete nv.h; else nv.h = h;
+            furnWrite(nv);
+        }
+    });
 }
 
 // ==========================================
@@ -1948,5 +2047,5 @@ window.houseRoomState = function () {
                  carry: S.carry, on: S.on, sm: S.sm }
              : { open: false, invited: Object.keys(INV) };
 };
-window.houseRoomDebug = { FURN: FURN, FB: FB, FD: FD, BODY: BODY, footOf: footOf, blockedAt: blockedAt, pos: function () { return S ? { x: S.x, y: S.y } : null; }, cellAt: cellAt, loadMask: loadMask, mirrorV: mirrorV, regionAt: regionAt, hkOf: hkOf, gradeOf: function (c) { return gradeOf(memOf(c)); }, memOf: memOf, setPos: function (x, y) { if (S) { S.x = x; S.y = y; } }, keys: function (k) { if (S) S.keys = k || {}; } };
+window.houseRoomDebug = { FURN: FURN, FB: FB, FD: FD, BODY: BODY, footOf: footOf, blockedAt: blockedAt, pos: function () { return S ? { x: S.x, y: S.y } : null; }, cellAt: cellAt, loadMask: loadMask, mirrorV: mirrorV, regionAt: regionAt, hkOf: hkOf, gradeOf: function (c) { return gradeOf(memOf(c)); }, memOf: memOf, setPos: function (x, y) { if (S) { S.x = x; S.y = y; } }, keys: function (k) { if (S) S.keys = k || {}; }, select: function (id) { select(id); }, tint: function () { return Object.keys(TINT); } };
 })();

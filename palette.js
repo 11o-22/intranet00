@@ -31,6 +31,10 @@
 //   광장은 u.dot 을 통째로 주고받으므로 **남의 화면에도 같은 색으로** 간다.
 //   따로 보낼 것이 없다.
 //
+// ■ 🪑 가구 (2026-11-17 사용자 「가구 색상 변경 가능하게 하자」)
+//   window.dotPaletteFor({ name, cur(), preview(box, 색), set(색 — '' 면 원래대로) }) — 같은 창 · 같은 값(팔레트 한 개 · 원래대로는 공짜)
+//   옷이 아닌 것을 물들일 때 쓴다. 사택(house-room.js)이 고른 가구를 넘긴다. 칠하는 것은 recolor.js dotPaintImg.
+//
 // ■ 콘솔
 //       paletteState()   가진 개수 · 오늘 산 개수 · 지금 물든 것
 //
@@ -90,6 +94,7 @@ function parts() {
     catch (e) { return []; }
 }
 function curHue(sheet) {
+    if (run && run.ext) { try { return window.dotHue(run.ext.cur()); } catch (e) { return null; } }   // 🪑 가구 (2026-11-17)
     const u = me_();
     const c = (u && u.dot && u.dot.col) || {};
     return window.dotHue(c[sheet]);
@@ -248,6 +253,7 @@ function previewSoon() {
     run.paintT = setTimeout(function () {
         const box = document.getElementById('pal-prev');
         if (!box || !run) return;
+        if (run.ext) { try { run.ext.preview(box, run.hue); } catch (e) { } return; }      // 🪑 가구
         const el = box.querySelector('.dot-layer[data-sheet="' + run.sheet + '"]');
         if (!el) return;
         el.dataset.hue = run.hue;
@@ -382,6 +388,7 @@ function paintPrev() {
         Array.prototype.forEach.call(box.querySelectorAll('.dot-box'), window.dotStop);
     }
     box.innerHTML = '';
+    if (run && run.ext) { try { run.ext.preview(box, run.hue); } catch (e) { } return; }   // 🪑 가구
     const u = me_();
     if (!u || typeof window.dotSprite !== 'function') return;
     // ★ 지금 입은 그대로에 **고른 색만 얹어** 그린다 (live:false — 멈춘 그림)
@@ -396,6 +403,12 @@ function paintWho() {
     const box = document.getElementById('pal-who');
     if (!box) return;
     box.innerHTML = '';
+    if (run.ext) {                                                     // 🪑 가구 — 고른 것 하나
+        const b = document.createElement('button');
+        b.className = 'on'; b.innerText = run.ext.name;
+        box.appendChild(b);
+        return;
+    }
     parts().forEach(function (x) {
         const b = document.createElement('button');
         if (x.sheet === run.sheet) b.className = 'on';
@@ -409,7 +422,7 @@ function pickPart(sheet) {
     run.sheet = sheet;
     const now = curHue(sheet);
     const c = toHsv(now);
-    const p = parts().filter(function (x) { return x.sheet === sheet; })[0] || {};
+    const p = run.ext ? {} : (parts().filter(function (x) { return x.sheet === sheet; })[0] || {});
     const k = document.getElementById('pal-keep');
     if (k) k.innerText = p.keep === 'biscuit' ? '과자 막대는 그대로 둡니다 — 딸기 · 초코 부분만 물듭니다.'      // 빼빼로 넷 (recolor.js · 2026-11-15)
         : (p.keep ? '안쪽 하얀 셔츠는 그대로 둡니다 — 겉만 물듭니다.' : '');
@@ -420,15 +433,17 @@ function pickPart(sheet) {
     paintPrev();
 }
 
-function open(sheet) {
-    const list = parts();
-    if (!list.length) {
-        showCustomAlert('물들일 옷이나 악세를 먼저 입어 주세요.\n(사택 → 옷장)');
-        return;
+function open(sheet, ext) {
+    if (!ext) {
+        const list = parts();
+        if (!list.length) {
+            showCustomAlert('물들일 옷이나 악세를 먼저 입어 주세요.\n(사택 → 옷장)');
+            return;
+        }
+        if (!list.some(function (x) { return x.sheet === sheet; })) sheet = list[0].sheet;
     }
-    if (!list.some(function (x) { return x.sheet === sheet; })) sheet = list[0].sheet;
     shut();
-    run = { sheet: sheet, h: 0, s: 0.85, v: 0.85, hue: hexOf(0, 0.85, 0.85),
+    run = { sheet: ext ? '' : sheet, ext: ext || null, h: 0, s: 0.85, v: 0.85, hue: hexOf(0, 0.85, 0.85),
             rgb: hsv2rgb(0, 0.85, 0.85), paintT: null };
 
     ov = document.createElement('div');
@@ -509,9 +524,15 @@ function cnt() {
 
 // ── 되돌린다 (공짜)
 function wipe() {
-    if (!run || typeof window.dotSetCol !== 'function') return;
+    if (!run) return;
+    if (run.ext) {                                                    // 🪑 가구
+        if (curHue() == null) return;
+        run.ext.set('');
+    } else {
+    if (typeof window.dotSetCol !== 'function') return;
     if (curHue(run.sheet) == null) return;
     window.dotSetCol(run.sheet, '');
+    }
     const off = document.getElementById('pal-off');
     if (off) off.disabled = true;
     paintPick();
@@ -521,13 +542,14 @@ function wipe() {
 // ── 물들인다 (팔레트 한 개)
 function apply() {
     if (!run) return;
-    const u = me_(); if (!u || typeof window.dotSetCol !== 'function') return;
+    const u = me_(); if (!u || (!run.ext && typeof window.dotSetCol !== 'function')) return;
     if (curHue(run.sheet) === run.hue) { showCustomAlert('이미 그 색입니다.'); return; }
     const i = (u.inventory || []).indexOf(PAL_ITEM);
     if (i < 0) { showCustomAlert('컬러 팔레트가 없습니다.\n유쾌 판매소에서 ' + PAL_PRICE + ' P 에 삽니다.'); return; }
+    if (run.ext && run.ext.ok && !run.ext.ok()) return;                  // 🪑 가구 — 그사이 치웠거나 남의 것이 되었으면 그만 (팔레트는 그대로)
     u.inventory.splice(i, 1);
-    const p = parts().filter(function (x) { return x.sheet === run.sheet; })[0] || {};
-    window.dotSetCol(run.sheet, run.hue);
+    const p = run.ext ? { name: run.ext.what || run.ext.name } : (parts().filter(function (x) { return x.sheet === run.sheet; })[0] || {});
+    if (run.ext) run.ext.set(run.hue); else window.dotSetCol(run.sheet, run.hue);
     addHistoryLog(u, '[컬러 팔레트] ' + (p.name || run.sheet) + ' 을(를) '
         + window.dotHueName(run.hue) + ' 로 물들였습니다.');
     saveFields({ inventory: 1, history: 1 });
@@ -540,6 +562,7 @@ function apply() {
 }
 
 window.dotPalette = open;
+window.dotPaletteFor = function (ext) { if (ext && typeof ext.set === 'function' && typeof ext.cur === 'function') open(null, ext); };
 
 // ==========================================
 // 기존 함수에 이어 붙인다 (skin.js · skip.js 가 하던 그대로)

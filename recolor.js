@@ -155,7 +155,7 @@ function hls2rgb(h, l, s) {
 
 function paint(img, sheet, hue) {
     const c = document.createElement('canvas');
-    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    c.width = img.naturalWidth || img.width; c.height = img.naturalHeight || img.height;      // 캔버스도 받는다 (🪑 가구 · 2026-11-17)
     const x = c.getContext('2d', { willReadFrequently: true });
     x.drawImage(img, 0, 0);
     let d;
@@ -307,6 +307,12 @@ window.dotHueCss = function (v) {
     if (h == null) return '';
     if (h === WHITE) return '#f3f3f3';
     return (typeof h === 'string') ? h : ('hsl(' + h + ',72%,55%)');
+};
+// ★ 🪑 옷이 아닌 그림(가구 등)을 같은 길로 칠한다 (2026-11-17) — img 는 그림이나 캔버스 · 그림 주소(png)를 돌려준다 · 안 물들면 null
+window.dotPaintImg = function (img, hue) {
+    const h = window.dotHue(hue);
+    if (h == null || !img) return null;
+    try { return paint(img, '', h); } catch (e) { console.warn('[색] 가구', e); return null; }
 };
 window.dotTintOn = function (fn) { if (typeof fn === 'function') hands.push(fn); };
 window.dotTintKeep = function (sheet) { return KEEP[sheet] || ''; };
