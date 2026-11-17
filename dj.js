@@ -17,7 +17,7 @@
 //       → 같은 날 「어둠 도중에 리듬 게임 곡 하나를 하드로 10 초 · 절반 이상 치면 행운 +2 · 회피 +1」 로 바꿈 (rhythm.js rhythmClip)
 //       → 같은 날 다시 「리듬게임 나오는 거 없애고 하이 로우로 · 세 판 2승시」 로 바꿈
 //       → 2026-11-16 다시 리듬 10 초 · 전부 하드 · 광시 빼고 · 어둠 한 판에 한 번 · 같이 탐사 간 모두가 같이 치고 50% 이상 친 사람마다 버프
-//       → 2026-11-17 다시 하이 로우 한 판 · 장착자가 하고 장착자만 버프 (아래 7)
+//       → 2026-11-17 다시 하이 로우 한 판 · 장착자가 하고 장착자만 버프 → 같은 날 같은 방 사람도 한 번씩 · 맞힌 사람마다 버프 (아래 7)
 //
 //   물어서 정한 것 (같은 날)
 //     에코 아웃   지목한 4명이 **저마다 4번씩** 즉사를 면한다 (모두 16번) · 본인은 따로 4번
@@ -530,17 +530,21 @@ setInterval(function () {
 }, 1000);
 
 // ==========================================
-// 7 — 피치 라이딩: 어둠 한 판에 한 번, 하이 로우 한 판 — 장착자만 하고 장착자만 받는다 (2026-11-17)
+// 7 — 피치 라이딩: 어둠 한 판에 한 번, 하이 로우 한 판 — 같은 방 사람도 저마다 한 번씩 · 맞힌 사람이 받는다 (2026-11-17)
 // ==========================================
 //   ★ 2026-11-17 사용자 「피치 라이딩 다시 하이 로우 한 번으로 바꿔줘. 대신 장착자가 하고 장착자만 버프 받게.」
+//     → 같은 날 「그 피치 라이딩 하이 로우 다른 사람들도 한 번 맞추게 하고 맞출 시에 맞춘 사람이 버프 받게 수정.」
 //     (그 앞 — 11-15 리듬 10 초 → 같은 날 하이 로우 세 판 2승 → 11-16 리듬 10 초 · 같은 방 모두 같이 · 50% 이상 친 사람마다)
-//     → 리듬 게임 10 초(rhythm.js rhythmClip)는 더는 열지 않는다. 같은 방 사람에게는 아무것도 뜨지 않고 방 채팅으로 결과만 본다.
-//   · 어둠 탐사(피날레 포함 · 혼자도)의 1~3 번째 장면 가운데 무작위 한 곳에서, 장면이 뜬 뒤 1.5 초에 장착자 화면에만 연다 (투표 · 구조 중이면 다음 장면).
+//     → 리듬 게임 10 초(rhythm.js rhythmClip)는 더는 열지 않는다.
+//   · 어둠 탐사(피날레 포함 · 혼자도)의 1~3 번째 장면 가운데 무작위 한 곳에서, 장면이 뜬 뒤 1.5 초에 장착자 화면에 연다 (투표 · 구조 중이면 다음 장면).
 //   · 기준 수(1~99)를 보고 내 수가 HIGH / LOW 인지 한 번 고른다 — 같은 수는 나오지 않는다.
-//   · 맞히면 장착자만 그 어둠에서 행운 +2 · 회피 +1 (itemBuffs run — 🔎 눈의 버프와 같은 길 · 탐사가 끝나면 걷힌다).
-//   · 열린 순간 그 어둠의 몫을 쓴 것으로 적는다 (다시 들어와도 또 나오지 않는다 · darkRuns/<사번>/djN.p).
-//     장착자가 둘 이상이면 저마다 제 하이 로우를 한다.
-const PITCH = { STEPS: 3, DELAY: 1500, LUCK: C.PITCH.LUCK, EVA: C.PITCH.EVA };
+//   · 장착자가 연 기준 수를 방에 적는다 — 같은 방에서 살아 있는 사람도 저마다 같은 기준 수로 한 번씩 고른다 (내 수는 저마다 따로 뽑는다).
+//       darkParties/<방>/djPitch = { id, by, n, base, t0, res: { <사번>: { ok, mine, n } } }
+//   · 맞힌 사람마다 그 어둠에서 행운 +2 · 회피 +1 (itemBuffs run — 🔎 눈의 버프와 같은 길 · 탐사가 끝나면 걷힌다). 틀린 사람은 없다.
+//   · 장착자 — 열린 순간 그 어둠의 몫을 쓴 것으로 적는다 (다시 들어와도 또 나오지 않는다 · darkRuns/<사번>/djN.p).
+//     같은 방에 장착자가 둘 이상이면 먼저 연 사람의 것 하나만 — 나머지 장착자도 거기에 한 번 고른다.
+//     같은 방 사람 — 그 기록 하나에 한 번만 (localStorage djPitchSeen_<사번> — 새로 열어도 다시 고르지 않는다).
+const PITCH = { STEPS: 3, DELAY: 1500, LUCK: C.PITCH.LUCK, EVA: C.PITCH.EVA, FRESH: 180000 };
 const PITCH_OV = 'dj-pitch-ov';
 function pitchSafe(r) {
     if (!r || r._dead || r.dying || r._settled) return false;
@@ -554,6 +558,8 @@ function pitchSafe(r) {
 function pitchDue(r) {
     const me = u_();
     if (!me || !r || !live(me) || !plain(r) || r._djPitch) return false;
+    // 같은 방에 이번 판 피치 라이딩이 이미 열렸으면(장착자가 둘 이상) 또 열지 않는다 — 그 기록에 한 번 고른다
+    try { if (r.isParty && r.partyId) { const v = (parties()[r.partyId] || {}).djPitch; if (v && v.id) { r._djPitch = 1; keepN(r); return false; } } } catch (e) { }
     if (r._djPitchAt == null) r._djPitchAt = 1 + Math.floor(Math.random() * PITCH.STEPS);
     return (Number(r.step) || 0) >= r._djPitchAt;
 }
@@ -576,12 +582,28 @@ wrap('renderDarkStep', function (_r) {
 });
 function card() { return 1 + Math.floor(Math.random() * 99); }
 function pitchShut() { const o = document.getElementById(PITCH_OV); if (o) o.remove(); }
+function srvNow() { try { if (typeof window.serverNow === 'function') return Number(window.serverNow()) || now(); } catch (e) { } return now(); }
+function pitchRef(r) { return (r && r.isParty && r.partyId && db_()) ? db_().ref('darkParties/' + r.partyId + '/djPitch') : null; }
+// 사번마다 따로 — 한 기기에서 여러 사원이 들어와도 서로 막지 않게
+function seenKey() { const me = u_(); return 'djPitchSeen_' + (me ? me.code : ''); }
+function seenGet() { try { return localStorage.getItem(seenKey()) || ''; } catch (e) { return ''; } }
+function seenSet(id) { try { localStorage.setItem(seenKey(), id); } catch (e) { } }
+// 장착자 — 기준 수를 뽑아 방에 적고 먼저 고른다
 function pitchGo(r) {
     const me = u_(); if (!me || !r) return;
     r._djPitch = 1; keepN(r);
-    const g = { r: r, base: card(), mine: null, done: false, ok: false };
-    try { if (r.log) r.log.push('[🎧 피치 라이딩] 하이 로우'); } catch (e) { }
-    chat('🎧 ' + (me.name || '') + ' 사원의 피치 라이딩 — 하이 로우 (맞히면 행운 +' + PITCH.LUCK + ' · 회피 +' + PITCH.EVA + ')');
+    const rec = { id: me.code + '_' + now(), by: me.code, n: me.name || '', base: card(), t0: srvNow() };
+    const ref = pitchRef(r);
+    if (ref) { try { ref.set(rec); } catch (e) { } }
+    try { if (r.log) r.log.push('[🎧 피치 라이딩] 하이 로우 — 기준 ' + rec.base + (r.isParty ? ' · 같은 방도 한 번씩' : '')); } catch (e) { }
+    chat('🎧 ' + (me.name || '') + ' 사원의 피치 라이딩 — 하이 로우 · 기준 ' + rec.base + ' · 모두 한 번씩 고릅니다 (맞힌 사람마다 행운 +' + PITCH.LUCK + ' · 회피 +' + PITCH.EVA + ')');
+    return pitchOpen(r, rec);
+}
+// 창을 연다 — 장착자 · 같은 방 사람 모두 같은 길 (저마다 제 수로 제 버프)
+function pitchOpen(r, rec) {
+    const me = u_(); if (!me || !r || !rec) return null;
+    seenSet(rec.id);
+    const g = { r: r, rec: rec, base: Number(rec.base) || card(), mine: null, done: false, ok: false, mineRun: rec.by === me.code };
     pitchShut();
     const w = document.createElement('div');
     w.id = PITCH_OV;
@@ -603,7 +625,7 @@ function pitchPaint(g, msg) {
             + '<button id="dj-pt-hi" class="game-btn" style="flex:1; margin:0; padding:12px; font-size:13px;' + NEON + '">HIGH ▲</button>'
             + '<button id="dj-pt-lo" class="game-btn" style="flex:1; margin:0; padding:12px; font-size:13px;' + NEON + '">LOW ▼</button></div>';
     w.innerHTML = '<div style="background:linear-gradient(145deg,#0d1622,#05080d); border:1px solid #3aa8d8; border-radius:10px; padding:14px; width:100%; max-width:360px; color:#e6f8ff;">'
-        + head('🎧 피치 라이딩 — 하이 로우', '한 번 맞히면 이 어둠에서 행운 +' + PITCH.LUCK + ' · 회피 +' + PITCH.EVA + '.<br>기준 수보다 내 수가 높을지(HIGH) 낮을지(LOW) 고릅니다.')
+        + head('🎧 피치 라이딩 — 하이 로우', (g.mineRun ? '' : esc(g.rec.n || '') + ' 사원의 피치 라이딩.<br>') + '한 번 맞히면 이 어둠에서 행운 +' + PITCH.LUCK + ' · 회피 +' + PITCH.EVA + '.<br>기준 수보다 내 수가 높을지(HIGH) 낮을지(LOW) 고릅니다.')
         + '<div style="display:flex; gap:8px;">' + cardBox('기준', g.base, false) + cardBox('내 수', g.mine == null ? '?' : g.mine, g.mine != null) + '</div>'
         + '<div id="dj-pt-msg" style="min-height:18px; text-align:center; font-size:12px; margin-top:10px; line-height:1.6;">' + (msg || '') + '</div>'
         + btns + '</div>';
@@ -623,6 +645,8 @@ function pitchPick(g, choice) {
     const ok = (choice === 'HIGH') ? (v > g.base) : (v < g.base);
     g.ok = ok;
     const line = '기준 ' + g.base + ' · ' + choice + ' · 내 수 ' + v;
+    const ref = pitchRef(g.r);
+    if (ref) { try { ref.child('res/' + me.code).set({ ok: ok, mine: v, n: me.name || '' }); } catch (e) { } }
     if (ok) {
         const add = (typeof window.ibAdd === 'function') ? window.ibAdd : (typeof ibAdd === 'function' ? ibAdd : null);
         try { if (add) { add(me, 'luck', PITCH.LUCK, 12 * HOUR, NAME, { run: true }); add(me, 'eva', PITCH.EVA, 12 * HOUR, NAME, { run: true }); } } catch (e) { }
@@ -645,6 +669,21 @@ function pitchPick(g, choice) {
 setInterval(function () {
     try { if (document.getElementById(PITCH_OV)) { const r = run(); if (!r || r._dead) pitchShut(); } } catch (e) { }
 }, 1000);
+// 같은 방 사람 — 장착자가 연 기록을 보면 같은 기준 수로 한 번 고른다
+setInterval(function () {
+    try {
+        const me = u_(), r = run();
+        if (!me || !r || !r.isParty || !r.partyId || !plain(r) || r._dead || r._settled) return;
+        const v = (parties()[r.partyId] || {}).djPitch;
+        if (!v || !v.id || v.by === me.code || v.base == null) return;
+        if (r._djPitchJoin === v.id || seenGet() === v.id) return;
+        if (v.res && v.res[me.code]) { r._djPitchJoin = v.id; return; }                                   // 이미 골랐다
+        if (srvNow() - (Number(v.t0) || 0) > PITCH.FRESH) { r._djPitchJoin = v.id; return; }              // 지난 것
+        if (!pitchSafe(r)) return;                                                                         // 투표 · 구조 · 다른 창 — 끝나면 연다
+        r._djPitchJoin = v.id;
+        pitchOpen(r, v);
+    } catch (e) { }
+}, 400);
 window.djPitchNow = function () { const r = run(); if (r) { r._djPitch = 0; r._djPitchAt = 0; return pitchGo(r); } };   // 점검용 — 지금 연다
 
 // ==========================================
@@ -721,7 +760,7 @@ const SKILLS = [
     { k: 'tone', n: '톤 플레이', d: '지정한 한 사람은 그날 하루 어둠에 들어가면 횟수 상관없이 쓰러지지 않는다 (당신과 같은 어둠이 아니어도). 하루 한 번 지정하면 다른 사람으로 바꾸지 못한다.' },
     { k: 'spin', n: '백스핀', d: '하루 한 번, 지정한 사원 한 명에게 공용시설 행운 ' + C.SPIN.LUCK + '% (' + C.SPIN.HOURS + '시간). 당신 자신도 된다.' },
     { k: 'dbl', n: '더블링', d: '음표가 장착자의 리듬을 탄다. 하루 한 번 리듬 게임 한 곡(난이도 상관없이)을 끝까지 치면 그날 모든 어둠에서 당신과 같은 어둠에 들어간 사원 모두 보정 +' + C.DBL.BON + '.' },
-    { k: 'pitch', n: '피치 라이딩', d: '어둠 한 판에 한 번, 탐사 도중에 하이 로우가 한 판 열린다 (당신 화면에만). 맞히면 당신만 그 어둠에서 행운 +' + C.PITCH.LUCK + ' · 회피 +' + C.PITCH.EVA + '.' }
+    { k: 'pitch', n: '피치 라이딩', d: '어둠 한 판에 한 번, 탐사 도중에 하이 로우가 한 판 열린다 — 같이 들어간 사람도 같은 기준 수로 저마다 한 번씩 고른다. 맞힌 사람마다 그 어둠에서 행운 +' + C.PITCH.LUCK + ' · 회피 +' + C.PITCH.EVA + '.' }
 ];
 function stat(k, me) {
     const x = useOf(me), r = run();
