@@ -8971,12 +8971,36 @@ function b508RequiredDocs() {
             <div style="background:rgba(0,0,0,0.3); border:1px solid var(--theme-border); border-radius:6px; padding:12px;">
                 <div style="font-size:10px; color:#888; font-weight:bold; margin-bottom:8px;">붙어 있는 쪽지</div>
                 ${notes.map(n => `
-                    <div style="background:rgba(212,175,55,0.06); border-left:2px solid #5a4a2a; padding:8px 10px; margin-bottom:6px;">
+                    <div style="position:relative; background:rgba(212,175,55,0.06); border-left:2px solid #5a4a2a; padding:8px 30px 8px 10px; margin-bottom:6px;">
                         <div style="font-size:11px; color:#ddd; line-height:1.6; word-break:break-all;">${n.text}</div>
                         <div style="font-size:9px; color:#666; margin-top:4px;">— ${n.by} · ${new Date(n.at).toLocaleString()}</div>
+                        <button class="house-note-del" title="쪽지 떼기" onclick="removeHouseNote(${Number(n.at) || 0})" style="position:absolute; top:6px; right:6px; width:20px; height:20px; padding:0; border:1px solid #5a4a2a; border-radius:4px; background:rgba(0,0,0,0.35); color:#aaa; font-size:11px; line-height:18px; cursor:pointer;">✕</button>
                     </div>`).join('')}
             </div>`;
     }
+
+    // ★ 2026-11-17 사용자 「사택 쪽지를 제거할 수 있게 해줘」 — 쪽지마다 ✕ 로 뗀다 (같은 방 둘 다)
+    //   붙인 시각(at)으로 찾는다 — 그새 새 쪽지가 붙어 순서가 밀려도 엉뚱한 것을 떼지 않게
+    function removeHouseNote(at) {
+        const ownerCode = houseStorageRef(currentUser);
+        const owner = db.users[ownerCode];
+        if (!owner) return;
+        const h = getHouse(owner);
+        const list = Array.isArray(h.notes) ? h.notes : Object.values(h.notes || {});
+        const hit = list.find(n => n && Number(n.at) === Number(at));
+        if (!hit) { renderHouseNotes(); return; }
+        if (!confirm('이 쪽지를 뗄까요?\n\n「' + String(hit.text || '').slice(0, 40) + '」 — ' + (hit.by || ''))) return;
+        const next = list.filter(n => n && Number(n.at) !== Number(at));
+        h.notes = next;
+        if (db.users[ownerCode] && db.users[ownerCode].house) db.users[ownerCode].house.notes = next;
+        if (currentUser.code === ownerCode && currentUser.house) currentUser.house.notes = next;
+        if (database) {
+            database.ref(`users/${ownerCode}/house/notes`).set(next.length ? next : null);
+            database.ref(`users/${ownerCode}/_adminStamp`).set(Date.now());
+        }
+        renderHouseNotes();
+    }
+    window.removeHouseNote = removeHouseNote;
 
        function houseTreat() {
         const r = getRoomie(currentUser);
