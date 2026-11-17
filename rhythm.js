@@ -107,6 +107,9 @@ const SONGS = [
     //   우리가 도움!: 52 Hz 붐 -8 · 95 Hz -4 · 140 Hz -2 · 좌우 넓게 · -14 LUFS
     { key: 'endure', title: 'Endure', artist: 'Benz', audio: 'snd/rhythm-endure.mp3', chart: 'rhythm/endure.json', color: '#7fb3c9', cover: 'rhythm/endure-cover.jpg' },
     { key: 'woori', title: '우리가 도움!', artist: 'Benz', audio: 'snd/rhythm-woori.mp3', chart: 'rhythm/woori.json', color: '#7aa8ff', cover: 'rhythm/woori-cover.jpg' },
+    // ★ 2026-11-18 사용자 — 송골매 (2026-11-17 받은 곡 · 제목은 다음 날 「송골매」 · 표지는 「일단 비워둬」 · 아티스트 Benz · 해금 조건 말이 없어 바로 열림)
+    //   50~130 Hz 저음이 다른 곡보다 8~10 dB 크게 울려서 55 Hz -5 · 85 Hz -4.5 · 120 Hz -3.5 · 180 Hz -2.5 · 28 Hz 아래 걷기 · 6 kHz 위 +2 · 11 kHz 위 +1.5 · -14 LUFS · 앞 무음 1.3 초 자름
+    { key: 'songgolmae', title: '송골매', artist: 'Benz', audio: 'snd/rhythm-songgolmae.mp3', chart: 'rhythm/songgolmae.json', color: '#c9a46a' },
 ];
 const DIFFS = [['easy', 'EASY', '이지', '#5fd18a'], ['normal', 'NORMAL', '노말', '#ffc94a'], ['hard', 'HARD', '하드', '#ff5f73']];
 const LANES = 6;                      // 채보의 칸 수 — 화면에서는 가로 자리로 바꾼다 (xOfLane)
