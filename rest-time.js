@@ -9,6 +9,8 @@
 //       지난 날짜는 14 ~ 18시 그대로 둔다 (time-freeze.js 가 이미 그 길이만큼 시계를 밀었다).
 //     · 2026-11-11(수) — 사용자 「셧다운제를 오늘은 15시부터 17시까지로 하자」 → 그날만 15:00 ~ 17:00 (DAY1).
 //       오전 칸(10:00 ~)은 이미 돌던 참이라 푼 때(CUT2 · 11:49)까지 한 칸으로 남긴다 — 그만큼 시계를 민다(time-freeze.js · 11-05 과 같은 길).
+//     · ★ 2026-11-18(수) 한국 08:10 — 사용자 「좋아. 셧다운 없애자. 일단.」 → 그때(END)부터 쉬는 시간 칸이 없다 (월~금 모두).
+//       지난 칸은 그대로 둔다 (time-freeze.js 가 이미 그 길이만큼 시계를 밀었다). 다시 켜려면 END 를 지우거나 뒤로 미룬다.
 //     time-freeze.js 는 끝난 칸마다 그만큼 시계를 민다 (칸 이름 'YYYY-MM-DD' + a/b — 글자 순서가 곧 시간 순서).
 // bundles.json 첫 묶음 맨 앞 — 다른 파일이 깨져도 이것은 돈다
 // ==========================================
@@ -41,6 +43,8 @@ const SKIP = { '2026-11-09': ['b'] };             // 2026-11-09(월) 14:00 ~ 18:
 // ★ 그날만 따로 — 2026-11-11 은 오전 칸을 푼 때(CUT2)까지 · 오후는 15 ~ 17시만
 const DAY1 = '2026-11-11';
 const CUT2 = Date.UTC(2026, 10, 11, 2, 49, 0);      // 한국 2026-11-11 11:49 — 오전 칸을 푼 때 (올린 때)
+// ★ 셧다운 없앰 — 이 시각 뒤로는 쉬는 시간 칸이 없다 (걸쳐 있던 칸은 여기서 끝난 것으로 · 2026-11-18 사용자 「셧다운 없애자. 일단.」)
+const END = Date.UTC(2026, 10, 17, 23, 10, 0);      // 한국 2026-11-18(수) 08:10
 const MSG = '휴식을 취하실 시간입니다.';
 const ADMIN = 'kario0987';
 
@@ -80,7 +84,7 @@ window.restTimeMsg = MSG;
 //   { id: 'YYYY-MM-DD'+'a'|'b' (한국 날짜 · 그날 몇째 칸) — 2026-11-05 는 'YYYY-MM-DD' 하나, a: 시작 ms, b: 끝 ms }
 function wins(t0, t1) {
     const out = [];
-    t0 = Math.max(Number(t0) || 0, START); t1 = Number(t1) || 0;
+    t0 = Math.max(Number(t0) || 0, START); t1 = Math.min(Number(t1) || 0, END);
     if (t1 <= t0) return out;
     let d = Math.floor((t0 + KST) / 86400000) * 86400000 - KST;     // t0 가 든 한국 날짜의 0시
     for (let n = 0; d < t1 && n < 800; n++, d += 86400000) {
@@ -95,7 +99,7 @@ function wins(t0, t1) {
         if (SKIP[day]) slots = slots.filter(function (x) { return SKIP[day].indexOf(x[2]) < 0; });
         slots.forEach(function (x) {
             if (x[1] <= t0 || x[0] >= t1) return;
-            out.push({ id: day + x[2], a: x[0], b: x[1] });
+            out.push({ id: day + x[2], a: x[0], b: Math.min(x[1], END) });
         });
     }
     return out;
