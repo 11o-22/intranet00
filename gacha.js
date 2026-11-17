@@ -82,6 +82,9 @@ const GACHA_WEAR = [
     // 남성 힙 의상 (2026-11-15 사용자 「의상들은 뽑기에」 — 등급은 말씀이 없으셔서 의상 1차 교복(남자)처럼 A) — 티 · 반바지 · 재킷 한 벌 (closet.js hip-m)
     { k: 'hip-m',       n: '남성 힙 의상', g: 'A', s: ['hip-m-tee', 'hip-m-pants', 'hip-m-jacket'] },
     { k: 'nun-robe',    n: '수녀복',     g: 'A', s: ['nun-robe', 'nun-veil'] },   // 2026-11-12 사용자 「이거 뽑기에 넣어주고」 — 수도복 + 베일 (closet.js nun)
+    // 2026-11-17 사용자 「가챠에 넣어줘 — 나비 스타킹, 수사복, 블라우스 스커트」 — 등급은 말씀이 없으셔서 수사복은 수녀복처럼 A · 블라우스 스커트 A · 스타킹은 검은 장갑처럼 B
+    { k: 'monk-robe',    n: '수사복',          g: 'A', s: ['monk-robe'] },
+    { k: 'blouse-skirt', n: '블라우스 스커트', g: 'A', s: ['blouse-skirt'] },
     { k: 'devil-m',     n: '악마(남자)', g: 'A', s: ['devil-m'] },
     { k: 'devil-f',     n: '악마(여자)', g: 'A', s: ['devil-f'] },        // 보통 몸 (부츠가 보통 몸 걸음에 맞춰 그려져 있다)
     { k: 'cape',        n: '하얀 망토',  g: 'A', s: ['cape'] },
@@ -101,6 +104,7 @@ const GACHA_WEAR = [
     // 세일러 신발 (2026-11-02 사용자 · B · 세일러복 짝)
     { k: 'sailor-shoes', n: '세일러 신발', g: 'B', s: ['sailor-shoes'] },
     { k: 'glove',       n: '검은 장갑',  g: 'B', s: ['glove'],       set: 1 },
+    { k: 'butterfly-stk', n: '나비 스타킹', g: 'B', s: ['butterfly-stk'] },
     { k: 'shoes',       n: '구두',       g: 'C', s: ['shoes'] },
     { k: 'han-shoes',   n: '신',         g: 'C', s: ['han-shoes'] },
     { k: 'bungeo',      n: '붕어빵 의상', g: 'C', s: ['bungeo'] }

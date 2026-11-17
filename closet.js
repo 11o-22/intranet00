@@ -155,10 +155,11 @@ const DOT = {
     //   ★ 뉴비 세트 (2026-10-25) — 장화는 신발 줄 끝 · 의상은 겉옷 줄(사운드 의상 다음) · 병아리 후드 그림자(newbie-hood-in)는
     //     늑대 잠옷 그림자 다음 (머리카락 뒤 · 옷 위). 후드 바깥(newbie-hood)은 머리 위(top).
     Z: ['gold-leash',                                           // 🪢 금 목줄 (2026-11-09 사용자 「옷 위가 아니라 옷 아래로」) — 몸 바로 위 · 모든 옷 밑
-        'sound-lp', 'sexy-pantsu', 'gochu', 'red-bikini', 'bunny-stk', 'sound-coat-in', 'pj-bottom', 'w-panty', 'hip-m-pants', 'hip-w-skirt', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'sailor-shoes', 'pj-top', 'w-shirt', 'w-shirt-open', 'knit', 'gym-suit', 'm-shirt', 'hip-m-tee', 'hip-w-top', 'han-inner',
+        'sound-lp', 'sexy-pantsu', 'gochu', 'red-bikini', 'bunny-stk', 'butterfly-stk', 'sound-coat-in', 'pj-bottom', 'w-panty', 'hip-m-pants', 'hip-w-skirt', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'sailor-shoes', 'pj-top', 'w-shirt', 'w-shirt-open', 'knit', 'gym-suit', 'm-shirt', 'hip-m-tee', 'hip-w-top', 'han-inner',
         'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit', 'newbie-outfit', 'sailor-bubble', 'garaetteok',
         'school-m', 'sdress', 'devil-m', 'devil-f',         // 의상 1차 (2026-11-04)
-        'robe', 'nun-robe', 'han-duru', 'cape',            // 수녀복 (2026-11-12) — 장포 옆
+        'blouse-skirt',                                     // 블라우스 스커트 (2026-11-17)
+        'robe', 'nun-robe', 'monk-robe', 'han-duru', 'cape',   // 수녀복 (2026-11-12) — 장포 옆 · 수사복 (2026-11-17) — 수녀복 옆
         // 바니걸 (2026-11-08) — 뒤 털 → 의상 → 앞 털. 완전체 그림에서 털 한 장(옆으로 늘어진 털)은 의상 밑, 다른 한 장(걸을 때 감기는 털)은 의상 위였다
         'bunny-fur-b', 'bunny-suit', 'lingerie', 'slave-tee', 'w-uniform2', 'office-look2', 'hip-m-jacket', 'hip-w-jacket', 'bunny-fur-f',     // 힙 재킷 (망토 칸 · 2026-11-15) — 겉옷 · 여성 체형 옷 위
         'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in',
@@ -482,7 +483,11 @@ const DOT_SLOTS = [
             { i: 'wpanty', n: '여성용 속옷', over: ['w-panty'], owner: true, fem: true },
             // 힙 의상 하의 (2026-11-15 — 상의 칸 설명 참고)
             { i: 'hip-m', n: '남성 힙 하의', over: ['hip-m-pants'], own: 'hip-m', tn: '남성 힙 의상' },
-            { i: 'hip-w', n: '여성 힙 하의', over: ['hip-w-skirt'], owner: true, fem: true }
+            { i: 'hip-w', n: '여성 힙 하의', over: ['hip-w-skirt'], owner: true, fem: true },
+            // ★ 나비 스타킹 (2026-11-17 사용자 「가챠에 넣어줘」 — 의상 뽑기) — 보통 몸에 맞춰 그려져 있다 (여성 체형보다 보통 몸에 꼭 맞았다)
+            //   주신 그림 5760x2560 (1728x768 의 10/3 배 · 도트 눈금 4) → 1728x768 로 줄이고(가장 가까운 점 — 눈금이 1.2 라 점 하나도 안 빠진다)
+            //   칸마다 +30 으로 352 칸. 걷기 여섯 칸이 다 그려져 있다 · 서기 여섯 칸은 같은 그림. 발까지 감싸 구두 밑에 깐다 (Z — 바니걸 스타킹 옆)
+            { i: 'bstk', n: '나비 스타킹', over: ['butterfly-stk'], own: 'butterfly-stk' }
         ]
     },
     {
@@ -510,6 +515,12 @@ const DOT_SLOTS = [
             //   걷기 여섯 칸이 다 그려져 있다 · 서기 여섯 칸은 같은 그림이라 첫 칸만 (보통 몸에 맞춰 그려져 있다)
             //   (같이 온 sister_wear 묶음의 낱장 192x320 은 같은 옷의 다른 꼴이라 쓰지 않았다)
             { i: 'nun', n: '수녀복', over: ['nun-robe'], top: ['nun-veil'], own: 'nun-robe' },
+            // ★ 수사복 · 블라우스 스커트 (2026-11-17 사용자 「가챠에 넣어줘」 — 의상 뽑기) — 둘 다 보통 몸에 맞춰 그려져 있다
+            //   수사복 — 주신 그림 1728x768 (칸 288) → 칸마다 +30 으로 352 칸 · 칸 가장자리에 떨어져 있던 점 두 개(0 · 288 칸 왼끝)는 지웠다 · 흰 칼라는 그대로
+            //   블라우스 스커트 — 5760x2560 → 1728x768 → +30 (나비 스타킹과 같은 길) · 걷기 손 자리는 비어 있어 몸(손)이 비친다
+            //   걷기 여섯 칸이 다 그려져 있다 · 서기 여섯 칸은 같은 그림. 하의(나비 스타킹 등) · 구두는 같이 입는다 (alone 아님)
+            { i: 'monk', n: '수사복', over: ['monk-robe'], own: 'monk-robe' },
+            { i: 'blouse', n: '블라우스 스커트', over: ['blouse-skirt'], own: 'blouse-skirt' },
             { i: 'han', n: '내의', over: ['han-inner'], own: 'han-inner' },
             { i: 'dress', n: '드레스', over: ['dress'], own: 'dress' },
             { i: 'tuxedo', n: '턱시도', over: ['tuxedo'], own: 'tuxedo' },
