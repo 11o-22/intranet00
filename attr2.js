@@ -34,12 +34,15 @@
 //                     포만감 깎임을 그만큼 덜 깎고,
 //                     격리는 그 값 × STEADY_H(10/3 시간) 만큼 줄인다
 //                     (D 0.5시간 · B 1시간 · S 2시간 · L 3시간)
+//                     ★ 2026-11-17 사용자 「굳건 속성 최대 등급으로 해도 가두리를 최대 30분까지로만 할 수 있게」
+//                       → 아무리 줄어도 남은 격리(가두리)는 30분 밑으로 내려가지 않는다 (STEADY_FLOOR_MIN · 전에는 1분까지 줄었다)
 
 (function attr2() {
 
 const FIX = 'fix', STEADY = 'steady';
 const FIX_CAP = 8;              // 파티에서 받는 보정의 윗마개
 const STEADY_H = 10 / 3;        // 굳건 1.0 일 때 줄어드는 격리 시간(시간) — S 2시간 · L 3시간이 되는 값
+const STEADY_FLOOR_MIN = 30;    // 줄여도 남는 격리 — 30분 아래로는 안 줄인다 (2026-11-17)
 
 // ==========================================
 // 속성 등록
@@ -51,7 +54,7 @@ const STEADY_H = 10 / 3;        // 굳건 1.0 일 때 줄어드는 격리 시간
         GEAR_ATTRS[FIX] = { name: '보정', icon: '✚',
             desc: '같은 파티 **다른 사람들**의 판정에 보정이 더해집니다. 자신에게는 들지 않습니다.' };
         GEAR_ATTRS[STEADY] = { name: '굳건', icon: '▣',
-            desc: '탐사에 드는 포만감이 덜 깎이고, 격리 시간이 줄어듭니다.' };
+            desc: '탐사에 드는 포만감이 덜 깎이고, 격리 시간이 줄어듭니다 (최대 등급이어도 30분 아래로는 안 줄어듭니다).' };
         GEAR_BASE[FIX] = 1;
         GEAR_BASE[STEADY] = 0.15;
         try {
@@ -169,7 +172,7 @@ function trimQuarantine() {
     const k = val(u, STEADY);
     if (k <= 0) { u.qSteadyAt = until; return; }        // 굳건이 없다 — 보기만 하고 둔다
     const cut = k * STEADY_H * 3600000;
-    const next = Math.max(Date.now() + 60000, until - cut);
+    const next = Math.max(Date.now() + STEADY_FLOOR_MIN * 60000, until - cut);     // 30분 밑으로는 안 줄인다
     if (next >= until) { u.qSteadyAt = until; return; }
     u.quarantineUntil = next;
     u.qSteadyAt = next;
