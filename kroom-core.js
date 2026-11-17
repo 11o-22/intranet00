@@ -2545,6 +2545,7 @@ window.kroomRescue = function (code) {
 //     📖 종말예언    덧쓰기 — 쓰러지면 회수품 1~3종 / 지우기 — 일행이 쓰러져 구조를 기다릴 때 장착자가 대신 죽는다 /
 //                    읽어내기 — 즉사 기믹에 🈲 가 보인다 · 그 길을 잡고 살아 나오면 포인트 세 배 (jisan.js)
 //     📺 토크 쇼      판정 +1 / 부활 두 번 / 열기만큼 포인트 배수 · 사회자와 끝까지 살면 포인트 두 배 (꿈결은 안 불린다)
+//                    ★ 2026-11-17 — 위 효과는 모두 뺐다 (TALK_SHOW_DARK_FX · 갈색 화면과 이름만 남음)
 //     🔎 감지하는 눈  파티 버프 / 버프 받은 사람과 생사가 엮인다 / 정산 배수
 //     📱 K·LEE       버프 / 예약 문자 — 쓰러져도 끌려가지 않는다
 //     ⛓️‍💥 이레귤러   전용 장비 L / 처음 두 굴림 확정 / 부활 하나 / 사망 판정 / 연속 실패 → 즉사 기믹 파훼
@@ -2793,7 +2794,8 @@ function lastChance(why) {
         return standUp(why, '— 끊어진 자리가 다시 이어진다.<br>원래 이렇게 되는 것이 아니라는 걸 안다. 알면서도 일어선다.');
     }
     // 📺 토크 쇼 — 쓰러질 때마다 무대가 달아오르고, 두 번은 일어선다
-    const p = showP();
+    //   ★ 2026-11-17 사용자 — 토크쇼의 어둠 효과(부활 · 판정 · 포인트 · 회수품)는 뺐다 (talkshow.js TALK_SHOW_DARK_FX)
+    const p = window.TALK_SHOW_DARK_FX ? showP() : null;
     if (p) {
         try { talkShowBumpHeat(p, talkShowIsHost(p)); } catch (e) { }
         r._showHeat = Math.max(Number(r._showHeat || 0), Number(p.heat || 0)) + 1;
@@ -3329,7 +3331,7 @@ function settle(how, txt) {
         //   (2026-10-24 — 🐾 아기 여우(행운) · 📺 사회자와 끝까지는 꿈결이 아니라 포인트만 불린다)
         const gm = [];                                          // { n, m, why }
         if (kr.truth && jisanOn()) gm.push({ n: '📖 읽어내기', m: 3, why: '죽을 길을 잡고 살아 나왔다' });
-        const p = showP();
+        const p = window.TALK_SHOW_DARK_FX ? showP() : null;     // ★ 2026-11-17 — 토크쇼 포인트 배수 뺌
         if (p) {
             let m = 1; const why = [];
             try { const h = talkShowMult(p); if (h > 1) { m *= h; why.push('무대 열기 ×' + h.toFixed(2)); } } catch (e) { }

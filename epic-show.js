@@ -104,6 +104,7 @@ function inEpic() {
 
         const _d = epicDeath;
         epicDeath = function (txt) {
+            if (!window.TALK_SHOW_DARK_FX) return _d.apply(this, arguments);   // ★ 2026-11-17 — 토크쇼 어둠 효과 뺌 (talkshow.js DARK_FX)
             const p = showNow();
             if (!p || !inEpic() || typeof er === 'undefined' || !er || er.dead) {
                 return _d.apply(this, arguments);
@@ -174,6 +175,7 @@ function inEpic() {
 
         const _s = epicSettle;
         epicSettle = function () {
+            if (!window.TALK_SHOW_DARK_FX) return _s.apply(this, arguments);   // ★ 2026-11-17 — 무대 열기 배수 뺌
             const p = showNow();
             const before = (p && currentUser) ? (Number(currentUser.points) || 0) : 0;
             const r = _s.apply(this, arguments);

@@ -32,6 +32,12 @@
 //   8  초대를 누르면 초대장과 러브레터 중에 고른다. 러브레터는 💕 와 함께
 //      직접 적어 보내고, 팝업이 흰색과 연분홍이 섞인 색으로 뜬다.
 //
+// ★ 2026-11-17 사용자 「어둠에서 작용하는 효과들(보정 · 회수품 · 포인트 · 부활) 다 빼 줘 — 시각적인 효과랑 어둠 이름 바뀌는 거 빼고」
+//   → DARK_FX = false — 4(부활 2회 · 판정 +1) · 5(무대 열기 포인트 배수) · 6(회수품 2배) · 7(부활 소리) 를 끈다.
+//     보통 어둠 · EPIC(epic-show.js) · K 의 방(kroom-core.js) 모두 window.TALK_SHOW_DARK_FX 를 본다.
+//     남는 것 — 갈색 화면 · 올라오는 😊📺 · 어둠 이름 「브라운의 심야 토크 쇼」 · 초대장/러브레터(1 · 8) · 격리 초대(2) · 초대받은 사람 횟수(3).
+//     되살리려면 DARK_FX 를 true 로.
+//
 // ■ 어디에 적히나
 //
 //   darkParties/{파티}/talkShow        { by, name }      이 파티가 토크쇼다
@@ -59,6 +65,8 @@ const ADMIN = 'kario0987';
 const GUEST_ROOT = 'talkShowGuest';     // 사회자별로 남는 초대장의 기운
 const OUT_POLL = 50;                   // 꺼내 온 사람의 오염도
 const ZONE_TITLE = '브라운의 심야 토크 쇼';   // 그 방의 어둠 이름
+const DARK_FX = false;          // ★ 어둠 안 효과(부활 · 판정 +1 · 무대 열기 배수 · 회수품 2배) — 2026-11-17 뺌
+window.TALK_SHOW_DARK_FX = DARK_FX;
 
 // 고급진 갈색 — 민무늬
 const BROWN = {
@@ -187,8 +195,7 @@ window.showInvited = invitedTo;
             price: 0, usable: true, targetable: false, effect: 'talkshow_equip', noSell: true,
             desc: '낡은 갈색 세트와 식지 않는 조명. 이것을 차고 파티를 모집하면 '
                 + '그 파티는 심야 토크 쇼가 된다. 초대장을 받은 사원만 들어올 수 있고, '
-                + '들어온 모두가 부활 2회와 모든 판정 +1을 받는다. '
-                + '파티원이 죽을수록 무대가 달아오른다.'
+                + '그 어둠은 「브라운의 심야 토크 쇼」로 이름이 바뀌고 화면이 갈색 무대가 된다.'
         };
         if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(SHOW) < 0) {
             NO_SELL_ITEMS.push(SHOW);
@@ -395,7 +402,7 @@ function pullOut() {
             try {
                 if (!show) return r;
                 if (typeof darkRun !== 'undefined' && darkRun) {
-                    darkRun._showRevives = REVIVES;      // 기능 4 — 부활 2회
+                    darkRun._showRevives = DARK_FX ? REVIVES : 0;      // 기능 4 — 부활 2회 (2026-11-17 뺌)
                     darkRun._show = true;
                     keepRevives();                       // 이어하기에서도 남게 적어 둔다
                 }
@@ -749,7 +756,7 @@ function keepRevives() {
                 if (!s || typeof darkRun === 'undefined' || !darkRun) return r;
                 if (!s.show && !showOf()) return r;          // 토크쇼가 아니었다
                 darkRun._show = true;
-                darkRun._showRevives = (s.showRevives == null) ? REVIVES : Number(s.showRevives);
+                darkRun._showRevives = !DARK_FX ? 0 : ((s.showRevives == null) ? REVIVES : Number(s.showRevives));
                 lastKept = null;
                 console.log('[토크쇼] 이어하기 — 남은 부활 ' + darkRun._showRevives + '회를 되살렸습니다.');
             } catch (e) { console.warn('[토크쇼] 이어하기 건너뜀:', e && e.message); }
@@ -771,7 +778,7 @@ function keepRevives() {
         const _r = rollDarkBonus;
         rollDarkBonus = function () {
             let b = _r.apply(this, arguments);
-            try { if (showOf()) b += 1; } catch (e) { }
+            try { if (DARK_FX && showOf()) b += 1; } catch (e) { }       // 2026-11-17 뺌
             return b;
         };
         rollDarkBonus._show = true;
@@ -818,6 +825,7 @@ function bumpHeat(p, iAmHost) {
         if (darkDeath._show) { clearInterval(iv); return; }
         const _d = darkDeath;
         darkDeath = function (reasonText) {
+            if (!DARK_FX) return _d.apply(this, arguments);              // ★ 2026-11-17 — 무대 열기 · 부활 뺌
             let p = null;
             try { p = showOf(); } catch (e) { }
             if (!p || typeof darkRun === 'undefined' || !darkRun) return _d.apply(this, arguments);
@@ -913,7 +921,7 @@ let lootBoostWas = false;       // 알림에 적으려고 남겨 둔다
         const _e = emLootMult;
         const wrapped = function (u) {
             let v = _e.apply(this, arguments) || 1;
-            if (lootBoost) { v *= 2; if (window.gearLootMark) window.gearLootMark('show', 2); }   // 기능 6 · 겹치면 가장 높은 하나만 (gear-cap.js)
+            if (DARK_FX && lootBoost) { v *= 2; if (window.gearLootMark) window.gearLootMark('show', 2); }   // 기능 6 · 겹치면 가장 높은 하나만 (gear-cap.js)
             return v;
         };
         wrapped._show = true;
@@ -928,6 +936,7 @@ let lootBoostWas = false;       // 알림에 적으려고 남겨 둔다
         if (renderDarkResult._show) { clearInterval(iv); return; }
         const _r = renderDarkResult;
         renderDarkResult = function () {
+            if (!DARK_FX) return _r.apply(this, arguments);              // ★ 2026-11-17 — 포인트 배수 · 회수품 2배 뺌
             let p = null, hostAlive = false, mine = false;
             try {
                 p = showOf();
