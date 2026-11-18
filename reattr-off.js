@@ -1,7 +1,14 @@
 // ==========================================
-// ★ 속성 변경권 폐지
+// ★ 속성 변경권 폐지 → ★ 2026-11-18 상담사 지급 전용으로 되살림
 // index.html 에서 reattr.js 보다 뒤, save-merge.js 앞에 불러온다
 // ==========================================
+//
+// ★ 2026-11-18 사용자 「그리고 속성 변경권 상담사가 줄 수 있게 하자.」
+//   · 물품 목록에 다시 올린다 — 상점(??? · 일반 · 우주)에는 안 나오고, 상담사 「보급품 지급」 목록에만 보인다 (adminOnly · 팔 수 없음).
+//   · 소지품에서 거두던 것(아래 2)은 그만둔다 — 상담사가 준 것이 들어오자마자 사라지지 않게.
+//   · 쓰면 전용 장비 속성 하나를 지우고 새로 고른다 — 주 3회 「🔁 속성 바꾸기」 횟수와 따로 센다 (reattr-free.js · 한 장 쓰면 한 장 사라진다).
+//
+// ── 아래는 예전(폐지) 설명 ──
 //
 // ■ 무엇을 하나
 //   1. 물품 목록에서 지운다 — ??? 상점 진열은 ITEM_CATALOG 의 qShop 을 훑어
@@ -23,9 +30,10 @@ const NAME = '속성 변경권';
 const PRICE = 140;
 
 // ==========================================
-// 1. 물품 목록에서 지운다
+// 1. 물품 목록 — 상담사 지급 전용으로 올린다 (2026-11-18 · 전에는 지웠다) · 상점 진열 후보에서는 뺀다
 // ==========================================
 let gone = false;
+window.REATTR_TICKET = NAME;
 function strip(arr) {
     if (!Array.isArray(arr)) return;
     let i;
@@ -35,15 +43,20 @@ function strip(arr) {
     let tries = 0;
     const iv = setInterval(function () {
         if (typeof ITEM_CATALOG === 'undefined') return;
-        if (ITEM_CATALOG[NAME]) { delete ITEM_CATALOG[NAME]; gone = true; }
-        // 진열 후보를 들고 있는 표에서도 뺀다 (있을 때만)
+        // ★ 상담사 지급 전용 — qShop 이 없어 ??? 상점에 안 나온다 · price '???' 라 값 매기는 진열에도 안 든다
+        ITEM_CATALOG[NAME] = {
+            price: '???', usable: true, targetable: false, effect: 'q_reattr', adminOnly: true,
+            desc: '[특수] 상담사가 지급하는 표. 전용 장비 속성 하나를 지우고 새로 고른다. 주 3회 속성 바꾸기와 따로 쓰며, 쓸 때 한 장이 사라진다.'
+        };
+        // 진열 후보를 들고 있는 표에서는 뺀다 (있을 때만)
         //   const 로 선언된 표는 window 에 안 올라간다. 이름으로 바로 집는다.
         strip(typeof ALL_10_ITEMS !== 'undefined' ? ALL_10_ITEMS : null);
         strip(typeof ALIEN_ITEMS_POOL !== 'undefined' ? ALIEN_ITEMS_POOL : null);
-        strip(typeof NO_SELL_ITEMS !== 'undefined' ? NO_SELL_ITEMS : null);
+        // 팔거나 거래로 바꿀 수 없게
+        try { if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(NAME) < 0) NO_SELL_ITEMS.push(NAME); } catch (e) { }
         if (++tries > 20) {
             clearInterval(iv);
-            console.log('[변경권] 물품 목록에서 지웠습니다.');
+            console.log('[변경권] 상담사 지급 전용으로 올렸습니다.');
         }
     }, 500);
 })();
@@ -77,26 +90,28 @@ function sweep() {
     console.log('[변경권] 남아 있던 ' + n + '개를 거뒀습니다.');
 }
 
-const iv2 = setInterval(function () {
-    if (typeof currentUser === 'undefined' || !currentUser) return;
-    sweep();
-    if (swept) clearInterval(iv2);
-}, 1000);
+// ★ 2026-11-18 — 거두지 않는다 (상담사가 준 변경권이 사라지면 안 된다). sweep() 은 남겨 두되 부르지 않는다.
+if (window.REATTR_SWEEP) {
+    const iv2 = setInterval(function () {
+        if (typeof currentUser === 'undefined' || !currentUser) return;
+        sweep();
+        if (swept) clearInterval(iv2);
+    }, 1000);
+}
 
 // ==========================================
 // 3. 확인
 // ==========================================
 window.reattrState = function () {
-    console.log('%c===== 속성 변경권 폐지 =====', 'color:#ff8a65; font-size:13px');
-    console.log('  물품 목록에서:', (typeof ITEM_CATALOG !== 'undefined' && ITEM_CATALOG[NAME])
-        ? '★ 아직 남음' : '지워짐');
+    console.log('%c===== 속성 변경권 (상담사 지급 전용) =====', 'color:#ff8a65; font-size:13px');
+    console.log('  물품 목록에:', (typeof ITEM_CATALOG !== 'undefined' && ITEM_CATALOG[NAME])
+        ? '있음 (상담사 지급 전용)' : '없음');
     console.log('  내 소지품에:', currentUser
         ? ((currentUser.inventory || []).filter(function (x) { return x === NAME; }).length + '개')
         : '(로그인 전)');
-    console.log('  환급:', window.REATTR_REFUND ? PRICE + ' P / 개' : '안 함');
     console.log('  속성 바꾸는 창:', (typeof openGearReattr === 'function') ? '그대로 (이레귤러용)' : '없음');
 };
 
-console.log('[변경권] 속성 변경권 폐지 — reattrState()');
+console.log('[변경권] 속성 변경권 — 상담사 지급 전용 · reattrState()');
 
 })();

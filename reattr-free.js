@@ -93,6 +93,10 @@ function leftText() {
         if (doGearReattr._weekly) { clearInterval(iv); return; }
         const _do = doGearReattr;
         doGearReattr = function (attr, itemName) {
+            // ★ 상담사가 준 속성 변경권 — 주간 횟수와 따로 (한 장 쓰면 한 장 사라진다 · dark.js doGearReattr 가 소지품에서 뺀다) · 2026-11-18
+            if (itemName && itemName === window.REATTR_TICKET && (currentUser.inventory || []).indexOf(itemName) >= 0) {
+                return _do.call(this, attr, itemName);
+            }
             if (window.reattrLeftN() <= 0) {
                 showCustomAlert('이번 주 속성 변경을 다 썼습니다.\n\n'
                     + '한 주에 ' + window.REATTR_WEEKLY + '번까지 바꿀 수 있습니다.\n'
@@ -119,7 +123,13 @@ function leftText() {
         openGearReattr = function (itemName) {
             const r = _open.call(this, itemName || LABEL);
             const body = document.getElementById('gear-modal-body');
-            if (body) {
+            if (body && itemName && itemName === window.REATTR_TICKET) {
+                // 상담사가 준 속성 변경권 — 주간 횟수는 그대로
+                const have = (currentUser.inventory || []).filter(function (x) { return x === itemName; }).length;
+                body.innerHTML = body.innerHTML.replace(
+                    /<span style="color:#ff9800;">변경권은 즉시 소모됩니다\.<\/span>/,
+                    '<span style="color:#ff9800;">지운 그 순간 속성 변경권 한 장이 사라집니다. (가진 변경권 ' + have + '장 · 주간 변경 횟수는 그대로)</span>');
+            } else if (body) {
                 body.innerHTML = body.innerHTML.replace(
                     /<span style="color:#ff9800;">변경권은 즉시 소모됩니다\.<\/span>/,
                     '<span style="color:#ff9800;">지운 그 순간 한 번 쓴 것이 됩니다. ('
