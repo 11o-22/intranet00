@@ -815,8 +815,9 @@ function afterMain() {
     const goOn = function () { if (!prof(u).job) cardPick(); else afterJob(); };
     attrGate(function () {
         // ☄ 재앙의 군주 — 아직 내리지 않은 재앙을 들어설 때마다 묻는다 (2026-11-13 · 13. 재앙). 첫번째 → 두번째 → 세번째 (2026-11-15)
+        //   · 네번째(가두리의 재앙)는 재앙의 군주 카드를 받아들인 사원에게 (2026-11-18)
         try {
-            const due = C_NS.filter(function (n) { return calamAskDue(n); });
+            const due = C_ALL.filter(function (n) { return calamAskDue(n); });
             if (due.length) {
                 const k0 = prof(u);
                 if (!k0.calam || typeof k0.calam !== 'object') k0.calam = {};
@@ -4967,10 +4968,29 @@ function jamGearOff() {
 //   users/<사번>/calamShop          = { until, at, n }    우주 주파수 채널 접속기 하루 4 번 → 2 번 (index.html alienMaxOf · window.calamShopMax)
 //   kroom.calam = { …, asked3, hold3, cast3 }
 //   ■ 묻기 · 맞는 사람 · 쳐내기 — 두번째와 같다 (첫번째 → 두번째 → 세번째 차례로 하나씩 묻는다).
+//
+//   ── 재앙의 군주 카드 · 네번째 재앙 : 가두리의 재앙 (2026-11-18 사용자)
+//   「그리고 재앙의 군주를 0947한테 주고, 『 네번째 재앙 : 가두리의 재앙 』 을 0947한테 띄워줘.
+//    (0947은 ' 어떠한 이유로 ■■의 길에 들어선 자여 재앙의 군주의 길을 받아 들이겠습니까? ' 내용이 적힌 ' 재앙의 군주 ' 카드가 보이며
+//    받아들인다. / 거절한다. 선택 가능. 받아들이면 네번째 재앙 팝업을 띄우기.) 네 명의 히든 직업들한테 랜덤으로 재앙을 내릴 수 있으며
+//    재앙을 맞은 히든들은 L이 아닐 시 4 시간동안 가두리에 갇혀 있는다. L일 경우 다이스를 굴려 확률적으로 쳐낼 수 있기.
+//    팝업은 내린다 / 보류한다. 선택할 수 있어.」
+//   ■ 카드 — 사번 C_GRANT_NO(0947) 사원에게 한 번 (재난의 길 · 업과 상관없이). 받아들이면 lord 에 grant 로 적고 곧바로 네번째 재앙을 묻는다.
+//            거절하면 끝 (다시 뜨지 않는다). kroom.calam = { …, grant: 'accepted' | 'declined', grantAt }
+//            grant 로 적힌 군주는 업을 이룬 것이 아니라서 히든 직업에게 「재앙이 업을 달성하였습니다」 문구를 띄우지 않는다.
+//   ■ 네번째 재앙은 카드를 받아들인 군주에게만 묻는다 (업을 이룬 재앙에게는 첫번째 ~ 세번째 그대로).
+//            보류하면 첫번째 ~ 세번째처럼 K 의 방에 들어설 때 다시 묻는다. 내리면 끝 (한 번).
+//   kroomCalam/lord/<사번>          = { code, name, no, at, grant: 1, grantAt, cast4: { at, to: [사번 ×4] } }
+//   kroomCalam/hit/<사번>/<재앙>_4   = { n: 4, from, at, state, roll, until, doneAt }     state  new · caged(가두리) · blocked
+//   ■ 맞는 사람 — 히든 직업을 받은 사원 가운데 무작위 **네 명** (모자라면 있는 만큼). 쳐내기는 첫번째와 같다 (L 만 d30 · 16 이상).
+//   ■ 가두리 — 못 쳐내면 그때부터 4 시간 가두리 (gaduri.js · by 'calam' · 광장 → 백일몽 → … 빈 자리 · 때가 되면 저절로 풀린다).
+//            이미 시간이 정해진 가두리에 있으면 그 자리에서 끝을 4 시간 뒤까지 늘린다 · 격리 때문에 들어가 있던 자리면 재앙 자리로 바꾼다.
 const C_NODE = 'kroomCalam';
 const C_SEAL_MS = 3 * 3600000;
 const C_FRZ_MS = 6 * 3600000, C_FRZ_FLOOR = 95;
 const C_SHOP_MAX = 2;                       // 세번째 재앙 — 우주 주파수 기회 (보통 하루 4 번)
+const C_CAGE_MS = 4 * 3600000;              // 네번째 재앙 — 가두리 4 시간
+const C_GRANT_NO = '0947';                  // 재앙의 군주 카드를 받는 사번 (2026-11-18 사용자)
 const C_DIE = 30, C_DC = 16;
 const C_TXT = {
     notice: '재앙이 업을 달성하였습니다. 제한 시간 내에 해치우지 않으면 방은 사라집니다.',
@@ -4979,15 +4999,21 @@ const C_TXT = {
     ask2: '『 두번째 재앙 : 오염도 동결 』 을 내리겠습니까?',
     hit2: '두번째 재앙이 내려졌습니다.',
     ask3: '『 세번째 재앙 : 물품 』 을 내리겠습니까?',
-    hit3: '세번째 재앙이 내려졌습니다.'
+    hit3: '세번째 재앙이 내려졌습니다.',
+    ask4: '『 네번째 재앙 : 가두리의 재앙 』 을 내리겠습니까?',
+    hit4: '네번째 재앙이 내려졌습니다.',
+    grant: '어떠한 이유로 ■■의 길에 들어선 자여 재앙의 군주의 길을 받아 들이겠습니까?'
 };
 // 재앙마다 — 이름 · 묻는 문구 · 맞은 사원 문구 · 맞는 사람 수
 const C_KIND = {
     1: { word: '첫번째', ask: C_TXT.ask, hit: C_TXT.hit, cnt: 1, who: '한 명' },
     2: { word: '두번째', ask: C_TXT.ask2, hit: C_TXT.hit2, cnt: 2, who: '두 명' },
-    3: { word: '세번째', ask: C_TXT.ask3, hit: C_TXT.hit3, cnt: 2, who: '두 명' }
+    3: { word: '세번째', ask: C_TXT.ask3, hit: C_TXT.hit3, cnt: 2, who: '두 명' },
+    4: { word: '네번째', ask: C_TXT.ask4, hit: C_TXT.hit4, cnt: 4, who: '네 명' }
 };
-const C_NS = [1, 2, 3];
+const C_NS = [1, 2, 3];                     // 업을 이룬 재앙이 내리는 것
+const C_GRANT_NS = [4];                     // 재앙의 군주 카드를 받아들인 사원이 내리는 것
+const C_ALL = C_NS.concat(C_GRANT_NS);
 function calamN(n) { n = Number(n); return C_KIND[n] ? n : 1; }
 let cLord = {}, cLordOn = false, cHit = {}, cHitRef = null, cHitCode = '', cBusy = false, cMade = '', cMadeAt = 0;
 function cNow() { try { if (typeof window.serverNow === 'function') return window.serverNow(); } catch (e) { } return now(); }
@@ -5007,6 +5033,10 @@ function calamCast(k, u, n) {
     const f = 'cast' + (n || 1);
     return !!((k && k.calam && k.calam[f]) || (u && cLord[u.code] && cLord[u.code][f]));
 }
+// 재앙의 군주 카드 — 이 사원이 받을 사번인가 · 받아들였나 · 아직 답하지 않았나
+function calamGrantee(u) { return !!(u && u.code !== ADMIN && String(u.no == null ? '' : u.no).trim() === C_GRANT_NO); }
+function calamGranted(k, u) { return !!((k && k.calam && k.calam.grant === 'accepted') || (u && cLord[u.code] && cLord[u.code].grant)); }
+function calamGrantDue(k, u) { return calamGrantee(u) && !(k && k.calam && k.calam.grant) && !(cLord[u.code] && cLord[u.code].grant); }
 setInterval(function () {
     const u = me(), d = db_();
     if (!u || !d) return;
@@ -5117,6 +5147,7 @@ function calamLordMake(u, k) {
 function calamAskDue(n) {
     const u = me(); if (!u || u.code === ADMIN) return false;
     const k = prof(u);
+    if (C_GRANT_NS.indexOf(Number(n)) >= 0) return calamGranted(k, u) && !calamCast(k, u, n);
     return calamFull(k, u) && !calamCast(k, u, n || 1);
 }
 function calamPick(all, mine) {
@@ -5190,6 +5221,116 @@ function calamLordPopup(cont, preview, n) {
         } }
     ]);
 }
+// ── 재앙의 군주 카드 — 『 어떠한 이유로 ■■의 길에 들어선 자여 재앙의 군주의 길을 받아 들이겠습니까? 』 (사번 0947 · 2026-11-18)
+//    받아들인다 → lord 에 grant 로 적고 곧바로 네번째 재앙을 묻는다 · 거절한다 → 끝
+function calamGrantPopup(preview) {
+    const u = me(), k = prof(u), d = db_();
+    cBusy = true;
+    pathCss();
+    ['kcal-ov', 'kpath-ov'].forEach(function (id) { const o = document.getElementById(id); if (o) o.remove(); });
+    // 붉은 카드(🔥 재난의 길)와 같은 틀 — 바탕은 재앙 창 빛깔, 안쪽은 ☄ 재앙의 군주
+    const ov = document.createElement('div');
+    ov.id = 'kpath-ov';
+    ov.dataset.kind = 'calam-grant';
+    ov.style.background = 'radial-gradient(ellipse at 50% 42%,rgba(52,6,10,.95) 0%,rgba(14,3,6,.98) 48%,rgba(2,0,2,.99) 82%)';
+    let ember = '';
+    for (let i = 0; i < 34; i++) {
+        ember += '<i class="kpath-ember" style="left:' + (Math.random() * 100).toFixed(1) + '%;animation-duration:'
+            + (5 + Math.random() * 8).toFixed(1) + 's;animation-delay:' + (Math.random() * 8).toFixed(1) + 's;"></i>';
+    }
+    ov.innerHTML = ember + '<div class="kpath-ring"></div>'
+        + '<div class="kpath-card"><div class="kpath-tag">CALAMITY</div>'
+        + '<div class="kpath-ico">☄</div>'
+        + '<div class="kpath-nm">재앙의 군주</div>'
+        + '<div class="kpath-at">LORD OF CALAMITY</div></div>'
+        + '<div class="kpath-q" style="max-width:420px;font-size:16px;word-break:keep-all;">『 어떠한 이유로 ■■의 길에<br>들어선 자여<br>재앙의 군주의 길을<br>받아 들이겠습니까? 』</div>'
+        + '<div class="kpath-note">받아들이면 『 네번째 재앙 : 가두리의 재앙 』 을 내릴 수 있다.<br>한 번 고르면 돌아오지 않는다.</div>'
+        + '<div class="kpath-btns"><button class="kpath-no">거절한다</button><button class="kpath-yes">받아들인다</button></div>';
+    document.body.appendChild(ov);
+    let done = false;
+    const card = function () { return ov.querySelector('.kpath-card'); };
+    const finish = function (cont, wait) { setTimeout(function () { try { ov.remove(); } catch (e) { } cBusy = false; if (typeof cont === 'function') { try { cont(); } catch (e) { console.warn('[재앙]', e); } } }, wait == null ? 1900 : wait); };
+    ov.querySelector('.kpath-yes').onclick = function () {
+        if (done) return; done = true;
+        if (preview) { finish(null, 0); return; }
+        const at = cNow();
+        if (!k.calam || typeof k.calam !== 'object') k.calam = {};
+        k.calam.grant = 'accepted'; k.calam.grantAt = at;
+        k.calam.asked4 = now();                                   // 곧바로 묻는다 — 화면이 비어서 또 묻지 않게
+        saveProf();
+        addHistoryLog(u, '[K 의 방] ☄ 재앙의 군주의 길을 받아들였다.');
+        try { saveFields({ kroom: 1, history: 1 }); } catch (e) { }
+        if (d) {
+            d.ref(C_NODE + '/lord/' + u.code).transaction(function (cur) {
+                const o = (cur && typeof cur === 'object') ? cur : { code: u.code, name: u.name || '', no: String(u.no || ''), at: at };
+                o.grant = 1; o.grantAt = o.grantAt || at;
+                return o;
+            }).catch(function () { });
+        }
+        ov.classList.add('done');
+        ov.querySelector('.kpath-q').innerHTML = '☄ 재앙의 군주 ☄';
+        ov.querySelector('.kpath-note').innerHTML = '재가 발밑에 내려앉는다. 식어 있다.';
+        ov.querySelector('.kpath-btns').remove();
+        finish(function () { cBusy = true; calamLordPopup(null, false, 4); });
+    };
+    ov.querySelector('.kpath-no').onclick = function () {
+        if (done) return; done = true;
+        if (preview) { finish(null, 0); return; }
+        if (!k.calam || typeof k.calam !== 'object') k.calam = {};
+        k.calam.grant = 'declined'; k.calam.grantAt = cNow();
+        saveProf();
+        addHistoryLog(u, '[K 의 방] 재앙의 군주 카드를 덮었다.');
+        try { saveFields({ kroom: 1, history: 1 }); } catch (e) { }
+        card().style.transition = 'opacity 1.2s, transform 1.2s';
+        card().style.opacity = '0';
+        card().style.transform = 'rotateY(180deg) scale(.7)';
+        ov.querySelector('.kpath-q').innerHTML = '재가 흩어진다.';
+        ov.querySelector('.kpath-note').innerHTML = '';
+        ov.querySelector('.kpath-btns').remove();
+        finish(null);
+    };
+}
+// 가두리의 재앙 — 4 시간 가두리 (gaduri.js · by 'calam' · 광장 → 백일몽 → … 빈 자리)
+function calamCageWrite(u, until) {
+    const d = db_();
+    if (!d || !u) return;
+    const NODE_G = 'gaduri';
+    const cur = (typeof window.gaduriOf === 'function') ? (window.gaduriOf(u.code) || '') : '';
+    const fresh = function () {
+        const rooms = (typeof window.gaduriOrder === 'function') ? window.gaduriOrder() : ['plaza', 'dream', 'post'];
+        const put = function (i) {
+            if (i >= rooms.length) {                            // 가두리가 모두 찼다
+                addHistoryLog(u, '[K 의 방] ☄ 가두리가 모두 차서 갇히지 않았다.');
+                try { saveFields({ history: 1 }); } catch (e) { }
+                return;
+            }
+            d.ref(NODE_G + '/' + rooms[i]).transaction(function (box) {
+                box = box || {};
+                if (box[u.code]) return box;
+                if (Object.keys(box).length >= 3) return;      // 찼다 — 다음 가두리
+                box[u.code] = { at: now(), by: 'calam', until: until, name: u.name || u.code };
+                return box;
+            }).then(function (r) { if (!r || !r.committed) put(i + 1); }).catch(function () { });
+        };
+        put(0);
+    };
+    if (!cur) { fresh(); return; }
+    d.ref(NODE_G + '/' + cur + '/' + u.code).transaction(function (v) {
+        if (!v) return;                                         // 그 사이 풀렸다 — 새로 건다
+        if (!v.auto && !Number(v.until)) return v;              // 상담사가 가둔 자리(끝이 없다) — 그대로
+        v.until = Math.max(Number(v.until) || 0, until);
+        v.by = 'calam'; v.auto = null; v.at = now();
+        return v;
+    }).then(function (r) { if (!(r && r.committed && r.snapshot.val())) fresh(); }).catch(function () { });
+}
+function calamCage(u, n) {
+    const t = cNow();
+    const until = t + C_CAGE_MS;
+    calamCageWrite(u, until);
+    addHistoryLog(u, '[K 의 방] ☄ 재앙을 맞았다 — 4 시간 동안 가두리에 갇힌다.');
+    try { saveFields({ history: 1 }); } catch (e) { }
+    return until;
+}
 // ── 히든 직업에게 — 『 재앙이 업을 달성하였습니다. … 』
 function calamNoticePopup(code, entry, preview) {
     const u = me(), k = prof(u);
@@ -5251,14 +5392,15 @@ function calamHitPopup(id, hit, preview) {
     const n = calamN(hit && hit.n), K = C_KIND[n];
     const ref = (d && !preview) ? d.ref(C_NODE + '/hit/' + u.code + '/' + id) : null;
     const isL = preview ? preview === 'dice' : calamIsL(k);
-    const span = (n === 2) ? C_FRZ_MS : (n === 3) ? Math.max(60000, calamNext22() - cNow()) : C_SEAL_MS;
-    const done = (n === 2) ? 'frozen' : (n === 3) ? 'shop' : 'sealed';
-    const lay = function () { return (n === 2) ? calamFreeze(u, n) : (n === 3) ? calamShop(u, n) : calamSeal(u, n); };
+    const span = (n === 2) ? C_FRZ_MS : (n === 3) ? Math.max(60000, calamNext22() - cNow()) : (n === 4) ? C_CAGE_MS : C_SEAL_MS;
+    const done = (n === 2) ? 'frozen' : (n === 3) ? 'shop' : (n === 4) ? 'caged' : 'sealed';
+    const lay = function () { return (n === 2) ? calamFreeze(u, n) : (n === 3) ? calamShop(u, n) : (n === 4) ? calamCage(u, n) : calamSeal(u, n); };
     cBusy = true;
     const sealNote = function (until) {
         const left = '<span style="font-size:10px;">남은 시간 ' + calamLeft(until - cNow()) + '</span>';
         if (n === 2) return '오염도가 <b style="color:#ffb8a4;">6 시간</b> 동안 <b style="color:#ffb8a4;">' + C_FRZ_FLOOR + '%</b> 아래로 내려가지 않습니다.<br>' + left;
         if (n === 3) return '우주 쇼핑몰 주파수 기회가 <b style="color:#ffb8a4;">다음 밤 10 시</b>까지 하루 <b style="color:#ffb8a4;">' + C_SHOP_MAX + ' 번</b>으로 줄어듭니다.<br>' + left;
+        if (n === 4) return '<b style="color:#ffb8a4;">4 시간</b> 동안 가두리에 갇힙니다 — 광장에 있는 동안 가두리 밖으로 나갈 수 없습니다.<br>' + left;
         return '가진 장비가 <b style="color:#ffb8a4;">3 시간</b> 동안 봉인됩니다 — 전용 장비 · 커스텀 장비 · 장착한 장비.<br>' + left;
     };
     const okBtn = function (ov) { return [{ t: '확인', cls: 'kcal-yes', fn: function () { calamEnd(ov, null, 0); } }]; };
@@ -5294,7 +5436,7 @@ function calamHitPopup(id, hit, preview) {
                 clearInterval(iv);
                 die.textContent = String(r);
                 die.classList.add(ok ? 'ok' : 'no');
-                calamNote(ov, ok ? '🎲 ' + r + ' — 재앙을 쳐냈다. ' + (n === 2 ? '오염도는' : n === 3 ? '우주 쇼핑몰은' : '장비는') + ' 그대로다.' : '🎲 ' + r + ' — 쳐내지 못했다.<br>' + sealNote(until));
+                calamNote(ov, ok ? '🎲 ' + r + ' — 재앙을 쳐냈다. ' + (n === 4 ? '가두리는 닫히지 않는다.' : (n === 2 ? '오염도는' : n === 3 ? '우주 쇼핑몰은' : '장비는') + ' 그대로다.') : '🎲 ' + r + ' — 쳐내지 못했다.<br>' + sealNote(until));
                 calamBtns(ov, okBtn(ov));
             }, 80);
         } }
@@ -5319,6 +5461,20 @@ function calamTick() {
     const id = Object.keys(cHit).filter(function (x) { return cHit[x] && cHit[x].state === 'new'; })
         .sort(function (a, b) { return (cHit[a].at || 0) - (cHit[b].at || 0); })[0];
     if (id) { calamHitPopup(id, cHit[id]); return; }
+    // ②-0 재앙의 군주 카드 — 사번 0947 에게 한 번 (2026-11-18)
+    if (calamGrantDue(k, u)) { calamGrantPopup(false); return; }
+    // ②-4 카드를 받아들인 군주 — 네번째 재앙을 처음 한 번은 바로 묻는다 (그 뒤로는 K 의 방에 들어설 때)
+    if (calamGranted(k, u)) {
+        for (let j = 0; j < C_GRANT_NS.length; j++) {
+            const n = C_GRANT_NS[j];
+            if (calamCast(k, u, n) || (k.calam && (k.calam['asked' + n] || k.calam['hold' + n]))) continue;
+            if (!k.calam || typeof k.calam !== 'object') k.calam = {};
+            k.calam['asked' + n] = now();
+            saveProf();
+            calamLordPopup(null, false, n);
+            return;
+        }
+    }
     // ② 재앙의 군주 — 처음 한 번은 바로 묻는다 (그 뒤로는 K 의 방에 들어설 때). 첫번째 → 두번째 → 세번째 순서로 하나씩
     if (full && cLord[u.code]) {
         for (let n = 1; n <= C_NS.length; n++) {
@@ -5333,18 +5489,21 @@ function calamTick() {
     // ③ 히든 직업 — 업을 이룬 재앙마다 한 번
     if (calamHolder(k)) {
         const seen = (k.calamSeen && typeof k.calamSeen === 'object') ? k.calamSeen : {};
-        const c = Object.keys(cLord).filter(function (x) { const v = cLord[x]; return x !== u.code && v && v.at && seen[x] !== v.at; })[0];
+        // 카드로 군주가 된 사원(grant)은 업을 이룬 것이 아니다 — 문구를 띄우지 않는다 (2026-11-18)
+        const c = Object.keys(cLord).filter(function (x) { const v = cLord[x]; return x !== u.code && v && v.at && !v.grant && seen[x] !== v.at; })[0];
         if (c) calamNoticePopup(c, cLord[c]);
     }
 }
 setInterval(function () { try { calamTick(); } catch (e) { console.warn('[재앙]', e); } }, 4000);
 // 상담사 — 화면 모양 보기 (아무것도 안 바뀐다): 'notice' 문구 · 'ask' 군주 · 'hit' 맞음(봉인) · 'dice' 맞음(L · 주사위)
 //          두번째 재앙은 뒤에 2 를 붙인다 — 'ask2' · 'hit2' (오염도 동결) · 'dice2' · 세번째는 3 — 'ask3' · 'hit3' (물품) · 'dice3'
+//          네번째는 4 — 'ask4' · 'hit4' (가두리) · 'dice4' · 'grant' 재앙의 군주 카드 (2026-11-18)
 window.kroomCalamPreview = function (kind) {
     const u = me(); if (!u) return;
-    const m = /([23])$/.exec(String(kind || ''));
+    if (kind === 'grant') { calamGrantPopup(true); return; }
+    const m = /([234])$/.exec(String(kind || ''));
     const n = m ? Number(m[1]) : 1;
-    kind = String(kind || '').replace(/[23]$/, '');
+    kind = String(kind || '').replace(/[234]$/, '');
     if (kind === 'ask') calamLordPopup(null, true, n);
     else if (kind === 'hit' || kind === 'dice') calamHitPopup('preview', { n: n }, kind);
     else calamNoticePopup('preview', { at: now() }, true);
@@ -5355,14 +5514,18 @@ window.kroomCalamState = function () {
     console.log('  🔥 재난의 길 ' + (onPath(k) ? '걷는 중' : '아니오') + ' · 열 속성 Lv ' + LV_MAX + ' — ' + Object.keys(ATTR).filter(function (a) { const p = profOf(k, u, a); return p && (p.lv || 1) >= LV_MAX; }).length + ' / ' + Object.keys(ATTR).length
         + ' · 업 ' + (calamFull(k, u) ? '달성' : '아직') + ' · 첫번째 재앙 ' + (calamCast(k, u) ? '내림' : (k.calam && k.calam.hold1 ? '보류' : '—'))
         + ' · 두번째 재앙 ' + (calamCast(k, u, 2) ? '내림' : (k.calam && k.calam.hold2 ? '보류' : '—'))
-        + ' · 세번째 재앙 ' + (calamCast(k, u, 3) ? '내림' : (k.calam && k.calam.hold3 ? '보류' : '—')));
+        + ' · 세번째 재앙 ' + (calamCast(k, u, 3) ? '내림' : (k.calam && k.calam.hold3 ? '보류' : '—'))
+        + ' · 재앙의 군주 카드 ' + (calamGrantee(u) ? ((k.calam && k.calam.grant) || '아직') : '해당 없음')
+        + ' · 네번째 재앙 ' + (calamCast(k, u, 4) ? '내림' : (k.calam && k.calam.hold4 ? '보류' : '—')));
     console.log('  히든 직업 ' + (calamHolder(k) ? '받음' + (calamIsL(k) ? ' (L — 주사위로 쳐낼 수 있다)' : '') : '없음')
         + ' · 내게 내려진 재앙 ' + JSON.stringify(cHit) + ' · 장비 봉인 ' + ((typeof window.calamSealLeft === 'function' && window.calamSealLeft(u) > 0) ? calamLeft(window.calamSealLeft(u)) + ' 남음' : '없음')
         + ' · 오염도 동결 ' + ((typeof window.calamFreezeLeft === 'function' && window.calamFreezeLeft(u) > 0) ? calamLeft(window.calamFreezeLeft(u)) + ' 남음' : '없음')
         + ' · 물품(우주 쇼핑몰 ' + C_SHOP_MAX + '번) ' + (window.calamShopLeft(u) > 0 ? calamLeft(window.calamShopLeft(u)) + ' 남음' : '없음'));
     if (u.code === ADMIN) console.table(Object.keys(cLord).map(function (c) { const v = cLord[c] || {}; return { 재앙: v.name, 사번: v.no, 업: new Date(v.at).toLocaleString(), 첫번째: v.cast1 ? new Date(v.cast1.at).toLocaleString() : '—', 맞은사원: v.cast1 ? ((((typeof db !== 'undefined' && db.users) || {})[v.cast1.to] || {}).name || '?') : '',
         두번째: v.cast2 ? new Date(v.cast2.at).toLocaleString() : '—', 맞은사원2: v.cast2 ? Object.keys(v.cast2.to || {}).map(function (i) { return (((typeof db !== 'undefined' && db.users) || {})[v.cast2.to[i]] || {}).name || '?'; }).join(' · ') : '',
-        세번째: v.cast3 ? new Date(v.cast3.at).toLocaleString() : '—', 맞은사원3: v.cast3 ? Object.keys(v.cast3.to || {}).map(function (i) { return (((typeof db !== 'undefined' && db.users) || {})[v.cast3.to[i]] || {}).name || '?'; }).join(' · ') : '' }; }));
+        세번째: v.cast3 ? new Date(v.cast3.at).toLocaleString() : '—', 맞은사원3: v.cast3 ? Object.keys(v.cast3.to || {}).map(function (i) { return (((typeof db !== 'undefined' && db.users) || {})[v.cast3.to[i]] || {}).name || '?'; }).join(' · ') : '',
+        카드: v.grant ? '받아들임' : '',
+        네번째: v.cast4 ? new Date(v.cast4.at).toLocaleString() : '—', 맞은사원4: v.cast4 ? Object.keys(v.cast4.to || {}).map(function (i) { return (((typeof db !== 'undefined' && db.users) || {})[v.cast4.to[i]] || {}).name || '?'; }).join(' · ') : '' }; }));
 };
 
 window.kroomState = function () {
