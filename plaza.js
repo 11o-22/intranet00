@@ -5994,6 +5994,7 @@ function send(moving) {
     // 🧸 덧붙여 보내는 것 (doll-walk.js — 데리고 다니는 봉제인형) · 바뀌면 바로 알린다
     let ex = null;
     try { ex = (typeof window.plazaExtra === 'function') ? window.plazaExtra() : null; } catch (e) { ex = null; }
+    try { if (typeof window.snowHeld === 'function' && window.snowHeld()) ex = Object.assign({}, ex || {}, { sn: 1 }); } catch (e) { }   // ❄ 눈뭉치를 들고 있다 (snow.js) — 들거나 던지면 바로 알린다
     const exKey = ex ? JSON.stringify(ex) : '';
     const exChanged = exKey !== (run.sEx || '');
     if (!stopping && !jumped && !beat && !exChanged && (!changed || t - run.sent < P.SEND_MS)) return;
@@ -6639,6 +6640,7 @@ function onSeat(code, v, fresh) {
     q.ds = (v.ds && Array.isArray(v.ds.c) && v.ds.c.length) ? v.ds : null;   // 🪩 디스코 조명
     q.fr = Number(v.fr) || 0;                         // 🌧 여우비 — 🦊 호갑투를 찬 사람이 이 방에 들어온 때 (foxrain.js)
     q.fs = v.fs ? 1 : 0;                              // ❄ 그때 기온이 0도 밑이었다 — 비 대신 눈 (foxrain.js)
+    q.sn = v.sn ? 1 : 0;                              // ❄ 눈뭉치를 들고 있다 (snow.js)
     q.one.boff = v.bo ? 1 : 0;                        // 🛹 보드에서 내려 있다
     zzPaint(q.one, !!v.zz);                           // 💤 졸음
     q.j = v.j || 0;                        // 옛 판(j 없음)은 먼저 온 사람으로 친다
@@ -8354,6 +8356,12 @@ function open() {
             //   가만히 톡 치기가 어려워 이것이 「안 눌린다」로 느껴졌다.
             const tap = (now() - at < TAP_MS) && far < TAP_SLOP;
             if (!tap && drag) eatClick();
+            // ❄ 눈뭉치를 들고 사람을 톡 쳤으면 — 던진다 (snow.js · 2026-11-19)
+            if (tap && run && !(hit && hit.closest && hit.closest('#plaza-feed, #plaza-map'))) {
+                let sw = false;
+                try { sw = typeof window.snowTap === 'function' && window.snowTap(e.clientX, e.clientY); } catch (x) { sw = false; }
+                if (sw) { drag = false; far = 0; hit = null; return; }
+            }
             // 🐰 내 Null Owner 토끼 인형을 톡 쳤으면 — 말풍선 글씨 고르는 창 (nuow-text.js · 2026-11-03)
             if (tap && run && !(hit && hit.closest && hit.closest('#plaza-feed, #plaza-map'))) {
                 let nw = false;
@@ -8616,6 +8624,15 @@ window.plazaPosOf = function (code) {
     return { x: q.x, y: q.y, face: q.face || 1, room: run.room };
 };
 window.plazaPeerCodes = function () { return run ? Object.keys(run.peers || {}) : []; };
+// ❄ 눈싸움 (snow.js · 2026-11-19) — 톡 친 자리의 사람 · 그 사람(나 포함)의 그림 칸
+window.plazaPersonAt = function (cx, cy) { try { return run ? (personAt(cx, cy) || null) : null; } catch (e) { return null; } };
+window.plazaOneOf = function (code) {
+    if (!run || !code) return null;
+    const me = u_();
+    if (me && code === me.code) return run.me || null;
+    const q = run.peers[code];
+    return (q && !q.hid) ? q.one : null;
+};
 window.plazaReseat = function () { if (!run || !run.room) return false; const k = R[run.room].photo ? P.START : run.room; goRoom(k, null, run.lv || 0); return true; };
 window.plazaHsRefresh = function () { try { refreshTags(); showWho(); paintMap(); } catch (e) { } };
 
@@ -8630,7 +8647,7 @@ window.plazaWhere = function () {
 window.plazaPeerPos = function (code) {
     const q = run && run.peers && run.peers[code];
     if (!q) return null;
-    return { x: q.x, y: q.y, face: q.face || 1, hid: !!q.hid, pt: q.pt || null, po: !!q.po, moving: !!q.moving, fr: q.fr || 0, fs: q.fs || 0 };
+    return { x: q.x, y: q.y, face: q.face || 1, hid: !!q.hid, pt: q.pt || null, po: !!q.po, moving: !!q.moving, fr: q.fr || 0, fs: q.fs || 0, sn: q.sn || 0 };
 };
 // 🌧 지금 방의 길 띠 (방 그림 좌표 · 내가 선 층) — 여우비 웅덩이가 놓일 자리 (foxrain.js)
 window.plazaFloor = function () {

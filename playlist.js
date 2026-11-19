@@ -32,6 +32,14 @@
 //   → 곡이 넘어가는 사이에는 잠금 화면에 「멈춤」으로 알리지 않는다 (adv) · 넘어가다 막히면 다시 해 보고, 화면을 다시 켰을 때 이어 준다.
 //   → 플리를 틀어 둔 동안(멈춰 둔 것도)은 새 판이 올라와도 저절로 새로 열지 않는다 (update-check.js · playlistAlive) — 위쪽 띠를 눌러 연다.
 //
+// ■ ★ 인트라넷 1기 마무리 (2026-11-19 사용자 · farewell.js)
+//   「처음 팝업 뜰 땐 Endure가 쭉 나오게 · 다시 한 번 진심으로 즐겨 주셔서 감사합니다. 부분이 나올 때 山君 · 닫기 누르면 Legacy ·
+//     Legacy 가 끝나면 플레이리스트 노래들 (해금 조건 무시하고) 전부 순서대로」
+//   playlistLoopOne(열쇠) — 그 곡 하나를 끝나도 처음부터 다시 (Q.src 'fwLoop') · 해금 상관없이
+//   playlistFarewell()    — Legacy → 전체 곡을 목록 차례대로 (Q.src 'fwAll') · 해금 상관없이 · 무작위 · 한 곡 반복 · 반복 끔 설정을 따르지 않고 다 돌면 전체 곡 처음부터
+//   이 둘은 이 기기의 반복 · 무작위 설정을 바꾸지 않는다. 플리 창의 단추(무작위)를 직접 누르면 그때부터는 그 설정대로.
+//   음소거(광장 🔊)와 상관없이 나온다 — 플리는 원래 광장 배경 음악 단추를 따르지 않는다.
+//
 // ■ 콘솔
 //   playlistState()
 
@@ -203,6 +211,8 @@ function preClear() { Object.keys(PRE).forEach(function (k) { const e = PRE[k]; 
 // 곡이 끝나면 저절로 나올 곡 — step(1, true) 가 고를 것과 같다 (무작위 한 바퀴 끝이면 다음 바퀴를 미리 섞어 둔다 · Q.wrap)
 function nextKey() {
     if (!Q.order.length || !Q.key) return null;
+    if (Q.src === 'fwLoop') return Q.key;                                   // 🎞 1기 마무리 — 한 곡을 계속
+    if (Q.src === 'fwAll') return (Q.i + 1 < Q.order.length) ? Q.order[Q.i + 1] : (Q.base[0] || null);
     if (SET.rep === 'one') return Q.key;
     if (Q.i + 1 < Q.order.length) return Q.order[Q.i + 1];
     if (SET.rep === 'off') return null;
@@ -260,6 +270,8 @@ function shuffled(arr) {
 }
 // 🔒 해금하지 않은 곡(rhythm.js price)은 차례에서 뺀다 — 목록에는 자물쇠로 보이고, 누르면 그 자리에서 해금 (2026-11-11 사용자 「천지인」)
 function baseOf(src) {
+    if (src === 'fwAll') return songs().map(function (s) { return s.key; });            // 🎞 1기 마무리 — 해금 상관없이 전부
+    if (src === 'fwLoop') return Q.key ? [Q.key] : [];
     const all = songs().filter(function (s) { return !isLocked(s); }).map(function (s) { return s.key; });
     if (src === 'all') return all;
     const l = LISTS[src];
@@ -327,8 +339,13 @@ function playFrom(src, k) {
 // 다음 · 앞 — auto 는 곡이 끝나서 넘어가는 것 (한 곡 반복 · 반복 끔이 여기에만 걸린다)
 function step(dir, auto) {
     if (!Q.order.length) return;
-    if (auto && SET.rep === 'one') { playKey(Q.key); return; }
+    if (Q.src === 'fwLoop' && Q.key) { playKey(Q.key); return; }           // 🎞 1기 마무리 — 한 곡을 계속 (넘겨도 같은 곡)
+    if (auto && SET.rep === 'one' && Q.src !== 'fwAll') { playKey(Q.key); return; }
     let i = Q.i + dir;
+    if (i >= Q.order.length && Q.src === 'fwAll') {                        // 🎞 Legacy 뒤 전체 곡을 다 돌았다 — 전체 곡 처음부터 (반복 끔이어도)
+        Q.order = Q.base.slice();
+        i = 0;
+    }
     if (i >= Q.order.length) {
         if (auto && SET.rep === 'off') { Q.i = Q.order.length - 1; want = false; adv = false; try { A.pause(); A.currentTime = 0; } catch (e) { } paint(); mediaState(); return; }
         if (SET.shuf) {                                   // 한 바퀴 돌았으면 다시 섞는다 — 방금 곡이 바로 또 나오지 않게 (미리 섞어 둔 것이 있으면 그것 · nextKey)
@@ -420,7 +437,7 @@ function mediaPos() {
 const V = { tab: 'all', list: null, adding: null, naming: null, picker: null };
 let OV = null;
 
-function srcName(src) { return src === 'all' ? '전체 곡' : (LISTS[src] ? LISTS[src].n : '내 플리'); }
+function srcName(src) { return (src === 'all' || src === 'fwAll') ? '전체 곡' : src === 'fwLoop' ? '인트라넷 1기' : (LISTS[src] ? LISTS[src].n : '내 플리'); }
 
 const IC = {
     play: '<path d="M8 5v14l11-7z"/>',
@@ -939,6 +956,22 @@ function paintMini() {
 })();
 
 window.playlistOpen = open;
+// 🎞 인트라넷 1기 마무리 (2026-11-19 · farewell.js) — 해금 · 반복 · 무작위 설정과 상관없이
+window.playlistLoopOne = function (k) {
+    if (!song(k)) return false;
+    if (Q.key === k && Q.src === 'fwLoop' && A && !A.paused) return true;   // 이미 그 곡이 돈다
+    Q.src = 'fwLoop'; Q.base = [k]; Q.order = [k]; Q.i = 0; Q.wrap = null; errs = 0;
+    playKey(k);
+    return true;
+};
+window.playlistFarewell = function () {
+    const all = songs().map(function (s) { return s.key; });
+    if (!all.length) return false;
+    const first = song('legacy') ? 'legacy' : all[0];
+    Q.src = 'fwAll'; Q.base = all; Q.order = [first].concat(all); Q.i = 0; Q.wrap = null; errs = 0;
+    playKey(first);
+    return true;
+};
 window.playlistState = function () {
     const out = { 곡: Q.key, 목록: srcName(Q.src), 차례: Q.order, 몇째: Q.i, 반복: REP_TXT[SET.rep], 무작위: SET.shuf, 재생중: playing(), 플리: LISTS };
     console.log(out);

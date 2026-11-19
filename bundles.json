@@ -502,7 +502,9 @@
       "alien-weekly.js",
       "craft-pity.js",
       "party-ghost.js",
-      "calam-freeze.js"
+      "calam-freeze.js",
+      "snow.js",
+      "farewell.js"
     ]
   ]
 }
