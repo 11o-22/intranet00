@@ -1,0 +1,12 @@
+{
+ "nobody": [
+  "torso"
+ ],
+ "trimrim": [
+  "farArm",
+  "nearArm",
+  "farLeg",
+  "nearLeg"
+ ],
+ "note": "suitrig 로 입힐 때 NOBODY · TRIMRIM 에 넣는 값 (옷 밖으로 맨몸 선이 비치지 않게)"
+}
