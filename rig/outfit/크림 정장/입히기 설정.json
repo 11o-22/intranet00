@@ -1,0 +1,17 @@
+{
+ "nobody": [
+  "farLeg",
+  "nearLeg",
+  "torso"
+ ],
+ "trimrim": [
+  "farArm",
+  "nearArm"
+ ],
+ "flags": [
+  "JOINTFILL",
+  "WARPOVER"
+ ],
+ "size": "800×800 (받은 그대로 — 다른 의상의 3배율 2400 이 아니라 1배율)",
+ "note": "suitrig 로 입힐 때 NOBODY · TRIMRIM 에 넣는 값 · 받은 파일 이름(손위/손아래/발위/발아래)을 팔2/팔1/다리2/다리1 로 맞춤"
+}
