@@ -361,8 +361,55 @@ def build():
              [P(f'{n} 오른다리.png', follow='오른쪽 다리1', layer='neck'), P(f'{n} 왼다리.png', follow='왼쪽 다리1', layer='neck')], still=True)
 
 
+# ---------- 걷기 — 몸은 늑대잠옷과 같은 걸음(기우뚱 없이 다리만 번갈아) · 꼬리는 걸음에 맞춰 평소와 다르게 ----------
+WALK = {'frames': 16, 'fps': 16, 'bob': 0,
+        'walk': {'sway': 0, 'pivot': [1110, 2200], 'bounce': 6, 'lift': 22, 'stride': 20, 'arm': 10, 'legs_one': True,
+                 'shoulder': {'오른팔': [1050, 1585], '왼팔': [1195, 1590]}},
+        'skin': {'legs': {'from': 1880, 'to': 2110}, 'arms': {'r0': 40, 'r1': 190}}}
+
+
+def walkify(path, tails, note):
+    """tails: {파츠 이름(또는 파일): 걷기 때 덮어쓸 움직임}"""
+    cfg = ITEMS[path]
+    an = cfg.setdefault('anims', {})
+    an.setdefault('평소', {})
+    an['걷기'] = dict(WALK, **an.get('걷기', {}))
+    if 'fold_curve' in cfg:                       # 새는 걸을 때도 날개를 접어 둠
+        an['걷기']['fold_curve'] = [[0, 1], [1, 1]]
+    for prt in cfg['parts']:
+        key = prt.get('name') or prt['file'][:-4]
+        ov = tails.get(key) or tails.get(prt['file'])
+        if ov:
+            prt.setdefault('anim', {})['걷기'] = ov
+    cfg['설명'] += ' · 걸을 때 꼬리: ' + note
+
+
+def walk_tails():
+    walkify('acc/담비', {'꼬리1': {'rot': flap(4, 0, 2)}, '꼬리2': {'rot': flap(7, 0.1, 2)}, '꼬리3': {'rot': flap(11, 0.2, 2)}},
+            '살짝 들고 걸음마다 끝이 잘게 물결침')
+    walkify('acc/사자', {'꼬리1': {'rot': flap(7, 0, 1)}, '꼬리2': {'rot': flap(10, 0.12, 1)},
+                         '꼬리3': {'rot': flap(13, 0.24, 1)}, '꼬리4': {'rot': flap(18, 0.36, 1)}},
+            '한 걸음 한 걸음 크게 휘둘리고 끝 술이 한참 늦게 따라옴')
+    walkify('acc/가나디', {'가나디 꼬리': {'rot': flap(16, 0, 4), 'bend': {'anchor': [1154, 1807], 'len': 478, 'amp': 10, 'lag': 0.25, 'freq': 4}}},
+            '신나서 아주 빠르게 살랑살랑')
+    walkify('acc/호랑이', {'호랑이 꼬리': {'rot': flap(6, 0, 1), 'bend': {'anchor': [1147, 1803], 'len': 461, 'amp': 18, 'lag': 0.85, 'freq': 1}}},
+            '걸음에 맞춰 크게 S 자로 늘어지며 출렁')
+    for n in ('악마 1', '악마 2', '악마 3'):
+        walkify('acc/' + n, {'악마 꼬리': {'rot': flap(3, 0, 2), 'bend': {'anchor': [1163, 1839], 'len': 456, 'amp': 11, 'lag': 0.55, 'freq': 2}}},
+                '걸음마다 끝(화살촉)이 톡톡 튕김')
+    walkify('outfit/늑대잠옷', {'꼬리3': {'rot': flap(5, 0.0, 2)}, '꼬리2': {'rot': flap(9, 0.12, 2)}, '꼬리1': {'rot': flap(14, 0.24, 2)}},
+            '걸음마다 살랑 (끝이 늦게)')
+    for n, root, L in (('뱁새', [1128, 1839], 412), ('참새', [1154, 1814], 493)):
+        walkify('acc/' + n, {'꼬리': {'rot': flap(6, 0.1, 2), 'bend': {'anchor': root, 'len': L, 'amp': 4, 'lag': 0.3, 'freq': 2}}},
+                '걸음마다 까딱까딱 위아래로')
+    walkify('acc/돌고래', {'돌고래': {'rot': flap(5, 0, 2), 'bend': {'anchor': [1150, 1800], 'len': 583, 'amp': 9, 'lag': 0.45, 'freq': 2}}},
+            '걸음마다 지느러미가 좌우로 철썩')
+    walkify('acc/롭이어', {'꼬리': {'move': {'dy': 10, 'freq': 2, 'phase': 0.15}}}, '동그란 꼬리가 걸음마다 통통')
+
+
 if __name__ == '__main__':
     build()
+    walk_tails()
     for path, cfg in ITEMS.items():
         fp = os.path.join(RIG, path, '리깅.json')
         for p in cfg['parts']:
