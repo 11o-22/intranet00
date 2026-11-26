@@ -199,13 +199,13 @@ def build():
           P('타천사 왼쪽 날개 - 안.png', name='왼안', layer='back', z=0, pivot=[1048, 1609], rot=flap(6, 0, 1)),
           P('타천사 왼쪽 날개 - 겉.png', name='왼겉', layer='back', z=1, parent='왼안', pivot=[904, 1554], rot=flap(3, 0.08, 1)),
           P('타천사 헤일로.png', follow='머리', layer='front', move={'dy': 12, 'freq': 1})])
-    item('acc/천사 3', '천사 3 — 등 날개 안 · 겉 두 겹이 들썩 · 얼굴 옆 머리 날개는 움직이지 않고 머리만 따라감 · 깨진 헤일로 둥실',
+    item('acc/천사 3', '천사 3 — 등 날개 안 · 겉 두 겹이 들썩 · 얼굴 옆 머리 날개는 움직이지 않고 머리만 따라감(얼굴보다 위) · 깨진 헤일로 둥실',
          [P('천사 오른쪽 날개 - 안.png', name='오른안', layer='back', z=10, pivot=[1169, 1597], rot=flap(-6, 0, 1)),
           P('천사 오른쪽 날개 - 겉.png', name='오른겉', layer='back', z=11, parent='오른안', pivot=[1323, 1618], rot=flap(-3, 0.08, 1)),
           P('천사 왼쪽 날개 - 안.png', name='왼안', layer='back', z=0, pivot=[1040, 1596], rot=flap(6, 0, 1)),
           P('천사 왼쪽 날개 - 겉.png', name='왼겉', layer='back', z=1, parent='왼안', pivot=[865, 1594], rot=flap(3, 0.08, 1)),
           P('천사 머리 날개 - 아래.png', follow='머리', layer='back', z=20),
-          P('천사 머리 날개 - 위.png', follow='머리', layer='back', z=21),
+          P('천사 머리 날개 - 위.png', follow='머리', layer='head', z=21),
           P('천사 깨진 헤일로.png', follow='머리', layer='front', move={'dy': 12, 'freq': 1})])
     item('acc/작은 날개', '작은 날개 — 두 날개가 어깨 뒤 축에서 파닥',
          [P('작은 날개1.png', layer='back', pivot=[1096, 1658], rot=flap(10, 0, 2)),
@@ -230,9 +230,9 @@ def build():
           P('등불-본체.png', name='초롱', cut=stick, layer='back', z=1, pivot=[704, 1672], rot=flap(7, 0, 1)),
           P('등불-본체.png', name='막대', keep=stick, layer='back', z=2)])
     item('acc/마패', '마패 — 매듭을 축으로 흔들', [P('마패.png', layer='front', pivot=[1245, 1693], rot=flap(6, 0, 1))])
-    item('acc/크로스백', '크로스백 — 어깨끈 위쪽은 고정 · 아래로 갈수록 가방이 살짝 흔들',
+    item('acc/크로스백', '크로스백 — 어깨끈 위쪽은 고정 · 아래로 갈수록 가방이 살짝 흔들 · 가방은 몸통 위, 왼팔(가까운 팔) 아래',
          [P('크로스백 뒷레이어.png', layer='back'),
-          P('크로스백.png', layer='front', bend={'anchor': [1010, 1550], 'start': 280, 'len': 650, 'amp': 3, 'pow': 1.5, 'lag': 0.2, 'freq': 1})])
+          P('크로스백.png', layer='body', bend={'anchor': [1010, 1550], 'start': 280, 'len': 650, 'amp': 3, 'pow': 1.5, 'lag': 0.2, 'freq': 1})])
     item('acc/노리개', '노리개 — 윗부분 → 중간 → 술 세 마디가 차례로 흔들',
          [P('노리개 윗부분.png', name='윗', layer='front', pivot=[1125, 1786], rot=flap(3, 0, 1)),
           P('노리개 중간.png', name='중', layer='front', parent='윗', pivot=[1131, 1845], rot=flap(4, 0.08, 1)),
