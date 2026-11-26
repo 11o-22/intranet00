@@ -151,13 +151,37 @@ class Rig:
 
     # ---- 몸 움직임 (숨쉬기) ----
     def follow_M(self, name, t):
+        """몸 파츠(그리고 그 파츠를 따라가는 옷 · 악세서리)의 변환
+        walk (리깅.json · 동작 「걷기」) — 아장아장: 발 쪽을 축으로 몸이 좌우로 기우뚱 · 발을 번갈아 들고 ·
+        걸음마다 몸이 살짝 튀어 오르고 · 팔은 반대쪽 다리와 함께 흔듦
+          {sway 기울기(도), pivot 발 쪽 축, bounce 튀어 오름(px), lift 발 듦(px), stride 앞으로 내딛음(px),
+           arm 팔 흔듦(도), shoulder {오른팔: [x,y], 왼팔: [x,y]}}"""
         hv = self.cfg.get('hover')
         H = np.eye(3)
         if hv:
             H = T(0, (hv.get('dy', 0) + hv.get('amp', 0) * math.sin(2 * math.pi * (t * hv.get('freq', 1) - hv.get('phase', 0)))) * self.s)
+        s = self.s
+        w = self.cfg.get('walk')
+        if w:
+            sn = math.sin(2 * math.pi * t)
+            px, py = w['pivot']
+            G = H @ R(w.get('sway', 0) * sn, px * s, py * s)
+            if name in LEGS:
+                near = name.startswith('왼쪽')           # 화면 오른쪽(가까운) 다리
+                up = max(0.0, sn if near else -sn)
+                k = 1.0 if name.endswith('1') else 0.7
+                dx = w.get('stride', 0) * (sn if near else -sn)
+                return G @ T(dx * k * s, -w.get('lift', 0) * up * k * s)
+            G = G @ T(0, -w.get('bounce', 0) * abs(sn) * s)
+            for arm in ('오른팔', '왼팔'):
+                if name.startswith(arm):
+                    sx, sy = w['shoulder'][arm]
+                    a = w.get('arm', 0) * sn * (1 if arm == '왼팔' else -1)
+                    return G @ R(a, sx * s, sy * s)
+            return G
         if name in LEGS or name == '땅':
             return H
-        dy = self.bob * math.sin(2 * math.pi * t) * self.s
+        dy = self.bob * math.sin(2 * math.pi * t) * s
         return H @ T(0, dy)
 
     def local_M(self, p, t):

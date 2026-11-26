@@ -157,16 +157,25 @@ def build():
            '늑대잠옷_오른발 2.png': '왼쪽 다리2', '늑대잠옷_오른발 1.png': '왼쪽 다리1',
            '늑대잠옷_오른팔 2.png': '오른팔2', '늑대잠옷_오른팔 1.png': '오른팔1',
            '늑대잠옷_왼팔 2.png': '왼팔2', '늑대잠옷_왼팔 1.png': '왼팔1'}
-    item('outfit/늑대잠옷', '늑대잠옷 — 꼬리 세 마디(3 뿌리 → 2 → 1 끝)가 살랑 · 귀(후드)는 가끔 파르르 · 나머지는 몸 파츠를 따라감 '
+    item('outfit/늑대잠옷', '늑대잠옷 — 꼬리 세 마디(3 뿌리 → 2 → 1 끝)가 살랑 · 귀(후드)는 가끔 파르르 · 걸을 때는 아장아장(몸이 좌우로 기우뚱 · 통통한 다리를 번갈아 들고 · 아랫배 자락이 한 박자 늦게 출렁) · 나머지는 몸 파츠를 따라감 '
          '(받은 이름의 오른발 · 왼발은 화면 오른쪽 · 왼쪽 — 몸 파츠로는 왼쪽 다리 · 오른쪽 다리)',
-         [P('늑대잠옷_꼬리 3.png', name='꼬리3', layer='back', z=0, pivot=[1279, 1849], rot=flap(6, 0.0, 1)),
-          P('늑대잠옷_꼬리 2.png', name='꼬리2', layer='back', z=1, parent='꼬리3', pivot=[1478, 1850], rot=flap(9, 0.08, 1)),
-          P('늑대잠옷_꼬리 1.png', name='꼬리1', layer='back', z=2, parent='꼬리2', pivot=[1643, 1776], rot=flap(12, 0.16, 1)),
+         [P('늑대잠옷_꼬리 3.png', name='꼬리3', layer='back', z=0, pivot=[1279, 1849], rot=flap(6, 0.0, 1),
+            anim={'걷기': {'rot': flap(7, 0.05, 2)}}),
+          P('늑대잠옷_꼬리 2.png', name='꼬리2', layer='back', z=1, parent='꼬리3', pivot=[1478, 1850], rot=flap(9, 0.08, 1),
+            anim={'걷기': {'rot': flap(10, 0.13, 2)}}),
+          P('늑대잠옷_꼬리 1.png', name='꼬리1', layer='back', z=2, parent='꼬리2', pivot=[1643, 1776], rot=flap(12, 0.16, 1),
+            anim={'걷기': {'rot': flap(13, 0.21, 2)}}),
           P('늑대잠옷_머리 뒤.png', follow='머리', layer='neck', z=0)]
-         + [P(c, follow=fol.get(c, '몸통'), layer='neck', z=1 + i) for i, c in enumerate(cloth)]
+         + [P(c, follow=fol.get(c, '몸통'), layer='neck', z=1 + i,
+              **({'anim': {'걷기': {'pivot': [1110, 1560], 'rot': flap(-3, 0.12, 1)}}} if c == '늑대잠옷_몸통.png' else {}))
+            for i, c in enumerate(cloth)]
          + [P('늑대잠옷_왼귀.png', follow='머리', layer='head', z=0, pivot=[966, 924], rot=twitch(-8, 0.18)),
             P('늑대잠옷_머리.png', follow='머리', layer='head', z=1),
-            P('늑대잠옷_오른귀.png', follow='머리', layer='head', z=2, pivot=[1340, 908], rot=twitch(8, 0.0))])
+            P('늑대잠옷_오른귀.png', follow='머리', layer='head', z=2, pivot=[1340, 908], rot=twitch(8, 0.0))],
+         anims={'평소': {},
+                '걷기': {'frames': 16, 'fps': 16, 'bob': 0,
+                         'walk': {'sway': 5, 'pivot': [1110, 2200], 'bounce': 18, 'lift': 46, 'stride': 14, 'arm': 12,
+                                  'shoulder': {'오른팔': [1050, 1585], '왼팔': [1195, 1590]}}}})
 
     # ---------- 전에 받은 동물 · 날개 ----------
     item('acc/가나디', '가나디 — 꼬리는 빠르게 살랑살랑(뿌리 축 + 휨) · 귀는 가끔 파르르',
@@ -311,6 +320,8 @@ def build():
         kw = {'layer': 'neck', 'z': i}
         if '팔' in o or '소매' in o:   # 받은 이름의 오른쪽 · 왼쪽 = 화면 오른쪽 · 왼쪽 → 몸 파츠로는 왼팔 · 오른팔
             kw['follow'] = ('왼팔' if '오른쪽' in o else '오른팔') + ('2' if '윗팔' in o else '1')
+        if o == '두루마기 안감.png':          # 안쪽 천은 몸 뒤로
+            kw['layer'] = 'back'
         if o == '두루마기 오른쪽 고름.png':
             kw['bend'] = {'anchor': [1136, 1750], 'start': 20, 'len': 450, 'amp': 5, 'lag': 0.5, 'pow': 1.2, 'freq': 1}
         if o == '두루마기 왼쪽 고름.png':
