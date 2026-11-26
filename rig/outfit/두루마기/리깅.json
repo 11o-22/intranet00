@@ -42,7 +42,7 @@
    "file": "두루마기 왼쪽 아래 팔.png",
    "layer": "neck",
    "z": 2,
-   "follow": "왼팔1"
+   "follow": "오른팔1"
   },
   {
    "file": "두루마기 안감.png",
@@ -58,13 +58,13 @@
    "file": "두루마기 왼쪽 윗팔.png",
    "layer": "neck",
    "z": 5,
-   "follow": "왼팔2"
+   "follow": "오른팔2"
   },
   {
    "file": "두루마기 왼쪽 소매깃.png",
    "layer": "neck",
    "z": 6,
-   "follow": "왼팔1"
+   "follow": "오른팔1"
   },
   {
    "file": "두루마기 왼쪽 몸통.png",
@@ -75,19 +75,19 @@
    "file": "두루마기 오른쪽 소매깃.png",
    "layer": "neck",
    "z": 8,
-   "follow": "오른팔1"
+   "follow": "왼팔1"
   },
   {
    "file": "두루마기 오른쪽 윗팔.png",
    "layer": "neck",
    "z": 9,
-   "follow": "오른팔2"
+   "follow": "왼팔2"
   },
   {
    "file": "두루마기 오른쪽 아래 팔.png",
    "layer": "neck",
    "z": 10,
-   "follow": "오른팔1"
+   "follow": "왼팔1"
   }
  ]
 }

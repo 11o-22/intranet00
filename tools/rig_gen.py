@@ -207,12 +207,12 @@ def build():
           P('천사 머리 날개 - 아래.png', follow='머리', layer='back', z=20),
           P('천사 머리 날개 - 위.png', follow='머리', layer='head', z=21),
           P('천사 깨진 헤일로.png', follow='머리', layer='front', move={'dy': 12, 'freq': 1})])
-    item('acc/작은 날개', '작은 날개 — 두 날개가 어깨 뒤 축에서 파닥',
-         [P('작은 날개1.png', layer='back', pivot=[1096, 1658], rot=flap(10, 0, 2)),
-          P('작은 날개2.png', layer='back', pivot=[1137, 1660], rot=flap(-10, 0, 2))])
-    item('acc/큰 날개', '큰 날개 — 두 날개가 어깨 뒤 축에서 천천히 퍼덕',
-         [P('큰 날개1.png', layer='back', pivot=[1091, 1625], rot=flap(7, 0, 1)),
-          P('큰 날개2.png', layer='back', pivot=[1150, 1629], rot=flap(-7, 0, 1))])
+    item('acc/요정 날개', '요정 날개 — 큰 날개(위) · 작은 날개(아래)를 한 벌로 붙여 어깨 뒤 축에서 같이 파르르 (작은 날개가 조금 늦게) · 큰 날개1 오른쪽 위 반짝이 점은 그대로',
+         [P('큰 날개1.png', name='큰왼', clip=[0, 1200, 1160, 2400], layer='back', z=0, pivot=[1091, 1625], rot=flap(9, 0, 3)),
+          P('큰 날개1.png', name='반짝이', clip=[1160, 0, 2400, 1200], layer='back', z=0),
+          P('큰 날개2.png', name='큰오른', layer='back', z=0, pivot=[1150, 1629], rot=flap(-9, 0, 3)),
+          P('작은 날개1.png', name='작은왼', layer='back', z=1, pivot=[1096, 1658], rot=flap(7, 0.06, 3)),
+          P('작은 날개2.png', name='작은오른', layer='back', z=1, pivot=[1137, 1660], rot=flap(-7, 0.06, 3))])
     item('acc/롭이어', '롭이어 — 한 장 그림을 왼귀 · 오른귀 · 꼬리로 나눠, 늘어진 귀는 머리에 붙은 채 흔들 · 꼬리는 통통',
          [P('롭이어.png', name='왼귀', clip=[0, 0, 1100, 1800], follow='머리', layer='head', pivot=[897, 905], rot=flap(3, 0, 1),
             bend={'anchor': [897, 905], 'len': 800, 'start': 150, 'amp': 4, 'lag': 0.4, 'freq': 1}),
@@ -309,8 +309,8 @@ def build():
     parts = []
     for i, o in enumerate(order):
         kw = {'layer': 'neck', 'z': i}
-        if '팔' in o or '소매' in o:
-            kw['follow'] = ('오른팔' if '오른쪽' in o else '왼팔') + ('2' if '윗팔' in o else '1')
+        if '팔' in o or '소매' in o:   # 받은 이름의 오른쪽 · 왼쪽 = 화면 오른쪽 · 왼쪽 → 몸 파츠로는 왼팔 · 오른팔
+            kw['follow'] = ('왼팔' if '오른쪽' in o else '오른팔') + ('2' if '윗팔' in o else '1')
         if o == '두루마기 오른쪽 고름.png':
             kw['bend'] = {'anchor': [1136, 1750], 'start': 20, 'len': 450, 'amp': 5, 'lag': 0.5, 'pow': 1.2, 'freq': 1}
         if o == '두루마기 왼쪽 고름.png':
