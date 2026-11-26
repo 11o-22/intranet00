@@ -1,0 +1,60 @@
+{
+ "설명": "호랑이 — 꼬리는 느긋하게 휘며 흔들림(끝으로 갈수록 늦게) · 귀는 가끔 파르르",
+ "frames": 24,
+ "fps": 12,
+ "parts": [
+  {
+   "file": "호랑이 꼬리.png",
+   "layer": "back",
+   "pivot": [
+    1147,
+    1803
+   ],
+   "rot": {
+    "amp": 4,
+    "phase": 0,
+    "freq": 1
+   },
+   "bend": {
+    "anchor": [
+     1147,
+     1803
+    ],
+    "len": 461,
+    "amp": 12,
+    "lag": 0.6,
+    "freq": 1
+   }
+  },
+  {
+   "file": "호랑이 귀 오.png",
+   "follow": "머리",
+   "layer": "head",
+   "z": 5,
+   "pivot": [
+    1338,
+    1097
+   ],
+   "rot": {
+    "amp": 9,
+    "phase": 0.0,
+    "kind": "twitch"
+   }
+  },
+  {
+   "file": "호랑이 귀 왼.png",
+   "follow": "머리",
+   "layer": "head",
+   "z": 5,
+   "pivot": [
+    901,
+    1056
+   ],
+   "rot": {
+    "amp": -9,
+    "phase": 0.18,
+    "kind": "twitch"
+   }
+  }
+ ]
+}

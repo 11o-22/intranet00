@@ -1,0 +1,51 @@
+{
+ "설명": "작두 — 날은 그대로, 손잡이 끝 술과 무령 · 옥패가 대롱대롱",
+ "frames": 24,
+ "fps": 12,
+ "parts": [
+  {
+   "file": "작두 본체.png",
+   "layer": "front",
+   "z": 0
+  },
+  {
+   "file": "작두 술.png",
+   "layer": "front",
+   "z": 1,
+   "pivot": [
+    1825,
+    1320
+   ],
+   "rot": {
+    "amp": 3,
+    "phase": 0,
+    "freq": 1
+   },
+   "bend": {
+    "anchor": [
+     1825,
+     1320
+    ],
+    "len": 720,
+    "start": 60,
+    "amp": 3,
+    "lag": 0.4,
+    "freq": 1
+   }
+  },
+  {
+   "file": "작두 무령+ 옥패.png",
+   "layer": "front",
+   "z": 2,
+   "pivot": [
+    1819,
+    885
+   ],
+   "rot": {
+    "amp": 6,
+    "phase": 0.1,
+    "freq": 1
+   }
+  }
+ ]
+}

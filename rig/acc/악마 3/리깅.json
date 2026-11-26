@@ -1,0 +1,93 @@
+{
+ "설명": "악마 3 — 박쥐 날개는 어깨 뒤 축에서 천천히 퍼덕 · 꼬리는 채찍처럼 휨 · 뿔은 머리에 붙음",
+ "frames": 24,
+ "fps": 12,
+ "parts": [
+  {
+   "file": "악마 오른 날개.png",
+   "layer": "back",
+   "z": 1,
+   "pivot": [
+    1163,
+    1589
+   ],
+   "rot": {
+    "amp": -12,
+    "phase": 0,
+    "freq": 1
+   },
+   "bend": {
+    "anchor": [
+     1163,
+     1589
+    ],
+    "len": 334,
+    "start": 100,
+    "amp": -4,
+    "lag": 0.3,
+    "freq": 1
+   }
+  },
+  {
+   "file": "악마 왼날개.png",
+   "layer": "back",
+   "z": 0,
+   "pivot": [
+    1049,
+    1587
+   ],
+   "rot": {
+    "amp": 12,
+    "phase": 0,
+    "freq": 1
+   },
+   "bend": {
+    "anchor": [
+     1049,
+     1587
+    ],
+    "len": 342,
+    "start": 100,
+    "amp": 4,
+    "lag": 0.3,
+    "freq": 1
+   }
+  },
+  {
+   "file": "악마 꼬리.png",
+   "layer": "back",
+   "z": -1,
+   "pivot": [
+    1163,
+    1839
+   ],
+   "rot": {
+    "amp": 4,
+    "phase": 0,
+    "freq": 1
+   },
+   "bend": {
+    "anchor": [
+     1163,
+     1839
+    ],
+    "len": 456,
+    "amp": 14,
+    "lag": 0.7,
+    "freq": 1
+   }
+  },
+  {
+   "file": "서큐버스 오른뿔.png",
+   "follow": "머리",
+   "layer": "head",
+   "z": 3
+  },
+  {
+   "file": "서큐버스 왼뿔.png",
+   "follow": "머리",
+   "layer": "head",
+   "z": 3
+  }
+ ]
+}

@@ -1,0 +1,18 @@
+{
+ "설명": "헤드폰 — 움직이는 곳 없음 · 머리를 따라감 (오 = 머리 앞, 왼 = 머리 뒤)",
+ "frames": 24,
+ "fps": 12,
+ "parts": [
+  {
+   "file": "헤드폰 왼.png",
+   "follow": "머리",
+   "layer": "back"
+  },
+  {
+   "file": "헤드폰 오.png",
+   "follow": "머리",
+   "layer": "head"
+  }
+ ],
+ "still": true
+}

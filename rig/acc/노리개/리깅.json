@@ -1,0 +1,51 @@
+{
+ "설명": "노리개 — 윗부분 → 중간 → 술 세 마디가 차례로 흔들",
+ "frames": 24,
+ "fps": 12,
+ "parts": [
+  {
+   "file": "노리개 윗부분.png",
+   "name": "윗",
+   "layer": "front",
+   "pivot": [
+    1125,
+    1786
+   ],
+   "rot": {
+    "amp": 3,
+    "phase": 0,
+    "freq": 1
+   }
+  },
+  {
+   "file": "노리개 중간.png",
+   "name": "중",
+   "layer": "front",
+   "parent": "윗",
+   "pivot": [
+    1131,
+    1845
+   ],
+   "rot": {
+    "amp": 4,
+    "phase": 0.08,
+    "freq": 1
+   }
+  },
+  {
+   "file": "노리개 아랫부분 술.png",
+   "name": "술",
+   "layer": "front",
+   "parent": "중",
+   "pivot": [
+    1148,
+    1899
+   ],
+   "rot": {
+    "amp": 6,
+    "phase": 0.16,
+    "freq": 1
+   }
+  }
+ ]
+}

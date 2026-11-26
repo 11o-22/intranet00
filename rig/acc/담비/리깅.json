@@ -1,0 +1,81 @@
+{
+ "설명": "담비 — 꼬리 세 마디가 차례로 따라 흔들림 · 귀는 가끔 파르르",
+ "frames": 24,
+ "fps": 12,
+ "parts": [
+  {
+   "file": "꼬리1.png",
+   "layer": "back",
+   "z": 1,
+   "pivot": [
+    1148,
+    1807
+   ],
+   "rot": {
+    "amp": 6,
+    "phase": 0.0,
+    "freq": 1
+   }
+  },
+  {
+   "file": "꼬리2.png",
+   "layer": "back",
+   "z": 0,
+   "parent": "꼬리1",
+   "pivot": [
+    1264,
+    1959
+   ],
+   "rot": {
+    "amp": 9,
+    "phase": 0.08,
+    "freq": 1
+   }
+  },
+  {
+   "file": "꼬리3.png",
+   "layer": "back",
+   "z": 2,
+   "parent": "꼬리2",
+   "pivot": [
+    1424,
+    1986
+   ],
+   "rot": {
+    "amp": 12,
+    "phase": 0.16,
+    "freq": 1
+   }
+  },
+  {
+   "file": "오른귀.png",
+   "follow": "머리",
+   "layer": "head",
+   "z": 5,
+   "pivot": [
+    1374,
+    1151
+   ],
+   "rot": {
+    "amp": 9,
+    "phase": 0.0,
+    "kind": "twitch"
+   }
+  },
+  {
+   "file": "왼귀.png",
+   "follow": "머리",
+   "layer": "head",
+   "z": 5,
+   "pivot": [
+    852,
+    1094
+   ],
+   "rot": {
+    "amp": -9,
+    "phase": 0.18,
+    "kind": "twitch"
+   }
+  }
+ ]
+}

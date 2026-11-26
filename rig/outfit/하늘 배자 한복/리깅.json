@@ -1,0 +1,81 @@
+{
+ "설명": "하늘 배자 한복 (임시 이름) — 노리개가 대롱대롱 · 나머지는 몸 파츠를 따라감",
+ "frames": 24,
+ "fps": 12,
+ "parts": [
+  {
+   "file": "오른쪽 다리1.png",
+   "layer": "neck",
+   "z": 0,
+   "follow": "오른쪽 다리1"
+  },
+  {
+   "file": "오른쪽 다리2.png",
+   "layer": "neck",
+   "z": 1,
+   "follow": "오른쪽 다리2"
+  },
+  {
+   "file": "왼쪽 다리2.png",
+   "layer": "neck",
+   "z": 2,
+   "follow": "왼쪽 다리2"
+  },
+  {
+   "file": "왼쪽 다리1.png",
+   "layer": "neck",
+   "z": 3,
+   "follow": "왼쪽 다리1"
+  },
+  {
+   "file": "오른팔2.png",
+   "layer": "neck",
+   "z": 4,
+   "follow": "오른팔2"
+  },
+  {
+   "file": "오른팔1.png",
+   "layer": "neck",
+   "z": 5,
+   "follow": "오른팔1"
+  },
+  {
+   "file": "몸통.png",
+   "layer": "neck",
+   "z": 6,
+   "follow": "몸통"
+  },
+  {
+   "file": "노리개.png",
+   "layer": "neck",
+   "z": 7,
+   "follow": "몸통",
+   "bend": {
+    "anchor": [
+     1129,
+     1705
+    ],
+    "start": 20,
+    "len": 400,
+    "amp": 6,
+    "lag": 0.3,
+    "pow": 0,
+    "freq": 1,
+    "dir": 90,
+    "width": 60
+   }
+  },
+  {
+   "file": "왼팔2.png",
+   "layer": "neck",
+   "z": 8,
+   "follow": "왼팔2"
+  },
+  {
+   "file": "왼팔1.png",
+   "layer": "neck",
+   "z": 9,
+   "follow": "왼팔1"
+  }
+ ]
+}

@@ -1,0 +1,187 @@
+{
+ "설명": "참새 — 날개 세 깃을 어깨 뒤 한 축에서 퍼덕 · 꼬리는 까딱",
+ "frames": 24,
+ "fps": 12,
+ "parts": [
+  {
+   "file": "오른날개 3.png",
+   "layer": "back",
+   "z": 10,
+   "pivot": [
+    1150,
+    1596
+   ],
+   "rot": {
+    "amp": -5,
+    "phase": 0.0,
+    "freq": 2
+   },
+   "bend": {
+    "anchor": [
+     1150,
+     1596
+    ],
+    "len": 419,
+    "start": 146,
+    "amp": -0.0,
+    "lag": 0.3,
+    "freq": 2,
+    "pow": 1.3
+   }
+  },
+  {
+   "file": "오른날개 2.png",
+   "layer": "back",
+   "z": 11,
+   "pivot": [
+    1150,
+    1596
+   ],
+   "rot": {
+    "amp": -9,
+    "phase": 0.03,
+    "freq": 2
+   },
+   "bend": {
+    "anchor": [
+     1150,
+     1596
+    ],
+    "len": 591,
+    "start": 206,
+    "amp": -2.0,
+    "lag": 0.3,
+    "freq": 2,
+    "pow": 1.3
+   }
+  },
+  {
+   "file": "오른날개 1.png",
+   "layer": "back",
+   "z": 10,
+   "pivot": [
+    1150,
+    1596
+   ],
+   "rot": {
+    "amp": -14,
+    "phase": 0.06,
+    "freq": 2
+   },
+   "bend": {
+    "anchor": [
+     1150,
+     1596
+    ],
+    "len": 786,
+    "start": 275,
+    "amp": -4.0,
+    "lag": 0.3,
+    "freq": 2,
+    "pow": 1.3
+   }
+  },
+  {
+   "file": "왼날개3.png",
+   "layer": "back",
+   "z": 0,
+   "pivot": [
+    1066,
+    1594
+   ],
+   "rot": {
+    "amp": 5,
+    "phase": 0.0,
+    "freq": 2
+   },
+   "bend": {
+    "anchor": [
+     1066,
+     1594
+    ],
+    "len": 427,
+    "start": 149,
+    "amp": 0.0,
+    "lag": 0.3,
+    "freq": 2,
+    "pow": 1.3
+   }
+  },
+  {
+   "file": "왼날개 2.png",
+   "layer": "back",
+   "z": 1,
+   "pivot": [
+    1066,
+    1594
+   ],
+   "rot": {
+    "amp": 9,
+    "phase": 0.03,
+    "freq": 2
+   },
+   "bend": {
+    "anchor": [
+     1066,
+     1594
+    ],
+    "len": 575,
+    "start": 201,
+    "amp": 2.0,
+    "lag": 0.3,
+    "freq": 2,
+    "pow": 1.3
+   }
+  },
+  {
+   "file": "왼날개 1.png",
+   "layer": "back",
+   "z": 0,
+   "pivot": [
+    1066,
+    1594
+   ],
+   "rot": {
+    "amp": 14,
+    "phase": 0.06,
+    "freq": 2
+   },
+   "bend": {
+    "anchor": [
+     1066,
+     1594
+    ],
+    "len": 745,
+    "start": 260,
+    "amp": 4.0,
+    "lag": 0.3,
+    "freq": 2,
+    "pow": 1.3
+   }
+  },
+  {
+   "file": "꼬리.png",
+   "layer": "back",
+   "z": -5,
+   "pivot": [
+    1154,
+    1814
+   ],
+   "rot": {
+    "amp": 3,
+    "phase": 0.3,
+    "freq": 2
+   },
+   "bend": {
+    "anchor": [
+     1154,
+     1814
+    ],
+    "len": 493,
+    "amp": 5,
+    "lag": 0.4,
+    "freq": 2
+   }
+  }
+ ]
+}

@@ -1,0 +1,28 @@
+{
+ "설명": "곰방대 — 대는 입에 그대로, 술이 대롱대롱",
+ "frames": 24,
+ "fps": 12,
+ "parts": [
+  {
+   "file": "곰방대.png",
+   "follow": "머리",
+   "layer": "head",
+   "z": 0
+  },
+  {
+   "file": "곰방대 술.png",
+   "follow": "머리",
+   "layer": "head",
+   "z": 1,
+   "pivot": [
+    832,
+    1600
+   ],
+   "rot": {
+    "amp": 7,
+    "phase": 0,
+    "freq": 1
+   }
+  }
+ ]
+}

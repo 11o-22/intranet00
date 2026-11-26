@@ -1,0 +1,60 @@
+{
+ "설명": "가나디 — 꼬리는 빠르게 살랑살랑(뿌리 축 + 휨) · 귀는 가끔 파르르",
+ "frames": 24,
+ "fps": 12,
+ "parts": [
+  {
+   "file": "가나디 꼬리.png",
+   "layer": "back",
+   "pivot": [
+    1154,
+    1807
+   ],
+   "rot": {
+    "amp": 12,
+    "phase": 0,
+    "freq": 2
+   },
+   "bend": {
+    "anchor": [
+     1154,
+     1807
+    ],
+    "len": 478,
+    "amp": 8,
+    "lag": 0.35,
+    "freq": 2
+   }
+  },
+  {
+   "file": "가나디 오른쪽 귀.png",
+   "follow": "머리",
+   "layer": "head",
+   "z": 5,
+   "pivot": [
+    1316,
+    1143
+   ],
+   "rot": {
+    "amp": 9,
+    "phase": 0.0,
+    "kind": "twitch"
+   }
+  },
+  {
+   "file": "가나디 왼쪽 귀.png",
+   "follow": "머리",
+   "layer": "head",
+   "z": 5,
+   "pivot": [
+    901,
+    1033
+   ],
+   "rot": {
+    "amp": -9,
+    "phase": 0.18,
+    "kind": "twitch"
+   }
+  }
+ ]
+}

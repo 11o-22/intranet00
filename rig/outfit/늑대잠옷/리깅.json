@@ -1,0 +1,150 @@
+{
+ "설명": "늑대잠옷 — 꼬리 세 마디(3 뿌리 → 2 → 1 끝)가 살랑 · 귀(후드)는 가끔 파르르 · 나머지는 몸 파츠를 따라감 (받은 이름의 오른발 · 왼발은 화면 오른쪽 · 왼쪽 — 몸 파츠로는 왼쪽 다리 · 오른쪽 다리)",
+ "frames": 24,
+ "fps": 12,
+ "parts": [
+  {
+   "file": "늑대잠옷_꼬리 3.png",
+   "name": "꼬리3",
+   "layer": "back",
+   "z": 0,
+   "pivot": [
+    1279,
+    1849
+   ],
+   "rot": {
+    "amp": 6,
+    "phase": 0.0,
+    "freq": 1
+   }
+  },
+  {
+   "file": "늑대잠옷_꼬리 2.png",
+   "name": "꼬리2",
+   "layer": "back",
+   "z": 1,
+   "parent": "꼬리3",
+   "pivot": [
+    1478,
+    1850
+   ],
+   "rot": {
+    "amp": 9,
+    "phase": 0.08,
+    "freq": 1
+   }
+  },
+  {
+   "file": "늑대잠옷_꼬리 1.png",
+   "name": "꼬리1",
+   "layer": "back",
+   "z": 2,
+   "parent": "꼬리2",
+   "pivot": [
+    1643,
+    1776
+   ],
+   "rot": {
+    "amp": 12,
+    "phase": 0.16,
+    "freq": 1
+   }
+  },
+  {
+   "file": "늑대잠옷_머리 뒤.png",
+   "follow": "머리",
+   "layer": "neck",
+   "z": 0
+  },
+  {
+   "file": "늑대잠옷_오른팔 2.png",
+   "follow": "오른팔2",
+   "layer": "neck",
+   "z": 1
+  },
+  {
+   "file": "늑대잠옷_오른팔 1.png",
+   "follow": "오른팔1",
+   "layer": "neck",
+   "z": 2
+  },
+  {
+   "file": "늑대잠옷_왼발 2.png",
+   "follow": "오른쪽 다리2",
+   "layer": "neck",
+   "z": 3
+  },
+  {
+   "file": "늑대잠옷_왼발 1.png",
+   "follow": "오른쪽 다리1",
+   "layer": "neck",
+   "z": 4
+  },
+  {
+   "file": "늑대잠옷_몸통.png",
+   "follow": "몸통",
+   "layer": "neck",
+   "z": 5
+  },
+  {
+   "file": "늑대잠옷_오른발 2.png",
+   "follow": "왼쪽 다리2",
+   "layer": "neck",
+   "z": 6
+  },
+  {
+   "file": "늑대잠옷_오른발 1.png",
+   "follow": "왼쪽 다리1",
+   "layer": "neck",
+   "z": 7
+  },
+  {
+   "file": "늑대잠옷_왼팔 2.png",
+   "follow": "왼팔2",
+   "layer": "neck",
+   "z": 8
+  },
+  {
+   "file": "늑대잠옷_왼팔 1.png",
+   "follow": "왼팔1",
+   "layer": "neck",
+   "z": 9
+  },
+  {
+   "file": "늑대잠옷_왼귀.png",
+   "follow": "머리",
+   "layer": "head",
+   "z": 0,
+   "pivot": [
+    966,
+    924
+   ],
+   "rot": {
+    "amp": -8,
+    "phase": 0.18,
+    "kind": "twitch"
+   }
+  },
+  {
+   "file": "늑대잠옷_머리.png",
+   "follow": "머리",
+   "layer": "head",
+   "z": 1
+  },
+  {
+   "file": "늑대잠옷_오른귀.png",
+   "follow": "머리",
+   "layer": "head",
+   "z": 2,
+   "pivot": [
+    1340,
+    908
+   ],
+   "rot": {
+    "amp": 8,
+    "phase": 0.0,
+    "kind": "twitch"
+   }
+  }
+ ]
+}

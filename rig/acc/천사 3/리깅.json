@@ -1,0 +1,139 @@
+{
+ "설명": "천사 3 — 등 날개 안 · 겉 두 겹이 들썩 · 머리 날개는 좌우 따로 파닥 · 깨진 헤일로 둥실",
+ "frames": 24,
+ "fps": 12,
+ "parts": [
+  {
+   "file": "천사 오른쪽 날개 - 안.png",
+   "name": "오른안",
+   "layer": "back",
+   "z": 10,
+   "pivot": [
+    1169,
+    1597
+   ],
+   "rot": {
+    "amp": -6,
+    "phase": 0,
+    "freq": 1
+   }
+  },
+  {
+   "file": "천사 오른쪽 날개 - 겉.png",
+   "name": "오른겉",
+   "layer": "back",
+   "z": 11,
+   "parent": "오른안",
+   "pivot": [
+    1323,
+    1618
+   ],
+   "rot": {
+    "amp": -3,
+    "phase": 0.08,
+    "freq": 1
+   }
+  },
+  {
+   "file": "천사 왼쪽 날개 - 안.png",
+   "name": "왼안",
+   "layer": "back",
+   "z": 0,
+   "pivot": [
+    1040,
+    1596
+   ],
+   "rot": {
+    "amp": 6,
+    "phase": 0,
+    "freq": 1
+   }
+  },
+  {
+   "file": "천사 왼쪽 날개 - 겉.png",
+   "name": "왼겉",
+   "layer": "back",
+   "z": 1,
+   "parent": "왼안",
+   "pivot": [
+    865,
+    1594
+   ],
+   "rot": {
+    "amp": 3,
+    "phase": 0.08,
+    "freq": 1
+   }
+  },
+  {
+   "file": "천사 머리 날개 - 아래.png",
+   "follow": "머리",
+   "layer": "back",
+   "z": 20,
+   "bend": {
+    "anchor": [
+     1070,
+     1545
+    ],
+    "len": 520,
+    "start": 120,
+    "amp": 3,
+    "lag": 0.3,
+    "freq": 2
+   }
+  },
+  {
+   "file": "천사 머리 날개 - 위.png",
+   "name": "머리왼",
+   "clip": [
+    0,
+    0,
+    1115,
+    2400
+   ],
+   "follow": "머리",
+   "layer": "back",
+   "z": 21,
+   "pivot": [
+    849,
+    1366
+   ],
+   "rot": {
+    "amp": 8,
+    "phase": 0.1,
+    "freq": 2
+   }
+  },
+  {
+   "file": "천사 머리 날개 - 위.png",
+   "name": "머리오른",
+   "clip": [
+    1115,
+    0,
+    2400,
+    2400
+   ],
+   "follow": "머리",
+   "layer": "back",
+   "z": 21,
+   "pivot": [
+    1306,
+    1338
+   ],
+   "rot": {
+    "amp": -8,
+    "phase": 0.1,
+    "freq": 2
+   }
+  },
+  {
+   "file": "천사 깨진 헤일로.png",
+   "follow": "머리",
+   "layer": "front",
+   "move": {
+    "dy": 12,
+    "freq": 1
+   }
+  }
+ ]
+}

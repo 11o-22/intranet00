@@ -1,0 +1,93 @@
+{
+ "설명": "두루마기 — 고름 두 가닥이 살랑 · 나머지는 몸 파츠를 따라감 (차례는 「두루마기 only 전체샷」 과 맞춤)",
+ "frames": 24,
+ "fps": 12,
+ "parts": [
+  {
+   "file": "두루마기 오른쪽 고름.png",
+   "layer": "neck",
+   "z": 0,
+   "bend": {
+    "anchor": [
+     1136,
+     1750
+    ],
+    "start": 20,
+    "len": 450,
+    "amp": 5,
+    "lag": 0.5,
+    "pow": 1.2,
+    "freq": 1
+   }
+  },
+  {
+   "file": "두루마기 왼쪽 고름.png",
+   "layer": "neck",
+   "z": 1,
+   "bend": {
+    "anchor": [
+     945,
+     1727
+    ],
+    "start": 20,
+    "len": 420,
+    "amp": 5,
+    "lag": 0.5,
+    "pow": 1.2,
+    "freq": 1,
+    "phase": 0.15
+   }
+  },
+  {
+   "file": "두루마기 왼쪽 아래 팔.png",
+   "layer": "neck",
+   "z": 2,
+   "follow": "왼팔1"
+  },
+  {
+   "file": "두루마기 안감.png",
+   "layer": "neck",
+   "z": 3
+  },
+  {
+   "file": "두루마기 오른쪽 몸통.png",
+   "layer": "neck",
+   "z": 4
+  },
+  {
+   "file": "두루마기 왼쪽 윗팔.png",
+   "layer": "neck",
+   "z": 5,
+   "follow": "왼팔2"
+  },
+  {
+   "file": "두루마기 왼쪽 소매깃.png",
+   "layer": "neck",
+   "z": 6,
+   "follow": "왼팔1"
+  },
+  {
+   "file": "두루마기 왼쪽 몸통.png",
+   "layer": "neck",
+   "z": 7
+  },
+  {
+   "file": "두루마기 오른쪽 소매깃.png",
+   "layer": "neck",
+   "z": 8,
+   "follow": "오른팔1"
+  },
+  {
+   "file": "두루마기 오른쪽 윗팔.png",
+   "layer": "neck",
+   "z": 9,
+   "follow": "오른팔2"
+  },
+  {
+   "file": "두루마기 오른쪽 아래 팔.png",
+   "layer": "neck",
+   "z": 10,
+   "follow": "오른팔1"
+  }
+ ]
+}

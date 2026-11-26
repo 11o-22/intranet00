@@ -1,0 +1,73 @@
+{
+ "설명": "보라 드레스 — 망토 자락이 어깨를 축으로 하늘하늘 · 나머지는 몸 파츠를 따라감",
+ "frames": 24,
+ "fps": 12,
+ "parts": [
+  {
+   "file": "오른팔2.png",
+   "follow": "오른팔2",
+   "layer": "neck",
+   "z": 0
+  },
+  {
+   "file": "오른팔1.png",
+   "follow": "오른팔1",
+   "layer": "neck",
+   "z": 1
+  },
+  {
+   "file": "몸통.png",
+   "follow": "몸통",
+   "layer": "neck",
+   "z": 2
+  },
+  {
+   "file": "망토뒤.png",
+   "follow": "몸통",
+   "layer": "back",
+   "z": 3,
+   "bend": {
+    "anchor": [
+     1102,
+     1830
+    ],
+    "start": 30,
+    "len": 492,
+    "amp": 3,
+    "lag": 0.5,
+    "pow": 1.3,
+    "freq": 1
+   }
+  },
+  {
+   "file": "오른쪽 다리1.png",
+   "follow": "오른쪽 다리1",
+   "layer": "neck",
+   "z": 4
+  },
+  {
+   "file": "왼쪽 다리1.png",
+   "follow": "왼쪽 다리1",
+   "layer": "neck",
+   "z": 5
+  },
+  {
+   "file": "왼팔2.png",
+   "follow": "왼팔2",
+   "layer": "neck",
+   "z": 6
+  },
+  {
+   "file": "하의.png",
+   "follow": "몸통",
+   "layer": "neck",
+   "z": 7
+  },
+  {
+   "file": "왼팔1.png",
+   "follow": "왼팔1",
+   "layer": "neck",
+   "z": 8
+  }
+ ]
+}

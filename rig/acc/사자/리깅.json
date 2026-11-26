@@ -1,0 +1,96 @@
+{
+ "설명": "사자 — 꼬리 네 마디(끝은 술)가 채찍처럼 따라 흔들림 · 귀는 가끔 파르르",
+ "frames": 24,
+ "fps": 12,
+ "parts": [
+  {
+   "file": "꼬리1.png",
+   "layer": "back",
+   "z": 0,
+   "pivot": [
+    1155,
+    1817
+   ],
+   "rot": {
+    "amp": 5,
+    "phase": 0.0,
+    "freq": 1
+   }
+  },
+  {
+   "file": "꼬리2.png",
+   "layer": "back",
+   "z": 2,
+   "parent": "꼬리1",
+   "pivot": [
+    1213,
+    1961
+   ],
+   "rot": {
+    "amp": 7,
+    "phase": 0.08,
+    "freq": 1
+   }
+  },
+  {
+   "file": "꼬리3.png",
+   "layer": "back",
+   "z": 1,
+   "parent": "꼬리2",
+   "pivot": [
+    1314,
+    2086
+   ],
+   "rot": {
+    "amp": 9,
+    "phase": 0.16,
+    "freq": 1
+   }
+  },
+  {
+   "file": "꼬리4.png",
+   "layer": "back",
+   "z": 0,
+   "parent": "꼬리3",
+   "pivot": [
+    1484,
+    2020
+   ],
+   "rot": {
+    "amp": 13,
+    "phase": 0.24,
+    "freq": 1
+   }
+  },
+  {
+   "file": "오른귀.png",
+   "follow": "머리",
+   "layer": "head",
+   "z": 5,
+   "pivot": [
+    1345,
+    1103
+   ],
+   "rot": {
+    "amp": 9,
+    "phase": 0.0,
+    "kind": "twitch"
+   }
+  },
+  {
+   "file": "왼귀.png",
+   "follow": "머리",
+   "layer": "head",
+   "z": 5,
+   "pivot": [
+    901,
+    1073
+   ],
+   "rot": {
+    "amp": -9,
+    "phase": 0.18,
+    "kind": "twitch"
+   }
+  }
+ ]
+}
