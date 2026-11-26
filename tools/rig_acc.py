@@ -21,6 +21,11 @@ rig/acc/<이름>/리깅.json (또는 rig/outfit/<이름>/리깅.json) 을 읽어
            still: 이 그림의 불투명한 곳은 안 움직임 (리본 매듭 등)
   move     {dx, dy, phase, freq}  둥실둥실 (헤일로 · 풍선)
   glow     {amp, phase, freq}  밝기 깜빡임 (등불 빛)
+  anim     {동작 이름: {rot · fold · bend … 덮어쓸 값}} — 동작마다 움직임을 바꿈 (예: 새 날개 평소 / 날기)
+           리깅.json 의 anims: {동작 이름: {frames · fps · fold_curve · hover …}} 도 그 동작일 때 덮어씀
+  hover    (리깅.json) {dy, amp, freq} — 몸째로 떠 있기 (날기)
+  fold     {deg, scale, lag}  접기 — 리깅.json 의 fold_curve(0 = 받은 그림대로 편 모습, 1 = 다 접은 모습)를 따라
+           pivot 을 축으로 deg 만큼 돌고 scale 만큼 줄어듦 (새 날개 접었다 펴기)
 """
 import json, math, os, sys
 import numpy as np
@@ -67,15 +72,34 @@ def wave(m, t, extra=0.0):
     return bias + amp * math.sin(2 * math.pi * (t * f - ph - extra))
 
 
+def curve(keys, t):
+    """keys: [[t, v], …] — 사이는 부드럽게(smoothstep) 이음 · 한 바퀴로 돎"""
+    t %= 1.0
+    for (t0, v0), (t1, v1) in zip(keys, keys[1:]):
+        if t0 <= t <= t1:
+            u = 0.0 if t1 == t0 else (t - t0) / (t1 - t0)
+            u = u * u * (3 - 2 * u)
+            return v0 + (v1 - v0) * u
+    return keys[-1][1]
+
+
 class Rig:
-    def __init__(self, folder, s=0.3, body=True):
-        self.folder, self.s = folder, s
+    def __init__(self, folder, s=0.3, body=True, anim=None):
+        self.folder, self.s, self.anim = folder, s, anim
         self.cfg = json.load(open(os.path.join(folder, '리깅.json'), encoding='utf-8'))
+        if anim:
+            self.cfg.update(self.cfg.get('anims', {}).get(anim, {}))
         self.parts = []
         for p in self.cfg['parts']:
             if p.get('variant'):          # 같은 리깅을 쓰는 다른 그림 — 미리보기에는 안 그림
                 continue
             p = dict(p)
+            if anim and anim in p.get('anim', {}):
+                for k, v in p['anim'][anim].items():
+                    if v is None:
+                        p.pop(k, None)
+                    else:
+                        p[k] = v
             p.setdefault('name', os.path.splitext(p['file'])[0])
             p.setdefault('follow', '몸통')
             p.setdefault('layer', 'back')
@@ -127,10 +151,14 @@ class Rig:
 
     # ---- 몸 움직임 (숨쉬기) ----
     def follow_M(self, name, t):
+        hv = self.cfg.get('hover')
+        H = np.eye(3)
+        if hv:
+            H = T(0, (hv.get('dy', 0) + hv.get('amp', 0) * math.sin(2 * math.pi * (t * hv.get('freq', 1) - hv.get('phase', 0)))) * self.s)
         if name in LEGS or name == '땅':
-            return np.eye(3)
+            return H
         dy = self.bob * math.sin(2 * math.pi * t) * self.s
-        return T(0, dy)
+        return H @ T(0, dy)
 
     def local_M(self, p, t):
         """파츠의 2400 좌표계 변환 (부모 포함)."""
@@ -142,6 +170,12 @@ class Rig:
         if r:
             px, py = p['pivot']
             M = M @ R(wave(r, t), px * s, py * s)
+        fd = p.get('fold')
+        if fd:
+            g = curve(self.cfg['fold_curve'], t - fd.get('lag', 0.0))
+            px, py = p['pivot'][0] * s, p['pivot'][1] * s
+            k = 1 - (1 - fd.get('scale', 1.0)) * g
+            M = M @ R(fd['deg'] * g, px, py) @ T(px, py) @ np.diag([k, k, 1.0]) @ T(-px, -py)
         mv = p.get('move')
         if mv:
             ph, f = mv.get('phase', 0.0), mv.get('freq', 1)
@@ -262,8 +296,8 @@ def to_pil(a, bg=(236, 236, 236)):
     return Image.fromarray((rgb * 255 + 0.5).astype(np.uint8), 'RGB')
 
 
-def bake(folder, out, frames=None, fps=None, s=0.3, crop=None, maxw=520):
-    rig = Rig(folder, s)
+def bake(folder, out, frames=None, fps=None, s=0.3, crop=None, maxw=520, anim=None):
+    rig = Rig(folder, s, anim=anim)
     frames = frames or rig.cfg.get('frames', 24)
     fps = fps or rig.cfg.get('fps', 12)
     ims = [rig.frame(i / frames) for i in range(frames)]

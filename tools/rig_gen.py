@@ -89,22 +89,54 @@ def wing_fan(folder, segs, root, side, amps, z0=0, f=2, zs=None, bend=4):
     return out
 
 
+def far_pt(path, P):
+    a = mask(path); ys, xs = np.nonzero(a); d = np.hypot(xs - P[0], ys - P[1])
+    k = d >= np.percentile(d, 98); return float(xs[k].mean()), float(ys[k].mean())
+
+
+def wing_fold(folder, segs, root, side, zs, z0=0, target=62, scale=0.8):
+    """새 날개 접었다 펴기 — segs: 안쪽 → 바깥 차례 · side: +1 화면 오른쪽 / -1 왼쪽
+    접으면 깃 셋이 모두 어깨 축에서 아래(바깥쪽으로 조금)로 모여 겹침"""
+    tgt = target if side > 0 else 180 - target
+    out = []
+    for k, sg in enumerate(segs):
+        fx, fy = far_pt(os.path.join(folder, sg), root)
+        cur = float(np.degrees(np.arctan2(fy - root[1], fx - root[0])))
+        deg = (tgt - cur + 180) % 360 - 180
+        L = far_len(os.path.join(folder, sg), root)
+        amp = [9, 15, 22][k]
+        out.append(P(sg, layer='back', z=zs[k] + z0, pivot=root,
+                     fold={'deg': round(deg, 1), 'scale': scale, 'lag': 0},
+                     anim={'날기': {'rot': flap(-side * amp, 0.04 * k, 3),
+                                   'bend': {'anchor': root, 'len': L, 'start': int(L * 0.35), 'amp': -side * 5 * k / 2,
+                                            'lag': 0.3, 'freq': 3, 'pow': 1.3}}}))
+    return out
+
+
+# 평소: 늘 접음 (걷거나 움직일 때도) · 날기: 다 펴고 펄럭 · 몸은 떠서 날갯짓에 맞춰 오르내림
+BIRD_ANIMS = {'평소': {'fold_curve': [[0, 1], [1, 1]], 'frames': 24, 'fps': 12},
+              '날기': {'fold_curve': [[0, 0], [1, 0]], 'frames': 24, 'fps': 18, 'bob': 0,
+                       'hover': {'dy': -90, 'amp': 14, 'freq': 3, 'phase': 0.5}}}
+
+
 def build():
     # ---------- 새 동물 ----------
     f = os.path.join(ACC, '뱁새')
     RR, RL = [1160, 1592], [1080, 1592]
-    item('acc/뱁새', '뱁새 — 날개 세 깃(1 바깥 · 2 가운데 · 3 안쪽)을 어깨 뒤 한 축에서 퍼덕 · 꼬리는 까딱',
-         wing_fan(f, ['오른날개3.png', '오른날개2.png', '오른날개1.png'], RR, +1, [5, 9, 14], z0=10, zs=[2, 0, 1])
-         + wing_fan(f, ['왼날개 3.png', '왼날개2.png', '왼날개1.png'], RL, -1, [5, 9, 14], z0=0, zs=[0.5, 1, 0])
+    item('acc/뱁새', '뱁새 — 평소(걸을 때도)엔 날개 세 깃을 접어 등 뒤에 붙임 · 날 때는 다 펴고 어깨 뒤 축에서 펄럭(바깥 깃일수록 크게 · 조금 늦게) · 꼬리는 까딱',
+         wing_fold(f, ['오른날개3.png', '오른날개2.png', '오른날개1.png'], RR, +1, zs=[2, 0, 1], z0=10)
+         + wing_fold(f, ['왼날개 3.png', '왼날개2.png', '왼날개1.png'], RL, -1, zs=[0.5, 1, 0])
          + [P('꼬리.png', layer='back', z=-5, pivot=[1128, 1839], rot=flap(3, 0.3, 2),
-              bend={'anchor': [1128, 1839], 'len': 412, 'amp': 5, 'lag': 0.4, 'freq': 2})])
+              bend={'anchor': [1128, 1839], 'len': 412, 'amp': 5, 'lag': 0.4, 'freq': 2})],
+         fold_curve=[[0, 1], [1, 1]], anims=BIRD_ANIMS)
     f = os.path.join(ACC, '참새')
     RR, RL = [1150, 1596], [1066, 1594]
-    item('acc/참새', '참새 — 날개 세 깃을 어깨 뒤 한 축에서 퍼덕 · 꼬리는 까딱',
-         wing_fan(f, ['오른날개 3.png', '오른날개 2.png', '오른날개 1.png'], RR, +1, [5, 9, 14], z0=10, zs=[0, 1, 0])
-         + wing_fan(f, ['왼날개3.png', '왼날개 2.png', '왼날개 1.png'], RL, -1, [5, 9, 14], z0=0, zs=[0, 1, 0])
+    item('acc/참새', '참새 — 평소(걸을 때도)엔 날개 세 깃을 접어 등 뒤에 붙임 · 날 때는 다 펴고 어깨 뒤 축에서 펄럭(바깥 깃일수록 크게 · 조금 늦게) · 꼬리는 까딱',
+         wing_fold(f, ['오른날개 3.png', '오른날개 2.png', '오른날개 1.png'], RR, +1, zs=[0, 1, 0], z0=10)
+         + wing_fold(f, ['왼날개3.png', '왼날개 2.png', '왼날개 1.png'], RL, -1, zs=[0, 1, 0])
          + [P('꼬리.png', layer='back', z=-5, pivot=[1154, 1814], rot=flap(3, 0.3, 2),
-              bend={'anchor': [1154, 1814], 'len': 493, 'amp': 5, 'lag': 0.4, 'freq': 2})])
+              bend={'anchor': [1154, 1814], 'len': 493, 'amp': 5, 'lag': 0.4, 'freq': 2})],
+         fold_curve=[[0, 1], [1, 1]], anims=BIRD_ANIMS)
     item('acc/담비', '담비 — 꼬리 세 마디가 차례로 따라 흔들림 · 귀는 가끔 파르르',
          [P('꼬리1.png', layer='back', z=1, pivot=[1148, 1807], rot=flap(6, 0.0, 1)),
           P('꼬리2.png', layer='back', z=0, parent='꼬리1', pivot=[1264, 1959], rot=flap(9, 0.08, 1)),
@@ -167,17 +199,13 @@ def build():
           P('타천사 왼쪽 날개 - 안.png', name='왼안', layer='back', z=0, pivot=[1048, 1609], rot=flap(6, 0, 1)),
           P('타천사 왼쪽 날개 - 겉.png', name='왼겉', layer='back', z=1, parent='왼안', pivot=[904, 1554], rot=flap(3, 0.08, 1)),
           P('타천사 헤일로.png', follow='머리', layer='front', move={'dy': 12, 'freq': 1})])
-    f = os.path.join(ACC, '천사 3', '천사 머리 날개 - 위.png')
-    hl = near(f, (1115, 1480), clip=(0, 0, 1115, 2400)); hr = near(f, (1115, 1480), clip=(1115, 0, 2400, 2400))
-    item('acc/천사 3', '천사 3 — 등 날개 안 · 겉 두 겹이 들썩 · 머리 날개는 좌우 따로 파닥 · 깨진 헤일로 둥실',
+    item('acc/천사 3', '천사 3 — 등 날개 안 · 겉 두 겹이 들썩 · 얼굴 옆 머리 날개는 움직이지 않고 머리만 따라감 · 깨진 헤일로 둥실',
          [P('천사 오른쪽 날개 - 안.png', name='오른안', layer='back', z=10, pivot=[1169, 1597], rot=flap(-6, 0, 1)),
           P('천사 오른쪽 날개 - 겉.png', name='오른겉', layer='back', z=11, parent='오른안', pivot=[1323, 1618], rot=flap(-3, 0.08, 1)),
           P('천사 왼쪽 날개 - 안.png', name='왼안', layer='back', z=0, pivot=[1040, 1596], rot=flap(6, 0, 1)),
           P('천사 왼쪽 날개 - 겉.png', name='왼겉', layer='back', z=1, parent='왼안', pivot=[865, 1594], rot=flap(3, 0.08, 1)),
-          P('천사 머리 날개 - 아래.png', follow='머리', layer='back', z=20,
-            bend={'anchor': [1070, 1545], 'len': 520, 'start': 120, 'amp': 3, 'lag': 0.3, 'freq': 2}),
-          P('천사 머리 날개 - 위.png', name='머리왼', clip=[0, 0, 1115, 2400], follow='머리', layer='back', z=21, pivot=hl, rot=flap(8, 0.1, 2)),
-          P('천사 머리 날개 - 위.png', name='머리오른', clip=[1115, 0, 2400, 2400], follow='머리', layer='back', z=21, pivot=hr, rot=flap(-8, 0.1, 2)),
+          P('천사 머리 날개 - 아래.png', follow='머리', layer='back', z=20),
+          P('천사 머리 날개 - 위.png', follow='머리', layer='back', z=21),
           P('천사 깨진 헤일로.png', follow='머리', layer='front', move={'dy': 12, 'freq': 1})])
     item('acc/작은 날개', '작은 날개 — 두 날개가 어깨 뒤 축에서 파닥',
          [P('작은 날개1.png', layer='back', pivot=[1096, 1658], rot=flap(10, 0, 2)),
