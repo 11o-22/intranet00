@@ -24,6 +24,8 @@ rig/acc/<이름>/리깅.json (또는 rig/outfit/<이름>/리깅.json) 을 읽어
   anim     {동작 이름: {rot · fold · bend … 덮어쓸 값}} — 동작마다 움직임을 바꿈 (예: 새 날개 평소 / 날기)
            리깅.json 의 anims: {동작 이름: {frames · fps · fold_curve · hover …}} 도 그 동작일 때 덮어씀
   hover    (리깅.json) {dy, amp, freq} — 몸째로 떠 있기 (날기)
+  skin     (리깅.json) {legs: {from, to}, arms: {r0, r1}} — 걷기에서 다리 · 팔의 뿌리 쪽은 몸통을 따라가게 섞어
+           옷 · 바지 이음새가 벌어지거나 선이 생기지 않게 (몸 파츠와 그 파츠를 따라가는 옷 모두)
   fold     {deg, scale, lag}  접기 — 리깅.json 의 fold_curve(0 = 받은 그림대로 편 모습, 1 = 다 접은 모습)를 따라
            pivot 을 축으로 deg 만큼 돌고 scale 만큼 줄어듦 (새 날개 접었다 펴기)
 """
@@ -174,7 +176,7 @@ class Rig:
             if name in LEGS:
                 near = name.startswith('왼쪽')           # 화면 오른쪽(가까운) 다리
                 up = max(0.0, sn if near else -sn)
-                k = 1.0 if name.endswith('1') else 0.7
+                k = 1.0 if (name.endswith('1') or w.get('legs_one')) else 0.7   # legs_one: 다리 위 · 아래를 한 덩어리로
                 dx = w.get('stride', 0) * (sn if near else -sn)
                 return G @ T(dx * k * s, -w.get('lift', 0) * up * k * s)
             G = G @ T(0, -w.get('bounce', 0) * abs(sn) * s)
@@ -236,23 +238,46 @@ class Rig:
         ph, f, lag = b.get('phase', 0.0), b.get('freq', 1), b.get('lag', 0.0)
         return w * (bias + amp * np.sin(2 * np.pi * (t * f - ph - lag * u)))
 
+    def skin_of(self, p):
+        """걷기에서 다리 · 팔 이음새가 벌어지지 않게 — 뿌리 쪽은 몸통을, 끝 쪽은 그 파츠를 따라가며 부드럽게 섞음
+        리깅.json skin: {legs: {from: y, to: y}, arms: {r0, r1}} (2400 좌표 · 팔 축은 walk.shoulder)"""
+        sk = self.cfg.get('skin')
+        if not sk or not self.cfg.get('walk'):
+            return None
+        root = p
+        while root.get('parent'):
+            root = self.by[root['parent']]
+        f = root['follow']
+        names = f if isinstance(f, list) else [f]
+        if all(n in LEGS for n in names) and 'legs' in sk:
+            return ('legs', sk['legs'], None)
+        for arm in ('오른팔', '왼팔'):
+            if all(n.startswith(arm) for n in names) and 'arms' in sk:
+                return ('arms', sk['arms'], self.cfg['walk']['shoulder'][arm])
+        return None
+
     def render_part(self, p, t, canvas):
         s = self.s
         img = p['img']
         H, W = img.shape[:2]
         M = self.world_M(p, t)
         Mi = np.linalg.inv(M)
-        a = img[:, :, 3]
-        ys, xs = np.nonzero(a > 0.004)
-        if len(xs) == 0:
+        if 'bbox' not in p:
+            ys, xs = np.nonzero(img[:, :, 3] > 0.004)
+            p['bbox'] = None if len(xs) == 0 else (xs.min(), xs.max(), ys.min(), ys.max())
+        if p['bbox'] is None:
             return
-        x0, x1, y0, y1 = xs.min(), xs.max(), ys.min(), ys.max()
+        x0, x1, y0, y1 = p['bbox']
         b = p.get('bend')
+        sk = self.skin_of(p)
+        Bm = self.follow_M('몸통', t) @ self.local_M(p, t) if sk else None
         pad = 4
         if b:
             pad += int(b['len'] * s * 0.35)
         corners = np.array([[x0, y0, 1], [x1, y0, 1], [x0, y1, 1], [x1, y1, 1]], np.float64).T
         wc = M @ corners
+        if sk:
+            wc = np.hstack([wc, Bm @ corners])
         X0 = max(int(wc[0].min()) - pad, 0); X1 = min(int(wc[0].max()) + pad, W - 1)
         Y0 = max(int(wc[1].min()) - pad, 0); Y1 = min(int(wc[1].max()) + pad, H - 1)
         if X1 <= X0 or Y1 <= Y0:
@@ -260,6 +285,20 @@ class Rig:
         gx, gy = np.meshgrid(np.arange(X0, X1 + 1, dtype=np.float64), np.arange(Y0, Y1 + 1, dtype=np.float64))
         sx = Mi[0, 0] * gx + Mi[0, 1] * gy + Mi[0, 2]
         sy = Mi[1, 0] * gx + Mi[1, 1] * gy + Mi[1, 2]
+        if sk:
+            kind, c, sh = sk
+            for _ in range(5):
+                if kind == 'legs':
+                    u = np.clip((sy - c['from'] * s) / ((c['to'] - c['from']) * s), 0, 1)
+                else:
+                    r = np.hypot(sx - sh[0] * s, sy - sh[1] * s)
+                    u = np.clip((r - c['r0'] * s) / ((c['r1'] - c['r0']) * s), 0, 1)
+                w = u * u * (3 - 2 * u)
+                A = [(1 - w) * Bm[i, j] + w * M[i, j] for i in range(2) for j in range(3)]
+                a_, b_, c_, d_, e_, f_ = A
+                det = a_ * e_ - b_ * d_
+                qx, qy = gx - c_, gy - f_
+                sx, sy = (e_ * qx - b_ * qy) / det, (-d_ * qx + a_ * qy) / det
         if b:
             ax, ay = b['anchor'][0] * s, b['anchor'][1] * s
             qx, qy = sx - ax, sy - ay
@@ -285,15 +324,10 @@ class Rig:
         roi[:] = out + roi * (1 - out[:, :, 3:4])
 
     def render_body_part(self, n, t, canvas):
-        M = self.follow_M(n, t)
-        img = self.body[n]
-        dy = M[1, 2]
-        if abs(dy) < 1e-6:
-            o = img
-        else:
-            o = cv2.warpAffine(img, M[:2].astype(np.float32), (img.shape[1], img.shape[0]),
-                               flags=cv2.INTER_LINEAR, borderValue=(0, 0, 0, 0))
-        canvas[:] = o + canvas * (1 - o[:, :, 3:4])
+        if not hasattr(self, '_bp'):
+            self._bp = {}
+        p = self._bp.setdefault(n, {'img': self.body[n], 'follow': n, 'name': '몸:' + n})
+        self.render_part(p, t, canvas)
 
     def frame(self, t):
         n = round(2400 * self.s)
