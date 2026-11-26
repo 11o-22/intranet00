@@ -1,16 +1,16 @@
 {
- "설명": "작두 — 날은 그대로, 손잡이 끝 술과 무령 · 옥패가 대롱대롱",
+ "설명": "작두 — 등 뒤에 멤 · 날은 그대로, 손잡이 끝 술과 무령 · 옥패가 대롱대롱",
  "frames": 24,
  "fps": 12,
  "parts": [
   {
    "file": "작두 본체.png",
-   "layer": "front",
+   "layer": "back",
    "z": 0
   },
   {
    "file": "작두 술.png",
-   "layer": "front",
+   "layer": "back",
    "z": 1,
    "pivot": [
     1825,
@@ -35,7 +35,7 @@
   },
   {
    "file": "작두 무령+ 옥패.png",
-   "layer": "front",
+   "layer": "back",
    "z": 2,
    "pivot": [
     1819,

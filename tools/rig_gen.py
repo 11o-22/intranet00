@@ -256,10 +256,10 @@ def build():
          [P('노리개 윗부분.png', name='윗', layer='front', pivot=[1125, 1786], rot=flap(3, 0, 1)),
           P('노리개 중간.png', name='중', layer='front', parent='윗', pivot=[1131, 1845], rot=flap(4, 0.08, 1)),
           P('노리개 아랫부분 술.png', name='술', layer='front', parent='중', pivot=[1148, 1899], rot=flap(6, 0.16, 1))])
-    for col, knot, fol, lay in (('빨강', [1115, 1605], '몸통', 'front'), ('검정', [1355, 809], '머리', 'back')):
+    for col, knot, fol, lay in (('빨강', [1115, 1605], '몸통', 'back'), ('검정', [1355, 809], '머리', 'back')):
         nt = '(꼬리 없음)' if col == '빨강' else '(꼬리없음)'
         b = {'anchor': knot, 'start': 100, 'len': 650, 'amp': 5, 'lag': 0.5, 'pow': 1.2, 'freq': 1, 'still': f'리본 {col}{nt}.png'}
-        item('acc/리본 ' + col, f'리본 {col} — 매듭과 고리는 그대로, 늘어진 꼬리만 살랑 (꼬리 앞 · 꼬리 뒤 둘 다 같은 리깅)',
+        item('acc/리본 ' + col, f'리본 {col} — 등 뒤에 닮 · 매듭과 고리는 그대로, 늘어진 꼬리만 살랑 (꼬리 앞 · 꼬리 뒤 둘 다 같은 리깅)',
              [P(f'리본 {col}(꼬리 앞).png', follow=fol, layer=lay, bend=b),
               P(f'리본 {col}(꼬리 뒤).png', follow=fol, layer=lay, bend=b, variant='꼬리 뒤')],
              preview_variant=None)
@@ -275,11 +275,11 @@ def build():
     item('acc/곰방대', '곰방대 — 대는 입에 그대로, 술이 대롱대롱',
          [P('곰방대.png', follow='머리', layer='head', z=0),
           P('곰방대 술.png', follow='머리', layer='head', z=1, pivot=[832, 1600], rot=flap(7, 0, 1))])
-    item('acc/작두', '작두 — 날은 그대로, 손잡이 끝 술과 무령 · 옥패가 대롱대롱',
-         [P('작두 본체.png', layer='front', z=0),
-          P('작두 술.png', layer='front', z=1, pivot=[1825, 1320], rot=flap(3, 0, 1),
+    item('acc/작두', '작두 — 등 뒤에 멤 · 날은 그대로, 손잡이 끝 술과 무령 · 옥패가 대롱대롱',
+         [P('작두 본체.png', layer='back', z=0),
+          P('작두 술.png', layer='back', z=1, pivot=[1825, 1320], rot=flap(3, 0, 1),
             bend={'anchor': [1825, 1320], 'len': 720, 'start': 60, 'amp': 3, 'lag': 0.4, 'freq': 1}),
-          P('작두 무령+ 옥패.png', layer='front', z=2, pivot=[1819, 885], rot=flap(6, 0.1, 1))])
+          P('작두 무령+ 옥패.png', layer='back', z=2, pivot=[1819, 885], rot=flap(6, 0.1, 1))])
     item('acc/목줄', '목줄 — 목줄은 목에, 리드줄은 고리부터 아래로 흔들',
          [P('목줄.png', layer='neck', z=0),
           P('리드줄.png', layer='front', bend={'anchor': [1168, 1595], 'start': 20, 'len': 700, 'amp': 5, 'lag': 0.5, 'pow': 1.1, 'freq': 1})])
