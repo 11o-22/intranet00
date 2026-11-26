@@ -10,7 +10,7 @@ rig/acc/<이름>/리깅.json (또는 rig/outfit/<이름>/리깅.json) 을 읽어
 파츠 항목:
   file     그림 파일 (리깅.json 과 같은 폴더)
   name     이름 (없으면 file 에서 .png 뺀 것) — parent 로 부를 때 씀
-  follow   따라가는 몸 파츠: 몸통 · 머리 · 왼팔1 · … (기본 몸통)
+  follow   따라가는 몸 파츠: 몸통 · 머리 · 왼팔1 · … (기본 몸통) · 목록이면 그 파츠들의 가운데
   parent   다른 파츠 이름 — 그 파츠의 움직임을 이어받음 (꼬리 마디 · 날개 깃)
   layer    back(몸 뒤) · front(몸 앞) · head(머리 바로 앞) · body(몸통 위 · 가까운 팔 아래)
   z        같은 layer 안의 차례 (작을수록 먼저)
@@ -151,6 +151,11 @@ class Rig:
 
     # ---- 몸 움직임 (숨쉬기) ----
     def follow_M(self, name, t):
+        if isinstance(name, list):              # 여러 몸 파츠의 가운데를 따라감 (다리 사이 채움 등)
+            return sum(self.follow_M(n, t) for n in name) / len(name)
+        return self._follow_M(name, t)
+
+    def _follow_M(self, name, t):
         """몸 파츠(그리고 그 파츠를 따라가는 옷 · 악세서리)의 변환
         walk (리깅.json · 동작 「걷기」) — 아장아장: 발 쪽을 축으로 몸이 좌우로 기우뚱 · 발을 번갈아 들고 ·
         걸음마다 몸이 살짝 튀어 오르고 · 팔은 반대쪽 다리와 함께 흔듦
