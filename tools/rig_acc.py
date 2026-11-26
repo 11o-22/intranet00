@@ -24,6 +24,7 @@ rig/acc/<이름>/리깅.json (또는 rig/outfit/<이름>/리깅.json) 을 읽어
   anim     {동작 이름: {rot · fold · bend … 덮어쓸 값}} — 동작마다 움직임을 바꿈 (예: 새 날개 평소 / 날기)
            리깅.json 의 anims: {동작 이름: {frames · fps · fold_curve · hover …}} 도 그 동작일 때 덮어씀
   hover    (리깅.json) {dy, amp, freq} — 몸째로 떠 있기 (날기)
+  soft_edge {with: [그림…], px, y: [y0, y1]} — 그 그림들 위에 겹친 가장자리만 px 만큼 부드럽게 (y 범위 안)
   skin     (리깅.json) {legs: {from, to}, arms: {r0, r1}} — 걷기에서 다리 · 팔의 뿌리 쪽은 몸통을 따라가게 섞어
            옷 · 바지 이음새가 벌어지거나 선이 생기지 않게 (몸 파츠와 그 파츠를 따라가는 옷 모두)
   fold     {deg, scale, lag}  접기 — 리깅.json 의 fold_curve(0 = 받은 그림대로 편 모습, 1 = 다 접은 모습)를 따라
@@ -108,6 +109,20 @@ class Rig:
             p.setdefault('z', 0)
             p['img'] = _load(os.path.join(folder, p['file']), s)
             self._mask(p, s)
+            se = p.get('soft_edge')
+            if se:   # 다른 파츠 위에 겹친 가장자리를 부드럽게 — 움직여도 명암이 딱 잘려 보이지 않게
+                other = sum(_load(os.path.join(folder, f), s)[:, :, 3] for f in se['with'])
+                a = p['img'][:, :, 3]
+                inside = (a > 0.5).astype(np.uint8)
+                dist = cv2.distanceTransform(inside, cv2.DIST_L2, 5)
+                k = np.clip(dist / (se.get('px', 40) * s), 0, 1)
+                k = k * k * (3 - 2 * k)
+                n = a.shape[0]
+                yy = np.arange(n, dtype=np.float32)[:, None] / s
+                y0, y1 = se.get('y', [0, 2400])
+                zone = ((other > 0.5) & (yy >= y0) & (yy <= y1)).astype(np.float32)
+                zone = cv2.GaussianBlur(zone, (0, 0), 4 * s / 0.3)
+                p['img'] = p['img'] * (1 - zone * (1 - k))[:, :, None]
             b = p.get('bend')
             if b and b.get('still'):
                 st = _load(os.path.join(folder, b['still']), s)[:, :, 3]
