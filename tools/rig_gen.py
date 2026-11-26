@@ -173,7 +173,9 @@ def build():
           P('늑대잠옷_머리 뒤.png', follow='머리', layer='body', z=0)]
          + [P(c, follow=fol.get(c, '몸통'), layer='body', z=1 + i,
               **({'soft_edge': {'with': ['늑대잠옷_왼발 2.png', '늑대잠옷_왼발 1.png'], 'px': 45, 'y': [1840, 2075]}}
-                 if c.startswith('늑대잠옷_오른발') else {}))
+                 if c.startswith('늑대잠옷_오른발') else {}),
+              # 걸을 때만: 화면 왼쪽 다리 주름 선을 지우고, 오른쪽 다리에 가려지는 자리를 오른쪽 다리 명암으로 이어 칠한 그림
+              **({'anim': {'걷기': {'file': c.replace('.png', ' (걷기).png'), 'name': c[:-4]}}} if c.startswith('늑대잠옷_왼발') else {}))
             for i, c in enumerate(under)]
          + [P(c, follow=fol.get(c, '몸통'), layer='neck', z=1 + i) for i, c in enumerate(sleeve)]
          + [P('늑대잠옷_왼귀.png', follow='머리', layer='head', z=0, pivot=[966, 924], rot=twitch(-8, 0.18)),
