@@ -10,7 +10,7 @@
 //       ① 경고 (fox-loading-overlay)        3초
 //       ② 어디로 갈까 (quarantine-pick-overlay)
 //       ③ 문답 (fox-room-overlay)           여러 쪽
-//       ④ 들어간다 (fox-modal · bath-modal)
+//       ④ (대화방 — 2026-11-28 AI 대화와 함께 없앰)
 //
 //   그런데 ③ 문답을 하는 **도중에** updateUI() 가 한 번 돌면,
 //
@@ -53,8 +53,7 @@
 (function foxRoomFix() {
 
 const IDS = ['fox-loading-overlay', 'quarantine-pick-overlay',
-             'fox-room-overlay', 'fox-nameplate-overlay',
-             'fox-modal', 'bath-modal'];
+             'fox-room-overlay', 'fox-nameplate-overlay'];
 const blocked = [];
 
 function shown(id) {
@@ -103,7 +102,7 @@ setTimeout(function () { clearInterval(iv); }, 30000);
     new MutationObserver(function () {
         if (getComputedStyle(el).display === 'none') return;
         // 이미 격리됐거나 방에 들어가 있으면 고를 일이 없다
-        if (quarantined() || shown('fox-modal') || shown('bath-modal')) {
+        if (quarantined()) {
             el.style.display = 'none';
             note('늦게 터진 시계 — 도로 닫음');
         }

@@ -427,7 +427,7 @@ hookFn('rollDarkBonus', function (_r) {
     };
 }, 1500);
 
-const SHUT = ['fox-modal', 'bath-modal', 'fox-room-overlay', 'fox-nameplate-overlay',
+const SHUT = ['fox-room-overlay', 'fox-nameplate-overlay',
               'quarantine-pick-overlay', 'fox-loading-overlay'];
 function shutRooms() {
     SHUT.forEach(function (id) {

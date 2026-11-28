@@ -776,7 +776,7 @@ setInterval(function () {
 // ==========================================
 // 상담실 · 선녀탕 — 받는 쪽이 띄운다
 // ==========================================
-const SHUT_ROOMS = ['fox-modal', 'bath-modal', 'fox-room-overlay', 'fox-nameplate-overlay', 'quarantine-pick-overlay', 'fox-loading-overlay'];
+const SHUT_ROOMS = ['fox-room-overlay', 'fox-nameplate-overlay', 'quarantine-pick-overlay', 'fox-loading-overlay'];
 setInterval(function () {
     try {
         const me = u_();

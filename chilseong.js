@@ -939,7 +939,7 @@ hookStart('kroomSolo', function () {
 // ==========================================
 // 죽음 — 거문의 보호 · 녹존의 선물 (어둠 · EPIC · K의 방)
 // ==========================================
-const SHUT_ROOMS = ['fox-modal', 'bath-modal', 'fox-room-overlay', 'fox-nameplate-overlay', 'quarantine-pick-overlay', 'fox-loading-overlay'];
+const SHUT_ROOMS = ['fox-room-overlay', 'fox-nameplate-overlay', 'quarantine-pick-overlay', 'fox-loading-overlay'];
 function freeSelf(poll) {
     const u = me();
     u.pollution = poll; u.lastPollutionTime = Date.now();

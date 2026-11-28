@@ -549,7 +549,7 @@ setInterval(function () {
         }
         try { addHistoryLog(u, '[헬퍼] 상담실 · 선녀탕에 가지 않습니다.'); } catch (e) { }
         try { if (typeof saveFields === 'function') saveFields(f); } catch (e) { }
-        ['fox-modal', 'bath-modal', 'fox-room-overlay', 'fox-nameplate-overlay',
+        ['fox-room-overlay', 'fox-nameplate-overlay',
          'quarantine-pick-overlay', 'fox-loading-overlay'].forEach(function (id) {
             const el = document.getElementById(id); if (el) el.style.display = 'none';
         });

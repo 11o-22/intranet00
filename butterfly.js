@@ -641,7 +641,7 @@ function saveFromDeath(where) {
 function outUsed(u) { return (u && u.bflyOut && u.bflyOut.day === today()) ? (Number(u.bflyOut.n) || 0) : 0; }
 function outLeft(u) { return wears(u) ? Math.max(0, C.OUT - outUsed(u)) : 0; }
 function heldNow(u) { return !!(u && ((Number(u.quarantineUntil) || 0) > Date.now() || u.quarantineHospital)); }
-const OUT_SHUT = ['fox-modal', 'bath-modal', 'fox-room-overlay', 'fox-nameplate-overlay', 'quarantine-pick-overlay', 'fox-loading-overlay'];
+const OUT_SHUT = ['fox-room-overlay', 'fox-nameplate-overlay', 'quarantine-pick-overlay', 'fox-loading-overlay'];
 function outNow() {
     const me = u_();
     if (!me || outLeft(me) <= 0 || !heldNow(me)) return false;     // 제 二 신도가 먼저 꺼냈으면 그대로

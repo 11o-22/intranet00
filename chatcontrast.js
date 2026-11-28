@@ -1,5 +1,5 @@
 // ==========================================
-// ★ AI 대화창 자동 대비
+// ★ 대화창 자동 대비 (어둠 탐사 대화)
 // index.html 에서 awaken.js 다음에 불러온다
 // ==========================================
 //
@@ -8,42 +8,6 @@
 
 (function injectChatContrast() {
     const css = `
-/* 대화창 바탕 — 테마와 무관하게 확실한 대비 */
-#fox-chat-log, #bath-chat-log {
-    background: rgba(0,0,0,0.42) !important;
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 6px;
-    padding: 12px 11px !important;
-}
-#fox-chat-log *, #bath-chat-log * {
-    color: #f0f0f0 !important;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.9);
-}
-/* 상대 발언 강조색만 따로 */
-#fox-chat-log .ai-say, #fox-chat-log b {
-    color: #ffd76a !important;
-}
-#bath-chat-log .ai-say, #bath-chat-log b {
-    color: #9fe8e8 !important;
-}
-/* 내 발언 */
-#fox-chat-log .me-say, #bath-chat-log .me-say {
-    color: #cfcfcf !important;
-}
-/* 입력칸 */
-#fox-input, #bath-input {
-    background: rgba(0,0,0,0.55) !important;
-    color: #fff !important;
-    border: 1px solid rgba(255,255,255,0.22) !important;
-}
-#fox-input::placeholder, #bath-input::placeholder { color: #999 !important; }
-
-/* 모달 본문 전반 */
-#fox-modal .modal-content, #bath-modal .modal-content {
-    background: #10100c !important;
-}
-#bath-modal .modal-content { background: #0b1418 !important; }
-
 /* 어둠 탐사 대화 */
 /* 어둠 탐사 대화 — 바탕을 어둡게 깔고 글자를 밝게 */
 .pchat-wrap, .pchat-body, .pchat-log {
@@ -117,8 +81,9 @@
         });
     }
 
+       // 여우 상담사 · 초개 요원 대화창은 2026-11-28 AI 대화와 함께 없앰 — 고칠 대화창 목록이 비었다
        window.fixChatContrast = function () {
-        ['fox-chat-log', 'bath-chat-log'].forEach(function (id) {
+        [].forEach(function (id) {
             fix(document.getElementById(id));
         });
     };
@@ -128,28 +93,10 @@
         clearTimeout(window._ccT);
         window._ccT = setTimeout(window.fixChatContrast, 60);
     });
-    ['fox-chat-log', 'bath-chat-log'].forEach(function (id) {
-        const el = document.getElementById(id);
-        if (el) mo.observe(el, { childList: true, subtree: true });
-    });
-
     const chatSlot = document.getElementById('dro-chat');
     if (chatSlot) mo.observe(chatSlot, { childList: true, subtree: true });
 
     setTimeout(window.fixChatContrast, 300);
-})();
-
-// 모달을 열 때도 한 번
-(function hookOpen() {
-    ['openFoxRoom', 'openBathRoom', 'enterQuarantineRoom'].forEach(function (n) {
-        if (typeof window[n] !== 'function') return;
-        const _f = window[n];
-        window[n] = function () {
-            const r = _f.apply(this, arguments);
-            setTimeout(window.fixChatContrast, 200);
-            return r;
-        };
-    });
 })();
 
 console.log('[대화창] 자동 대비 적용');

@@ -843,7 +843,7 @@ wrap('winPoints', function (_w) {
 // ==========================================
 function quarantinedU(u) { return !!(u && Number(u.quarantineUntil) > now()); }
 function roomName(u) { return (u.quarantineHospital ? '입원 · ' : '') + ((u.quarantineDest || 'fox') === 'bath' ? '선녀탕' : '상담실'); }
-const ROOMS_UI = ['fox-modal', 'bath-modal', 'fox-room-overlay', 'fox-nameplate-overlay', 'quarantine-pick-overlay', 'fox-loading-overlay'];
+const ROOMS_UI = ['fox-room-overlay', 'fox-nameplate-overlay', 'quarantine-pick-overlay', 'fox-loading-overlay'];
 function selfOut() {
     const me = u_();
     if (!me || !wears(me) || !quarantinedU(me)) return;

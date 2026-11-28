@@ -1156,7 +1156,7 @@ window.eyeOutPay = function (amount) {
     try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
     try { if (typeof saveFields === 'function') saveFields({ quarCause: 1, quarFood: 1, eyeOutDay: 1, eyeOwed: 1 }); } catch (e) { }
     try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
-    ['fox-modal', 'bath-modal', 'fox-room-overlay', 'fox-nameplate-overlay',
+    ['fox-room-overlay', 'fox-nameplate-overlay',
      'quarantine-pick-overlay', 'fox-loading-overlay'].forEach(function (id) {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';

@@ -130,7 +130,7 @@ function doExit(nm, kind) {
     const out = release();
     const r = spend(nm);
 
-    shut(['fox-modal', 'bath-modal', 'fox-room-overlay',
+    shut(['fox-room-overlay',
           'fox-nameplate-overlay', 'quarantine-pick-overlay', 'fox-loading-overlay']);
 
     if (typeof addHistoryLog === 'function') {

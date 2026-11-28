@@ -23,8 +23,7 @@
     // 이미 절차가 떠 있는가
     function alreadyOpen() {
         const ids = ['quarantine-pick-overlay', 'fox-loading-overlay',
-                     'fox-room-overlay', 'fox-nameplate-overlay',
-                     'fox-modal', 'bath-modal'];
+                     'fox-room-overlay', 'fox-nameplate-overlay'];
         return ids.some(function (id) {
             const el = document.getElementById(id);
             return el && el.style.display && el.style.display !== 'none';

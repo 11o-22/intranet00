@@ -318,7 +318,7 @@ function tapeUse(u) {
     if (!u.ebTapeOut || u.ebTapeOut.d !== today()) u.ebTapeOut = { d: today(), n: 0 };
     u.ebTapeOut.n = (Number(u.ebTapeOut.n) || 0) + 1;
 }
-const ROOMS_UI = ['fox-modal', 'bath-modal', 'fox-room-overlay', 'fox-nameplate-overlay', 'quarantine-pick-overlay', 'fox-loading-overlay'];
+const ROOMS_UI = ['fox-room-overlay', 'fox-nameplate-overlay', 'quarantine-pick-overlay', 'fox-loading-overlay'];
 let tapeBusy = false;
 window.ebTapeOut = function () {
     const me = u_(); if (!me || tapeBusy) return;

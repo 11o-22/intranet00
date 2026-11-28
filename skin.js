@@ -162,7 +162,7 @@ function rollUiSkin() {
 // 어둠 탐사 화면·오락기·여우 상담실·선녀탕은 고유 분위기를 지키도록 제외한다.
 const SK_AREAS = [
     '#app-container',
-    '.modal-overlay:not(#fox-modal):not(#bath-modal)',
+    '.modal-overlay',
     '#custom-alert-overlay',
     '#luxury-alert-overlay',
     '#vip-invite-overlay',
